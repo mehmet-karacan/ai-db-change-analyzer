@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "release": "0.1.0",
+  "files": {
+    "Jenkinsfile": "7b8452ea3b0b94a62cff4cf18cf1cd2d78dac1f13b65dc5f06f8f0e63bad5b56",
+    "pyproject.toml": "88fe8b1626c4c9933971e24249d1c33cbf2b4bb908aee91cb53b0b8d0bea5307",
+    "requirements-dev.lock": "cd7b511db18fda8ad59254a835e02bd7f5d137edb4717a28c1440c64c00df919",
+    "requirements.lock": "0ec6850509987caa1e1ea1019425767419077befab7d96d6a118a09dba682b4d",
+    "schemas/delivery.schema.json": "a70bba7ad17ac40c796d47423be41830e76f6e658267bdc41db49d249437e286",
+    "schemas/report.schema.json": "b2871e3b9434e99a55ef91ea71624a63bebe9af47a4b353558d7cd173fa24a67",
+    "schemas/result.schema.json": "d3472d601ad57ad3e803bd8726eecad3313ddfcc061c1f337ef3976dadcea39b",
+    "schemas/unit-response.schema.json": "14eee526d9ecb6b46496f2b16874c23a755382602d7481640deb7d16f368d9eb",
+    "src/db_change_analyzer/oracle/generated/manifest.json": "4500ddc25000ef7d995c0a0af575e5a02f9e2bfa29962a74dc495c19ed416b12",
+    "vendor/antlr-plsql/manifest.json": "4500ddc25000ef7d995c0a0af575e5a02f9e2bfa29962a74dc495c19ed416b12"
+  }
+}

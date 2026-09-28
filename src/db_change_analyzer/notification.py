@@ -5,6 +5,7 @@ import sqlite3
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Callable
 
 from .smtp_transport import SmtpDeliveryError, SmtpResult, SmtpTransport
 
@@ -66,14 +67,28 @@ def send_persisted_notification(
     *,
     username: str | None,
     password: str | None,
+    on_accepted_transaction: Callable[[sqlite3.Connection, str], None] | None = None,
 ) -> NotificationOutcome:
     connection.row_factory = sqlite3.Row
-    row = connection.execute("SELECT * FROM notifications WHERE notification_id = ?", (notification_id,)).fetchone()
+    row = connection.execute(
+        """SELECT
+               *
+           FROM notifications
+           WHERE notification_id = ?""",
+        (notification_id,),
+    ).fetchone()
     if row is None:
         raise ValueError("notification does not exist")
     if row["status"] == "UNKNOWN":
         raise ValueError("unknown delivery requires explicit operator resolution")
-    recipients = [item["address"] for item in connection.execute("SELECT address FROM notification_recipients WHERE notification_id=? AND status='PENDING' ORDER BY address", (notification_id,))]
+    recipients = [item["address"] for item in connection.execute(
+        """SELECT
+               address
+           FROM notification_recipients
+           WHERE notification_id=? AND status='PENDING'
+           ORDER BY address""",
+        (notification_id,),
+    )]
     if not recipients:
         raise ValueError("notification has no pending recipients")
     attempt_id = str(uuid.uuid4())
@@ -101,8 +116,16 @@ def send_persisted_notification(
             connection.execute("UPDATE notification_recipients SET status='ACCEPTED', smtp_code=250, accepted_at=? WHERE notification_id=? AND address=?", (_now(), notification_id, address))
         for address, code in result.refused.items():
             connection.execute("UPDATE notification_recipients SET status='REFUSED', smtp_code=? WHERE notification_id=? AND address=?", (code, notification_id, address))
-        all_accepted = connection.execute("SELECT COUNT(*) FROM notification_recipients WHERE notification_id=? AND status!='ACCEPTED'", (notification_id,)).fetchone()[0] == 0
+        all_accepted = connection.execute(
+            """SELECT
+                   COUNT(*)
+               FROM notification_recipients
+               WHERE notification_id=? AND status!='ACCEPTED'""",
+            (notification_id,),
+        ).fetchone()[0] == 0
         status = "ACCEPTED" if all_accepted else "PARTIAL"
         connection.execute("UPDATE notification_attempts SET state='ACCEPTED', completed_at=? WHERE attempt_id=?", (_now(), attempt_id))
         connection.execute("UPDATE notifications SET status=? WHERE notification_id=?", (status, notification_id))
+        if on_accepted_transaction is not None:
+            on_accepted_transaction(connection, status)
     return NotificationOutcome(status, 1, 1, None)

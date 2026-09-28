@@ -43,7 +43,8 @@ def validate_report(report: dict[str, Any], schema_path: Path | None = None) -> 
     schema = json.loads((schema_path or (_root() / "schemas" / "report.schema.json")).read_text(encoding="utf-8"))
     errors = sorted(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(report), key=lambda error: list(error.path))
     if errors:
-        raise ReportError("REPORT_SCHEMA_INVALID:" + errors[0].validator)
+        location = "/".join(str(item) for item in errors[0].path) or "$"
+        raise ReportError(f"REPORT_SCHEMA_INVALID:{location}:{errors[0].validator}")
     run = report["run"]
     times = [datetime.fromisoformat(run[name].replace("Z", "+00:00")) for name in ("planned_at", "analysis_started_at", "analysis_completed_at")]
     if not times[0] <= times[1] <= times[2]:

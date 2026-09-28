@@ -92,3 +92,28 @@ def test_disconnect_after_data_started_becomes_unknown_and_is_not_auto_retried()
         assert "explicit operator" in str(exc)
     else:
         raise AssertionError("UNKNOWN notification was retried")
+
+
+def test_receipt_and_checkpoint_callback_share_one_transaction() -> None:
+    connection = database()
+    mime = b"message"
+    persist_notification(connection, notification_id="n3", report_id="report", generation=0, recipients=["ok@example.test"], message_id="<n3@example.test>", mime_bytes=mime, mime_sha256=hashlib.sha256(mime).hexdigest())
+
+    def fail_commit(_connection, _status):
+        raise RuntimeError("simulated checkpoint failure")
+
+    try:
+        send_persisted_notification(connection, "n3", transport(FakeSmtp), username="user", password="pass", on_accepted_transaction=fail_commit)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("fault injection did not interrupt transaction")
+    recipient = connection.execute("""SELECT
+        status
+    FROM notification_recipients
+    WHERE notification_id='n3'""").fetchone()[0]
+    attempt = connection.execute("""SELECT
+        state
+    FROM notification_attempts
+    WHERE notification_id='n3'""").fetchone()[0]
+    assert recipient == "PENDING" and attempt == "INFLIGHT"

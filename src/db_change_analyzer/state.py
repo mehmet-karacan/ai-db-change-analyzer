@@ -349,3 +349,143 @@ class SqliteStateStore:
     def connection(self) -> sqlite3.Connection:
         self.verify_markers()
         return self._connect()
+
+    def status(self) -> dict[str, Any]:
+        base = self.verify()
+        connection = self._connect()
+        try:
+            base.update(
+                {
+                    "unfinished_runs": connection.execute("""SELECT
+                        COUNT(*)
+                    FROM runs
+                    WHERE status NOT IN ('BASELINED','NO_CHANGE','OUT_OF_SCOPE_ONLY','COMMITTED','CLOSED')""").fetchone()[0],
+                    "pending_units": connection.execute("""SELECT
+                        COUNT(*)
+                    FROM units
+                    WHERE status NOT IN ('VALIDATED','CLOSED')""").fetchone()[0],
+                    "unknown_notifications": connection.execute("""SELECT
+                        COUNT(*)
+                    FROM notifications
+                    WHERE status='UNKNOWN'""").fetchone()[0],
+                    "pending_notifications": connection.execute("""SELECT
+                        COUNT(*)
+                    FROM notifications
+                    WHERE status IN ('READY','FAILED','HELD','PARTIAL')""").fetchone()[0],
+                }
+            )
+            return base
+        finally:
+            connection.close()
+
+    def rebaseline(self, expected_base: str, target: str, reason: str) -> None:
+        if not reason.strip():
+            raise StateError("rebaseline reason is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            if connection.execute("""SELECT
+                COUNT(*)
+            FROM notifications
+            WHERE status IN ('INFLIGHT','DATA_STARTED','UNKNOWN')""").fetchone()[0]:
+                raise StateError("active or unknown notification prevents rebaseline")
+            row = connection.execute("""SELECT
+                epoch,
+                checkpoint_sha
+            FROM scopes
+            WHERE scope_hash=?""", (self.config.scope_hash,)).fetchone()
+            if row is None or row["checkpoint_sha"] != expected_base:
+                raise StateError("expected checkpoint mismatch")
+            connection.execute("UPDATE scopes SET epoch=epoch+1, checkpoint_sha=? WHERE scope_hash=? AND epoch=? AND checkpoint_sha=?", (target, self.config.scope_hash, row["epoch"], expected_base))
+            connection.execute("INSERT INTO audit_events(scope_hash,action,actor,expected_base,target,reason,created_at) VALUES (?,'REBASELINED','operator',?,?,?,?)", (self.config.scope_hash, expected_base, target, reason, _now()))
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def retry_blocked(self, run_id: str, expected_base: str, report_sha256: str, reason: str) -> int:
+        return self._new_generation(run_id, expected_base, report_sha256, reason, action="RETRY_BLOCKED", required_status="REVIEW_REQUIRED")
+
+    def acknowledge_limits(self, run_id: str, expected_base: str, report_sha256: str, reason: str) -> None:
+        if not reason.strip():
+            raise StateError("acknowledgement reason is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("""SELECT
+                r.target_sha,
+                r.status,
+                p.content_sha256,
+                n.status notification_status
+            FROM runs r
+            JOIN reports p ON p.report_id=r.report_id
+            JOIN notifications n ON n.report_id=p.report_id
+            WHERE r.run_id=? AND r.base_sha=?""", (run_id, expected_base)).fetchone()
+            if row is None or row["status"] != "REVIEW_REQUIRED" or row["notification_status"] != "ACCEPTED" or row["content_sha256"] != report_sha256:
+                raise StateError("run is not eligible for limit acknowledgement")
+            cursor = connection.execute("UPDATE scopes SET checkpoint_sha=? WHERE scope_hash=? AND checkpoint_sha=?", (row["target_sha"], self.config.scope_hash, expected_base))
+            if cursor.rowcount != 1:
+                raise StateError("checkpoint compare-and-swap failed")
+            connection.execute("UPDATE runs SET status='COMMITTED' WHERE run_id=?", (run_id,))
+            connection.execute("INSERT INTO audit_events(scope_hash,run_id,action,actor,expected_base,target,reason,evidence_reference,created_at) VALUES (?,?,'LIMITS_ACKNOWLEDGED','operator',?,?,?,?,?)", (self.config.scope_hash, run_id, expected_base, row["target_sha"], reason, report_sha256, _now()))
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def _new_generation(self, run_id: str, expected_base: str, report_sha256: str, reason: str, *, action: str, required_status: str) -> int:
+        if not reason.strip():
+            raise StateError("generation change reason is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("""SELECT
+                r.analysis_generation,
+                r.status,
+                p.content_sha256,
+                n.status notification_status
+            FROM runs r
+            JOIN reports p ON p.report_id=r.report_id
+            JOIN notifications n ON n.report_id=p.report_id
+            WHERE r.run_id=? AND r.base_sha=?""", (run_id, expected_base)).fetchone()
+            if row is None or row["status"] != required_status or row["notification_status"] != "ACCEPTED" or row["content_sha256"] != report_sha256:
+                raise StateError("run is not eligible for a new analysis generation")
+            generation = int(row["analysis_generation"]) + 1
+            connection.execute("UPDATE runs SET analysis_generation=?,status='PLANNED',report_id=NULL,last_attempt_at=? WHERE run_id=?", (generation, _now(), run_id))
+            connection.execute("INSERT INTO audit_events(scope_hash,run_id,action,actor,expected_base,reason,evidence_reference,created_at) VALUES (?,?,?,?,?,?,?,?)", (self.config.scope_hash, run_id, action, "operator", expected_base, reason, report_sha256, _now()))
+            connection.commit()
+            return generation
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def migrate_run(self, run_id: str, reason: str) -> int:
+        if not reason.strip():
+            raise StateError("migration reason is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("""SELECT
+                analysis_generation,
+                status,
+                report_id
+            FROM runs
+            WHERE run_id=?""", (run_id,)).fetchone()
+            if row is None or row["report_id"] is not None or row["status"] in ('COMMITTED','CLOSED'):
+                raise StateError("run cannot be migrated")
+            generation = int(row["analysis_generation"]) + 1
+            connection.execute("UPDATE runs SET analysis_generation=?,config_digest=?,fingerprint_json=?,status='PLANNED',last_attempt_at=? WHERE run_id=?", (generation, self.config.config_digest, _canonical({"config_digest": self.config.config_digest}), _now(), run_id))
+            connection.execute("INSERT INTO audit_events(scope_hash,run_id,action,actor,reason,created_at) VALUES (?,?,'RUN_MIGRATED','operator',?,?)", (self.config.scope_hash, run_id, reason, _now()))
+            connection.commit()
+            return generation
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()

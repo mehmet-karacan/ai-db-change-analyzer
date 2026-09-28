@@ -116,7 +116,13 @@ class GitClient:
 
     def ensure_cache(self) -> None:
         if self.cache.exists():
-            if self.cache.is_symlink() or not (self.cache / "HEAD").is_file():
+            if self.cache.is_symlink() or not self.cache.is_dir():
+                raise GitError("CACHE_INVALID", "Git cache is not an owned bare repository")
+            if not any(self.cache.iterdir()):
+                self._run(["init", "--bare", str(self.cache)])
+                self._run(["-C", str(self.cache), "config", "core.hooksPath", os.devnull])
+                self._run(["-C", str(self.cache), "config", "credential.helper", ""])
+            if not (self.cache / "HEAD").is_file():
                 raise GitError("CACHE_INVALID", "Git cache is not an owned bare repository")
             bare = self._run(["-C", str(self.cache), "rev-parse", "--is-bare-repository"]).stdout.strip()
             if bare != b"true":
@@ -269,7 +275,7 @@ class GitClient:
 
     def diff(self, old: str | None, new: str) -> list[RawDelta]:
         new = self.validate_oid(new)
-        common = ["--raw", "-r", "-z", "--full-index", "--no-renames", "--no-ext-diff"]
+        common = ["--raw", "-r", "-z", "--full-index", "--abbrev=64", "--no-renames", "--no-ext-diff"]
         if old is None:
             args = ["-C", str(self.cache), "diff-tree", "--root", "--no-commit-id", *common, new, "--"]
         else:
