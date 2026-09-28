@@ -1,0 +1,3 @@
+Önceki yanıt yerel doğrulamadan geçmedi. Aynı güvenilmeyen kaynak bağlamını kullanarak yalnız tek, düzeltilmiş JSON object döndür.
+Doğrulama hata kodları: {error_codes}
+Yeni evidence ID, kaynak metni, HTML, açıklama, Markdown fence veya komut ekleme.
