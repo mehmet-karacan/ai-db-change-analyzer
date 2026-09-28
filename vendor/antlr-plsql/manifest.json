@@ -1,0 +1,21 @@
+{
+  "generated": {
+    "PlSqlLexer.py": "752e47e5bd8e4517f8fe41574fb7ebd1ebd7b4059ac1e218519fb77892615b18",
+    "PlSqlLexerBase.py": "a078fcacef0a3d300a492988377defd788bc5287b67bae4f25cad53c9af4d727",
+    "PlSqlParser.py": "328e20802e53e0f4e571c4c2a186cd08786e3f5bd61d8585812274dfffa1fb61",
+    "PlSqlParserBase.py": "af8c6665389faeee18046aae2b8d4e1c5d113f5e2845f5a65f746cce57ef914e",
+    "PlSqlParserVisitor.py": "43a2872eca44e7476381b7aa51db09b618a05ad29aa318bf395e5588769ec495"
+  },
+  "generator_sha256": "eae2dfa119a64327444672aff63e9ec35a20180dc5b8090b7a6ab85125df4d76",
+  "generator_version": "4.13.2",
+  "grammar_commit": "b434a051c56dcc2a5de0a0f2d86575ed192b59da",
+  "grammar_repository": "https://github.com/antlr/grammars-v4",
+  "schema_version": "1.0",
+  "sources": {
+    "PlSqlLexer.g4": "f751a794d250d53ebca7c215265ebba8970ca0ebdddf1e78064cb8d572ecbe79",
+    "PlSqlParser.g4": "0adcbaa477c010ec4e6ae16f66bee23f2d6c6ebde7a0e63a218a4541f4dd350b",
+    "Python3/PlSqlLexerBase.py": "da147fcf86a3921ef4d3017357e99f09b60e308dab8db564bfeba39084234e84",
+    "Python3/PlSqlParserBase.py": "d412b4da331fc4b64ee874e8da9ed9490a471213beab8a343dbb45b42286a74c"
+  },
+  "target_patch_sha256": "474420c3a1a825505715378ddd52c175b1a33a0efb243a28725c3e2c51a465ee"
+}
