@@ -64,7 +64,9 @@ def validate_unit_response(
         raise ResponseValidationError("SECRET_IN_RESPONSE")
     value = parse_json_object(content, prompt_json=prompt_json)
     try:
-        response = UnitResponse.model_validate(value, strict=True)
+        # JSON enum values are strings; strict Python validation incorrectly
+        # requires pre-instantiated Enum objects that a model cannot emit.
+        response = UnitResponse.model_validate_json(json.dumps(value, ensure_ascii=False), strict=True)
     except ValidationError as exc:
         # Do not include Pydantic's input values in diagnostics.
         codes = [f"SCHEMA_{item['type'].upper()}" for item in exc.errors(include_input=False, include_url=False)]

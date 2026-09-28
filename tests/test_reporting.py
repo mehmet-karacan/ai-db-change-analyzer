@@ -78,3 +78,35 @@ def test_template_autoescapes_ai_text_and_message_is_stable() -> None:
 def test_report_link_requires_explicit_https_host() -> None:
     with pytest.raises(ReportError, match="REPORT_URL_NOT_ALLOWED"):
         render_report(minimal_report(), report_url="https://evil.example/report", allowed_link_hosts={"jenkins.example"})
+
+
+def test_sequence_only_mail_uses_fact_table_without_model_risk() -> None:
+    report = minimal_report()
+    report["quality"] = "complete"
+    report["summary_tr"] = "Yalnız START WITH değeri değişti."
+    report["counts"].update(net_known_objects=1, history_known_objects=1, analyzed_objects=1, unknown_artifacts=0, has_unknown_object_count=False)
+    report["objects"] = [{
+        "identity": {
+            "object_key": "SCHEMA|GPU_USER|SEQUENCE|SEQ_TEST", "namespace": "SCHEMA",
+            "schema_name": "GPU_USER", "name": "SEQ_TEST", "object_type": "SEQUENCE",
+            "raw_schema": "GPU_USER", "raw_name": "SEQ_TEST", "schema_quoted": False,
+            "name_quoted": False, "identity_confidence": "known", "parent_key": None,
+            "routine_signature": None,
+        },
+        "net_operation": "modified", "categories": ["sequence_observed_value"],
+        "status": "analyzed", "parser_level": "structural", "old_evidence_ids": [],
+        "new_evidence_ids": [], "facts": [{
+            "fact_id": "fact_test", "property": "START WITH", "before": "7", "after": "8",
+            "category": "sequence_observed_value", "evidence_ids": ["ev_test"],
+            "source_pair": {"old_revision": "1" * 40, "new_revision": "2" * 40},
+            "event_ids": [], "view_tags": ["net"],
+        }], "assessments": [], "diagnostics": [],
+    }]
+    rendered = render_report(report)
+    html = rendered.html.decode("utf-8")
+    assert "SEQ_TEST" in html and "START WITH" in html
+    assert "GPU_USER.SEQ_TEST | 7 | 8 | +1" in rendered.text.decode("utf-8")
+    assert "Risk: medium" not in html
+    assert "kanıtlanmış bir operasyonel risk seviyesi atanmadı" in html
+    message = build_message(report, rendered, sender="analyzer@example.test", recipients=["dev@example.test"], message_id="<fixed@example.test>", date=datetime(2026, 9, 28, tzinfo=UTC), job_short_name="db", current_build_number=None, max_bytes=150000)
+    assert "1 sequence başlangıç değeri" in message.subject

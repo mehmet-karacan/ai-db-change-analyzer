@@ -36,6 +36,18 @@ def response_format(mode: str, schema: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def synthetic_probe_payload() -> dict[str, Any]:
+    return {
+        "schema_version": "1.0", "unit_id": "synthetic-smoke", "object_identity": None,
+        "artifact_paths": ["synthetic/smoke.sql"], "related_object_keys": [], "view_tags": ["net"],
+        "source_pair": {"old_revision": None, "new_revision": "0" * 40},
+        "deterministic_facts": [],
+        "evidence_registry": [{"kind": "source", "evidence_id": "synthetic-ev", "snippet": "CREATE TABLE SYNTHETIC_CHECK (ID NUMBER);"}],
+        "dependency_edges": [], "coverage_manifest": {"synthetic": True},
+        "allowed_claim_kinds": ["interpretation"],
+    }
+
+
 class LiteLLMClient:
     def __init__(self, config: ModelConfig, *, transport: httpx.BaseTransport | None = None) -> None:
         self.config = config
@@ -82,6 +94,29 @@ class LiteLLMClient:
     ) -> ModelReply:
         if not self.config.route_verified or not self.config.capabilities_verified:
             raise ModelTransportError("MODEL_CAPABILITY_UNVERIFIED")
+        return self._complete_request(
+            api_key=api_key, system_message=system_message, user_payload=user_payload,
+            response_schema=response_schema, output_tokens=output_tokens,
+        )
+
+    def probe_synthetic(self, *, api_key: str, response_schema: dict[str, Any], output_tokens: int) -> ModelReply:
+        """Probe an unverified route with fixed synthetic content only."""
+        return self._complete_request(
+            api_key=api_key,
+            system_message="Return only the requested JSON for this synthetic smoke input.",
+            user_payload=synthetic_probe_payload(),
+            response_schema=response_schema,
+            output_tokens=output_tokens,
+        )
+
+    def _complete_request(
+        self, *, api_key: str, system_message: str, user_payload: dict[str, Any],
+        response_schema: dict[str, Any], output_tokens: int,
+    ) -> ModelReply:
+        if self.config.output_mode != "json_schema":
+            system_message += "\nReturn exactly one JSON object matching this schema; do not add fields: " + json.dumps(
+                response_schema, ensure_ascii=False, separators=(",", ":")
+            )
         body: dict[str, Any] = {
             "model": self.config.id,
             "messages": [
@@ -115,6 +150,7 @@ class LiteLLMClient:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ModelTransportError("MODEL_ENVELOPE_INVALID") from exc
         return self._validate_envelope(payload)
+
 
     def _raise_status(self, response: httpx.Response) -> None:
         status = response.status_code

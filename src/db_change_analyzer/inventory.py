@@ -78,7 +78,7 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
     return result, projections, status, tuple((*result.diagnostics, *parse_diagnostics))
 
 
-def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, max_file_bytes: int, timeout_seconds: int) -> list[FileInventory]:
+def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, max_file_bytes: int, timeout_seconds: int, parse_paths: set[bytes] | None = None) -> list[FileInventory]:
     inventories: list[FileInventory] = []
     for entry in git.list_tree(revision):
         matching = [(root, schema) for root, schema in roots.items() if entry.path == root.encode() or entry.path.startswith(root.encode() + b"/")]
@@ -95,6 +95,6 @@ def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, 
         if not entry.path.lower().endswith(b".sql"):
             inventories.append(FileInventory(entry, len(raw), None, _newline_style(raw), "artifact", (), (), ()))
             continue
-        scan_result, projections, status, diagnostics = inventory_bytes(raw, default_schema=matching[0][1], parse_timeout_seconds=timeout_seconds)
+        scan_result, projections, status, diagnostics = inventory_bytes(raw, default_schema=matching[0][1], parse_timeout_seconds=timeout_seconds, parse=parse_paths is None or entry.path in parse_paths)
         inventories.append(FileInventory(entry, len(raw), "utf-8" if "ENCODING_UNRESOLVED" not in diagnostics else None, _newline_style(raw), status, diagnostics, scan_result.occurrences, projections))
     return inventories

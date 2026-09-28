@@ -21,6 +21,7 @@ from .models import AnalysisUnit, FindingKind, ObjectIdentity, SourcePair
 from .notification import persist_notification, send_persisted_notification
 from .reporting import ReportError, build_message, render_report
 from .security import scan_secret
+from .source_classification import sequence_start_value_only
 from .smtp_transport import SmtpTransport
 from .validation import ResponseValidationError
 
@@ -90,14 +91,15 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         with connection:
             connection.execute(
                 "INSERT INTO runs(run_id,scope_hash,mode,base_sha,target_sha,epoch,analysis_generation,status,config_digest,fingerprint_json,originating_build_json,planned_at,last_attempt_at) VALUES (?,?,?,?,?,?,0,'ANALYZING',?,?,?,?,?)",
-                (run_id, config.scope_hash, mode, plan.base_sha, plan.target_sha, epoch, config.config_digest, json.dumps({"model": config.model.id, "prompt": "db-change-tr-1.0"}, separators=(",", ":")), None, planned_at, planned_at),
+                (run_id, config.scope_hash, mode, plan.base_sha, plan.target_sha, epoch, config.config_digest, json.dumps({"model": config.model.id, "prompt": "db-change-tr-1.1"}, separators=(",", ":")), None, planned_at, planned_at),
             )
     finally:
         connection.close()
 
     roots = {root.path: root.default_schema for root in config.scope.roots}
-    old_inventories = [] if plan.base_sha is None else inventory_revision(git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds)
-    new_inventories = inventory_revision(git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds)
+    changed_paths = {delta.path for delta in plan.scope_deltas}
+    old_inventories = [] if plan.base_sha is None else inventory_revision(git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths)
+    new_inventories = inventory_revision(git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths)
     old_index = _index(git, plan.base_sha, old_inventories, config.parser.max_file_bytes) if plan.base_sha else {}
     new_index = _index(git, plan.target_sha, new_inventories, config.parser.max_file_bytes)
     changed_keys = sorted(key for key in old_index.keys() | new_index.keys() if _signature(old_index.get(key, [])) != _signature(new_index.get(key, [])))
@@ -111,7 +113,6 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     objects: list[dict[str, Any]] = []
     http_attempts = 0
     analysis_started = _now()
-    api_key = read_secret("LITELLM_API_KEY").get_secret_value()
     try:
         with LiteLLMClient(config.model) as model:
             for key in changed_keys:
@@ -125,13 +126,32 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 mandatory_bytes = sum(len(json.dumps(item, ensure_ascii=False).encode("utf-8")) for item in local_evidence)
                 diagnostics: list[str] = []
                 assessments: list[dict[str, Any]] = []
+                facts: list[dict[str, Any]] = []
+                categories = ["unknown"]
                 status = "limited" if any(item.inventory.parse_status != "parsed" for item in all_refs) else "analyzed"
+                sequence_change = (
+                    sequence_start_value_only(local_evidence[0]["snippet"], local_evidence[1]["snippet"])
+                    if len(old_refs) == len(new_refs) == 1
+                    and old_refs[0].occurrence.object_type == new_refs[0].occurrence.object_type == "SEQUENCE"
+                    else None
+                )
                 if conflict:
                     status, diagnostics = "unresolved", ["CONFLICTING_DEFINITIONS"]
                 elif secret:
                     status, diagnostics = "unresolved", ["SECRET_IN_MANDATORY_SOURCE"]
                 elif mandatory_bytes > config.analysis.max_request_utf8_bytes:
                     status, diagnostics = "unresolved", ["MANDATORY_CONTEXT_EXCEEDS_BUDGET"]
+                elif sequence_change:
+                    before, after = sequence_change
+                    categories = ["sequence_observed_value"]
+                    facts.append({
+                        "fact_id": stable_id("fact", {"key": key, "base": plan.base_sha, "target": plan.target_sha, "property": "START WITH"})[:100],
+                        "property": "START WITH", "before": before, "after": after,
+                        "category": "sequence_observed_value",
+                        "evidence_ids": [item["evidence_id"] for item in local_evidence],
+                        "source_pair": {"old_revision": plan.base_sha, "new_revision": plan.target_sha},
+                        "event_ids": [], "view_tags": ["net"],
+                    })
                 else:
                     occurrence = representative.occurrence
                     identity = ObjectIdentity(
@@ -152,7 +172,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                     )
 
                     def call(extra_system: str = system_prompt) -> str:
-                        return model.complete(api_key=api_key, system_message=extra_system, user_payload=unit.model_dump(mode="json"), response_schema=response_schema, output_tokens=config.analysis.output_tokens).content
+                        return model.complete(api_key=read_secret("LITELLM_API_KEY").get_secret_value(), system_message=extra_system, user_payload=unit.model_dump(mode="json"), response_schema=response_schema, output_tokens=config.analysis.output_tokens).content
 
                     outcome = analyze_with_single_repair(
                         unit,
@@ -183,11 +203,11 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                         "name_quoted": representative.occurrence.name_quoted, "identity_confidence": "known", "parent_key": None, "routine_signature": None,
                     },
                     "net_operation": "added" if not old_refs else "removed" if not new_refs else "modified",
-                    "categories": ["unknown"], "status": status,
+                    "categories": categories, "status": status,
                     "parser_level": "structural" if status == "analyzed" else "limited" if status == "limited" else "unresolved",
                     "old_evidence_ids": [item["evidence_id"] for item in local_evidence[:len(old_refs)]],
                     "new_evidence_ids": [item["evidence_id"] for item in local_evidence[len(old_refs):]],
-                    "facts": [], "assessments": assessments, "diagnostics": diagnostics,
+                    "facts": facts, "assessments": assessments, "diagnostics": diagnostics,
                 })
     except ModelTransportError as exc:
         return _finish(args, mode="RUN", outcome="AI_TRANSPORT_OR_AUTH", exit_code=30, error_code=exc.code, checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
@@ -201,13 +221,22 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     artifacts = [{"path_display": item.path_display, "path_b64": item.path_b64, "net_operation": _operation(item), "old_mode": item.old_mode or None, "new_mode": item.new_mode or None, "old_blob": item.old_oid if set(item.old_oid) != {"0"} else None, "new_blob": item.new_oid if set(item.new_oid) != {"0"} else None, "known_objects": None, "parse_status": "metadata_only", "diagnostic_codes": [], "assessments": []} for item in unique_deltas.values()]
     events = [{"event_id": stable_id("event", {"target": plan.target_sha, "path": item.path_b64})[:100], "commit_sha": plan.target_sha, "parent_sha": plan.base_sha, "object_key": None, "artifact_paths_b64": [item.path_b64], "operation": _operation(item), "categories": ["unknown"], "before_evidence_ids": [], "after_evidence_ids": []} for item in unique_deltas.values()]
     counts = {"net_files": len(plan.net_deltas), "history_files": len(unique_deltas), "net_known_objects": len(changed_keys), "history_known_objects": len(changed_keys), "change_events": len(events), "ai_units": sum(len(item["assessments"]) for item in objects), "ai_http_attempts": http_attempts, "analyzed_objects": sum(item["status"] == "analyzed" for item in objects), "limited_objects": sum(item["status"] == "limited" for item in objects), "unresolved_objects": sum(item["status"] == "unresolved" for item in objects), "unknown_artifacts": 0, "has_unknown_object_count": False}
+    sequence_only = bool(objects) and all(item["categories"] == ["sequence_observed_value"] for item in objects)
+    summary = (
+        f"Git kaynağında {len(objects)} sequence için yalnız START WITH değeri değişti; diğer tanım metni aynı. Canlı veritabanı etkisi doğrulanmadı."
+        if sequence_only else
+        f"Git snapshot'ında {len(changed_keys)} nesne kaynak geçişi incelendi."
+    )
+    limitations = ["Analiz Git snapshot kaynaklarıyla sınırlıdır; canlı veritabanı doğrulaması değildir."]
+    if sequence_only:
+        limitations.append("START WITH kaynak farkı, mevcut NEXTVAL veya dağıtım sonucu hakkında tek başına kanıt değildir.")
     report = {
         "schema_version": "1.0", "synthetic": False, "report_id": report_id, "supersedes_report_id": None,
         "run": {"run_id": run_id, "mode": mode, "repository_id": config.repository.id, "branch": config.repository.branch, "scope_hash": config.scope_hash, "epoch": epoch, "base_sha": plan.base_sha, "target_sha": plan.target_sha, "planned_at": planned_at, "analysis_started_at": analysis_started, "analysis_completed_at": _now(), "analysis_generation": 0, "observed_git_at": _now(), "snapshot_captured_at": None, "actual_db_change_at": None, "originating_analyzer_build": None, "sync_build": None},
-        "quality": quality, "automatic_commit_eligible": quality != "blocked", "summary_tr": f"Git snapshot'inda {len(changed_keys)} nesne kaynak gecisi incelendi.", "overall_ai_risk": "unknown",
-        "counts": counts, "versions": {"analyzer": "0.1.0", "grammar_commit": config.parser.grammar_commit, "parser_adapter": "1.0", "prompt": "db-change-tr-1.0", "unit_response_schema": "1.0", "report_schema": "1.0", "configured_model": config.model.id, "returned_model": None, "resolved_model_version": None, "config_digest": config.config_digest},
+        "quality": quality, "automatic_commit_eligible": quality != "blocked", "summary_tr": summary, "overall_ai_risk": "unknown",
+        "counts": counts, "versions": {"analyzer": "0.1.0", "grammar_commit": config.parser.grammar_commit, "parser_adapter": "1.0", "prompt": "db-change-tr-1.1", "unit_response_schema": "1.0", "report_schema": "1.0", "configured_model": config.model.id, "returned_model": None, "resolved_model_version": None, "config_digest": config.config_digest},
         "commits": commits, "events": events, "artifacts": artifacts, "evidence_registry": evidence_registry, "objects": objects,
-        "limitations": ["Analiz Git snapshot kaynaklariyla sinirlidir; canli veritabani dogrulamasi degildir."],
+        "limitations": limitations,
     }
     try:
         rendered = render_report(report, max_object_details=config.reports.mail_max_object_details)

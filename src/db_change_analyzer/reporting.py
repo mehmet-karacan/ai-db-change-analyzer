@@ -61,16 +61,43 @@ def validate_report(report: dict[str, Any], schema_path: Path | None = None) -> 
 
 def _cards(report: dict[str, Any]) -> list[dict[str, str]]:
     rank = {"blocked": 0, "unresolved": 0, "limited": 1, "analyzed": 2}
-    risk = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
     cards: list[dict[str, str]] = []
     for item in report["objects"]:
+        if "sequence_observed_value" in item["categories"]:
+            continue
         assessments = item.get("assessments", [])
         responses = [assessment.get("response", {}) for assessment in assessments]
         summary = " | ".join(response.get("summary_tr", "") for response in responses if response.get("summary_tr"))
-        finding_risks = [finding["risk"] for response in responses for finding in response.get("findings", [])]
-        highest = min(finding_risks, key=lambda value: risk[value]) if finding_risks else "unknown"
-        cards.append({"object_key": item["identity"]["object_key"], "summary": summary or "Yerel fark kaydi mevcut.", "risk": highest, "status": item["status"]})
-    return sorted(cards, key=lambda card: (rank.get(card["status"], 3), risk[card["risk"]], card["object_key"]))
+        cards.append({
+            "name": item["identity"]["name"], "schema": item["identity"]["schema_name"],
+            "object_type": item["identity"]["object_type"],
+            "summary": summary or "Kaynak tanımında fark gözlendi; ayrıntı tam rapordadır.",
+            "status": item["status"],
+        })
+    return sorted(cards, key=lambda card: (rank.get(card["status"], 3), card["schema"], card["name"]))
+
+
+def _sequence_rows(report: dict[str, Any]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for item in report["objects"]:
+        if "sequence_observed_value" not in item["categories"]:
+            continue
+        for fact in item["facts"]:
+            if fact["category"] != "sequence_observed_value" or fact["property"] != "START WITH":
+                continue
+            before, after = fact["before"], fact["after"]
+            if before is None or after is None:
+                continue
+            try:
+                difference = int(after) - int(before)
+            except (TypeError, ValueError):
+                continue
+            rows.append({
+                "name": item["identity"]["name"], "schema": item["identity"]["schema_name"],
+                "before": before, "after": after,
+                "delta": f"{difference:+d}",
+            })
+    return sorted(rows, key=lambda row: (row["schema"], row["name"]))
 
 
 def _environment() -> Environment:
@@ -89,13 +116,30 @@ def render_report(report: dict[str, Any], *, report_url: str = "", allowed_link_
             raise ReportError("REPORT_URL_NOT_ALLOWED")
     canonical = json.dumps(report, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     cards = _cards(report)
+    sequence_rows = _sequence_rows(report)
+    visible_sequence_rows = sequence_rows[:max_object_details]
+    visible_cards = cards[:max(0, max_object_details - len(visible_sequence_rows))]
+    quality_display = {
+        "complete": ("Analiz tamamlandı", "#E5F5EB", "#17603A"),
+        "limited": ("Sınırlı analiz", "#FFF3D9", "#855300"),
+        "blocked": ("İnceleme gerekli", "#FDE8E8", "#9B2C2C"),
+    }[report["quality"]]
+    sequence_only = bool(report["objects"]) and len(sequence_rows) == len(report["objects"])
     context = {
         "summary_tr": report["summary_tr"],
         "quality": report["quality"],
+        "quality_label": quality_display[0],
+        "quality_background": quality_display[1],
+        "quality_foreground": quality_display[2],
+        "headline": "Sequence başlangıç değerleri" if sequence_only else "Veritabanı kaynak değişim özeti",
+        "sequence_only": sequence_only,
         "counts": report["counts"],
         "run": report["run"],
-        "object_cards": cards[:max_object_details],
-        "omitted_objects": max(0, len(cards) - max_object_details),
+        "short_base": (report["run"]["base_sha"] or "ROOT")[:12],
+        "short_target": report["run"]["target_sha"][:12],
+        "sequence_rows": visible_sequence_rows,
+        "object_cards": visible_cards,
+        "omitted_objects": max(0, len(cards) + len(sequence_rows) - len(visible_cards) - len(visible_sequence_rows)),
         "limitations": report["limitations"] or ["Kaynak kapsami disindaki tuketiciler bilinmez."],
         "report_url": report_url,
     }
@@ -117,12 +161,16 @@ def build_message(
     current_build_number: str | None,
     max_bytes: int,
 ) -> RenderedMessage:
-    if any("\r" in value or "\n" in value for value in (sender, message_id, job_short_name, *recipients)):
+    if any("\r" in value or "\n" in value for value in (sender, message_id, job_short_name, report["run"]["repository_id"], *recipients)):
         raise ReportError("MAIL_HEADER_INJECTION")
     origin = report["run"].get("originating_analyzer_build")
     build = origin["build_number"] if origin else ("MANUAL" if report["run"]["mode"] == "MANUAL" else report["run"]["run_id"][:8])
-    quality = report["quality"].upper()
-    subject = f"[AI DB Analyzer][{report['run']['repository_id']}][{quality}] Analyzer {job_short_name} #{build} · {report['report_id'][:8]}"
+    descriptor = (
+        f"{len(_sequence_rows(report))} sequence başlangıç değeri"
+        if report["objects"] and len(_sequence_rows(report)) == len(report["objects"])
+        else f"{report['counts']['net_known_objects']} nesne değişikliği"
+    )
+    subject = f"[AI DB Analyzer][{report['run']['repository_id']}] {descriptor} · {job_short_name} #{build}"
     message = EmailMessage(policy=SMTP)
     message["From"] = sender
     message["To"] = ", ".join(recipients)

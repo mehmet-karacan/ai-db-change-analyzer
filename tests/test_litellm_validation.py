@@ -49,7 +49,7 @@ def verified_model_config(tmp_path: Path, *, output_mode: str = "json_schema"):
     raw = raw.replace("capabilities_verified = false", "capabilities_verified = true")
     raw = raw.replace('capability_record = ""', 'capability_record = "reviewed/test.json"')
     raw = raw.replace("verified_context_window_tokens = 0", "verified_context_window_tokens = 32768")
-    raw = raw.replace('output_mode = "prompt_json"', f'output_mode = "{output_mode}"')
+    raw = raw.replace('output_mode = "json_schema"', f'output_mode = "{output_mode}"')
     path = tmp_path / "config.toml"
     path.write_text(raw, encoding="utf-8")
     return load_config(path).model
@@ -82,6 +82,19 @@ def test_prompt_json_allows_exactly_one_fenced_object() -> None:
         validate_unit_response(f"text\n```json\n{valid_content()}\n```", unit(), prompt_json=True)
 
 
+def test_strict_json_accepts_valid_finding_enums() -> None:
+    response = json.loads(valid_content())
+    response["findings"] = [{
+        "kind": "interpretation",
+        "claim": "Tablo tanimi kaynakta goruldu.",
+        "risk": "unknown",
+        "evidence_level": "source_backed_inference",
+        "evidence_ids": ["ev1"],
+    }]
+    validated = validate_unit_response(json.dumps(response), unit())
+    assert validated.response.findings[0].kind is FindingKind.INTERPRETATION
+
+
 def test_single_repair_is_bounded_and_evidence_validated() -> None:
     calls: list[tuple[str, ...]] = []
     outcome = analyze_with_single_repair(unit(), lambda: "not json", lambda codes: calls.append(codes) or valid_content())
@@ -103,9 +116,24 @@ def test_http_request_shape_and_envelope_are_strict(tmp_path: Path) -> None:
     with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client:
         reply = client.complete(api_key="local-test-key", system_message="safe", user_payload=unit().model_dump(mode="json"), response_schema={"type": "object"}, output_tokens=64)
     assert reply.finish_reason == "stop"
-    assert captured["model"] == "openai/codepilot-gpt-oss"
+    assert captured["model"] == "Kimi-K2.7-Code"
     assert "tools" not in captured and "temperature" not in captured
     assert captured["response_format"]["type"] == "json_schema"
+
+
+def test_json_object_mode_includes_schema_in_prompt(tmp_path: Path) -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": valid_content()}, "finish_reason": "stop"}]})
+
+    config = verified_model_config(tmp_path, output_mode="json_object")
+    schema = {"type": "object", "required": ["unit_id"]}
+    with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client:
+        client.complete(api_key="local-test-key", system_message="safe", user_payload=unit().model_dump(mode="json"), response_schema=schema, output_tokens=64)
+    assert captured["response_format"] == {"type": "json_object"}
+    assert '"required":["unit_id"]' in captured["messages"][0]["content"]
 
 
 def test_http_never_retries_or_downgrades_generic_400(tmp_path: Path) -> None:
@@ -128,3 +156,19 @@ def test_unverified_route_blocks_before_network(tmp_path: Path) -> None:
     with LiteLLMClient(config, transport=httpx.MockTransport(lambda _: pytest.fail("network called"))) as client, pytest.raises(ModelTransportError) as caught:
         client.complete(api_key="x" * 8, system_message="safe", user_payload={}, response_schema={}, output_tokens=1)
     assert caught.value.code == "MODEL_CAPABILITY_UNVERIFIED"
+
+
+def test_unverified_synthetic_probe_uses_fixed_safe_payload() -> None:
+    config = load_config(ROOT / "config" / "gpu.example.toml").model
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": valid_content()}, "finish_reason": "stop"}]})
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client:
+        client.probe_synthetic(api_key="local-test-key", response_schema={"type": "object"}, output_tokens=4096)
+    sent = json.loads(captured["messages"][1]["content"])
+    assert sent["coverage_manifest"] == {"synthetic": True}
+    assert sent["artifact_paths"] == ["synthetic/smoke.sql"]
+    assert captured["max_tokens"] == 4096

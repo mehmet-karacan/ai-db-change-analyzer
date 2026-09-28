@@ -49,20 +49,20 @@ dependency_depth = 1
 max_dependency_depth = 2
 max_neighbors_per_side = 8
 max_synonym_hops = 5
-output_tokens = 4096
+output_tokens = 16384
 safety_tokens = 4096
 
 [model]
 base_url = "https://aihub-api.turktelekom.com.tr/"
 chat_path = "chat/completions"
 allowed_host = "aihub-api.turktelekom.com.tr"
-id = "openai/codepilot-gpt-oss"
+id = "Kimi-K2.7-Code"
 route_verified = false
 capabilities_verified = false
 capability_record = ""
 # 0 = bilinmiyor; AI çağrısından önce gerçek izinli limit doldurulacak.
 verified_context_window_tokens = 0
-output_mode = "prompt_json"
+output_mode = "json_schema"
 output_limit_parameter = "max_tokens"
 connect_timeout_seconds = 10
 read_timeout_seconds = 120

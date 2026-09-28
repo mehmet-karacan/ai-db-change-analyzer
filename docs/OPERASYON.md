@@ -12,6 +12,15 @@ Bu ürün yalnız sabit Git snapshot'larını okur. Oracle'a bağlanmaz, DDL ça
 6. `inventory --target <FULL_SHA> --offline`, sonra `run --dry-run --offline` çalıştırılır.
 7. İlk normal AUTO çağrısı yalnız baseline kurar; model ve mail kullanmaz.
 
+`smoke-model` yalnız sabit sentetik SQL ile route ve yanıt şemasını doğrular; modelin
+azami bağlam penceresini doğrulamaz. Bu değer ayrı bir sağlayıcı kaydıyla teyit
+edilmeden üretim profilinde `capabilities_verified=true` yapılmaz.
+
+Tam `inventory` bütün kapsamdaki dosyaları yapısal olarak ayrıştırmayı dener.
+Değişiklik analizi ise bütün dosyaları nesne imzası için tarar, pahalı yapısal
+ayrıştırmayı yalnız planın değişen yollarında çalıştırır. Timeout alan değişen
+dosya raporda `limited` olarak görünür.
+
 ## Normal çalışma ve recovery
 
 - `run --allow-ai --allow-mail`: fetch, fixed target, analiz, immutable rapor, outbox ve SMTP receipt akışıdır.

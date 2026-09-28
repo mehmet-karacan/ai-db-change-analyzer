@@ -370,15 +370,22 @@ def notification_command(args: argparse.Namespace) -> int:
 
 
 def smoke_model_command(args: argparse.Namespace) -> int:
-    from .litellm_http import LiteLLMClient
+    from .litellm_http import LiteLLMClient, ModelTransportError, synthetic_probe_payload
+    from .models import AnalysisUnit
+    from .validation import ResponseValidationError, validate_unit_response
     config = load_config(args.config)
     if not args.allow_ai:
         return _finish(args, mode="SMOKE_MODEL", outcome="LIVE_PERMISSION_REQUIRED", exit_code=20, error_code="LIVE_PERMISSION_REQUIRED")
     schema = json.loads((Path(__file__).resolve().parents[2] / "schemas" / "unit-response.schema.json").read_text(encoding="utf-8"))
-    payload = {"schema_version": "1.0", "unit_id": "synthetic-smoke", "object_identity": None, "artifact_paths": ["synthetic/smoke.sql"], "related_object_keys": [], "view_tags": ["net"], "source_pair": {"old_revision": None, "new_revision": "0" * 40}, "deterministic_facts": [], "evidence_registry": [{"kind": "source", "evidence_id": "synthetic-ev", "snippet": "CREATE TABLE SYNTHETIC_CHECK (ID NUMBER);"}], "dependency_edges": [], "coverage_manifest": {"synthetic": True}, "allowed_claim_kinds": ["interpretation"]}
-    with LiteLLMClient(config.model) as client:
-        reply = client.complete(api_key=os.environ["LITELLM_API_KEY"], system_message="Return only the requested JSON for this synthetic smoke input.", user_payload=payload, response_schema=schema, output_tokens=min(256, config.analysis.output_tokens))
-    record = {"schema_version": 1, "synthetic": True, "route": client.url, "configured_model": config.model.id, "returned_model": reply.returned_model, "output_mode": config.model.output_mode, "verified_context_window_tokens": config.model.verified_context_window_tokens, "recorded_at": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()}
+    try:
+        with LiteLLMClient(config.model) as client:
+            reply = client.probe_synthetic(api_key=os.environ["LITELLM_API_KEY"], response_schema=schema, output_tokens=config.analysis.output_tokens)
+        validate_unit_response(reply.content, AnalysisUnit.model_validate_json(json.dumps(synthetic_probe_payload()), strict=True), prompt_json=config.model.output_mode == "prompt_json")
+    except ModelTransportError as exc:
+        return _finish(args, mode="SMOKE_MODEL", outcome="AI_TRANSPORT_OR_AUTH", exit_code=30, error_code=exc.code)
+    except ResponseValidationError as exc:
+        return _finish(args, mode="SMOKE_MODEL", outcome="AI_RESPONSE_INVALID", exit_code=31, error_code=exc.codes[0])
+    record = {"schema_version": 1, "synthetic": True, "response_schema_validated": True, "route": client.url, "configured_model": config.model.id, "returned_model": reply.returned_model, "output_mode": config.model.output_mode, "verified_context_window_tokens": config.model.verified_context_window_tokens, "recorded_at": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()}
     path = Path(args.record).resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
