@@ -27,3 +27,4 @@ owner.json
 *.pem
 *.key
 .env
+/.ai-db-change-analyzer
