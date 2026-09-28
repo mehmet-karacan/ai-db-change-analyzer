@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DB Change Analyzer Delivery 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "notification_id", "report_id", "report_sha256", "generation", "message_id", "status", "recipients", "attempts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "notification_id": {"type": "string", "minLength": 1},
+    "report_id": {"type": "string", "minLength": 1},
+    "report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "generation": {"type": "integer", "minimum": 0},
+    "message_id": {"type": "string", "minLength": 1},
+    "status": {"type": "string"},
+    "recipients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address", "status", "smtp_code", "accepted_at"],
+        "properties": {
+          "address": {"type": "string"},
+          "status": {"enum": ["PENDING", "ACCEPTED", "REFUSED", "UNKNOWN"]},
+          "smtp_code": {"type": ["integer", "null"]},
+          "accepted_at": {"type": ["string", "null"], "format": "date-time"}
+        }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt_id", "state", "intended_recipients", "started_at", "completed_at", "sanitized_error"],
+        "properties": {
+          "attempt_id": {"type": "string"},
+          "state": {"enum": ["INFLIGHT", "ACCEPTED", "FAILED", "UNKNOWN"]},
+          "intended_recipients": {"type": "array", "items": {"type": "string"}},
+          "started_at": {"type": "string", "format": "date-time"},
+          "completed_at": {"type": ["string", "null"], "format": "date-time"},
+          "sanitized_error": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

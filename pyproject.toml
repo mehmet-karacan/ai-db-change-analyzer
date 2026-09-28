@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-db-change-analyzer"
+version = "0.1.0"
+description = "Evidence-bound Oracle DDL change analysis from fixed Git revisions"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = {text = "Proprietary"}
+authors = [{name = "mehmet-karacan"}]
+dependencies = [
+  "antlr4-python3-runtime==4.13.2",
+  "httpx==0.28.1",
+  "Jinja2==3.1.6",
+  "pydantic==2.13.4",
+]
+
+[project.scripts]
+db-change-analyzer = "db_change_analyzer.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+db_change_analyzer = [
+  "migrations/*.sql",
+  "prompts/*.txt",
+  "templates/*.j2",
+  "oracle/generated/*.json",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = ["live: requires explicitly authorized external services"]

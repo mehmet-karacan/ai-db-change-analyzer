@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DB Change Analyzer Result 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "operation_id", "run_id", "report_id", "report_sha256", "mode", "outcome", "exit_code", "checkpoint_before", "checkpoint_after", "notification_status", "quality", "ai_http_attempts", "smtp_attempts", "smtp_accepted_transactions", "originating_build", "current_build", "emitted_files", "error_code"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "operation_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": ["string", "null"]},
+    "report_id": {"type": ["string", "null"]},
+    "report_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "mode": {"type": "string"},
+    "outcome": {"type": "string"},
+    "exit_code": {"type": "integer"},
+    "checkpoint_before": {"type": ["string", "null"]},
+    "checkpoint_after": {"type": ["string", "null"]},
+    "notification_status": {"type": "string"},
+    "quality": {"type": ["string", "null"], "enum": ["complete", "limited", "blocked", null]},
+    "ai_http_attempts": {"type": "integer", "minimum": 0},
+    "smtp_attempts": {"type": "integer", "minimum": 0},
+    "smtp_accepted_transactions": {"type": "integer", "minimum": 0},
+    "originating_build": {"type": ["object", "null"]},
+    "current_build": {"type": ["object", "null"]},
+    "emitted_files": {"type": "array", "items": {"type": "string"}},
+    "error_code": {"type": ["string", "null"]}
+  }
+}
