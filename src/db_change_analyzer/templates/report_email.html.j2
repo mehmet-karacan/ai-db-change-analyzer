@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="tr"><body style="margin:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#1f2937">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:20px">
+<table role="presentation" width="760" cellpadding="0" cellspacing="0" style="max-width:760px;background:#ffffff;border:1px solid #d1d5db">
+<tr><td style="padding:20px"><h1 style="font-size:20px;margin:0 0 12px">AI DB Analyzer raporu</h1>
+<p>{{ summary_tr }}</p>
+<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;border:1px solid #d1d5db">
+<tr><td>Kalite</td><td>{{ quality }}</td></tr><tr><td>Net dosya</td><td>{{ counts.net_files }}</td></tr>
+<tr><td>History dosya</td><td>{{ counts.history_files }}</td></tr><tr><td>Degisiklik olayi</td><td>{{ counts.change_events }}</td></tr>
+<tr><td>Base</td><td>{{ run.base_sha or 'ROOT' }}</td></tr><tr><td>Target</td><td>{{ run.target_sha }}</td></tr>
+</table>
+{% for item in object_cards %}<table role="presentation" width="100%" cellpadding="6" cellspacing="0" style="margin-top:12px;border-collapse:collapse;border:1px solid #d1d5db">
+<tr><td><strong>{{ item.object_key }}</strong></td></tr><tr><td>{{ item.summary }}</td></tr><tr><td>Risk: {{ item.risk }}</td></tr>
+</table>{% endfor %}
+{% if omitted_objects %}<p>Mail boyut siniri nedeniyle {{ omitted_objects }} nesne ayrintisi tam rapordadir.</p>{% endif %}
+<h2 style="font-size:16px">Sinirlar</h2><ul>{% for limitation in limitations %}<li>{{ limitation }}</li>{% endfor %}</ul>
+<p>Bu rapor yalniz Git snapshot'inda gozlenen kaynaklari degerlendirir; canli veritabani durumu veya deployment onayi degildir.</p>
+{% if report_url %}<p><a href="{{ report_url }}">Korunan tam rapor</a></p>{% endif %}
+<p style="font-size:12px;color:#6b7280">AI yorumlari ve oneriler insan incelemesi gerektirir.</p>
+</td></tr></table></td></tr></table></body></html>

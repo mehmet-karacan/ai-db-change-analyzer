@@ -1,0 +1,19 @@
+AI DB Analyzer raporu
+
+{{ summary_tr }}
+Kalite: {{ quality }}
+Net/history dosya: {{ counts.net_files }}/{{ counts.history_files }}
+Degisiklik olayi: {{ counts.change_events }}
+Base: {{ run.base_sha or 'ROOT' }}
+Target: {{ run.target_sha }}
+
+{% for item in object_cards %}* {{ item.object_key }} | Risk: {{ item.risk }}
+  {{ item.summary }}
+{% endfor %}{% if omitted_objects %}Mail boyut siniri nedeniyle {{ omitted_objects }} nesne ayrintisi tam rapordadir.
+{% endif %}
+Sinirlar:
+{% for limitation in limitations %}- {{ limitation }}
+{% endfor %}
+Bu rapor yalniz Git snapshot'inda gozlenen kaynaklari degerlendirir; canli veritabani durumu veya deployment onayi degildir.
+{% if report_url %}Korunan tam rapor: {{ report_url }}
+{% endif %}AI yorumlari ve oneriler insan incelemesi gerektirir.
