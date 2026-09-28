@@ -8,9 +8,6 @@ pipeline {
         timeout(time: 30, unit: 'MINUTES')
         buildDiscarder(logRotator(daysToKeepStr: '30', numToKeepStr: '120'))
     }
-    triggers {
-        cron('TZ=Europe/Istanbul\n10 7,19 * * *')
-    }
     environment {
         ANALYZER_CONFIG = '/etc/ai-db-change-analyzer/gpu.toml'
         ANALYZER_WHEELHOUSE = '<APPROVED_LOCAL_WHEELHOUSE_PATH>'
@@ -28,6 +25,15 @@ pipeline {
                         set +x
                         set -eu
                         umask 077
+                        python3.13 - <<'PY'
+import os
+import tomllib
+
+with open(os.environ['ANALYZER_CONFIG'], 'rb') as config_file:
+    recipients = tomllib.load(config_file)['smtp']['recipients']
+if recipients != ['mkaracan@innova.com.tr']:
+    raise SystemExit('Pilot mail recipient mismatch')
+PY
                         python3.13 -m venv .venv
                         .venv/bin/python -m pip install \
                             --no-index --find-links "$ANALYZER_WHEELHOUSE" \
@@ -85,6 +91,18 @@ pipeline {
                 artifacts: "out/${env.BUILD_NUMBER}/result.json,out/${env.BUILD_NUMBER}/report.json,out/${env.BUILD_NUMBER}/report.html,out/${env.BUILD_NUMBER}/report.txt,out/${env.BUILD_NUMBER}/delivery.json,out/${env.BUILD_NUMBER}/inventory.json",
                 allowEmptyArchive: true,
                 fingerprint: true
+            )
+            emailext(
+                to: 'mkaracan@innova.com.tr',
+                subject: "[AI DB Analyzer][${currentBuild.currentResult}] Build #${env.BUILD_NUMBER}",
+                body: """
+                    <p>AI DB Change Analyzer Jenkins çalışması tamamlandı.</p>
+                    <p><b>Sonuç:</b> ${currentBuild.currentResult}<br/>
+                    <b>Job:</b> ${env.JOB_NAME}<br/>
+                    <b>Build:</b> #${env.BUILD_NUMBER}<br/>
+                    <a href="${env.BUILD_URL}">Build detayını aç</a></p>
+                """,
+                mimeType: 'text/html; charset=UTF-8'
             )
         }
     }
