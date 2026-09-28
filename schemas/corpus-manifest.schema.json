@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/db-change-analyzer/corpus-manifest.schema.json",
+  "title": "Offline corpus manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sources", "warnings"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_kind", "archive_name", "archive_sha256", "output_prefix", "observed", "declared", "provenance", "files", "warnings"],
+      "properties": {
+        "source_kind": {"enum": ["ddl_snapshot_corpus", "application_source_corpus"]},
+        "archive_name": {"type": "string", "minLength": 1},
+        "archive_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "output_prefix": {"enum": ["metadata", "application-sql"]},
+        "observed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["entry_count", "file_count", "sql_count", "raw_total_bytes", "root_counts", "encoding_counts", "newline_counts"],
+          "properties": {
+            "entry_count": {"type": "integer", "minimum": 0},
+            "file_count": {"type": "integer", "minimum": 0},
+            "sql_count": {"type": "integer", "minimum": 0},
+            "raw_total_bytes": {"type": "integer", "minimum": 0},
+            "root_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+            "encoding_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+            "newline_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+          }
+        },
+        "declared": {"type": ["object", "null"]},
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["git_history_present", "verified_source_commit", "snapshot_captured_at", "history_kind"],
+          "properties": {
+            "git_history_present": {"type": "boolean"},
+            "verified_source_commit": {"type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+            "snapshot_captured_at": {"type": ["string", "null"], "format": "date-time"},
+            "history_kind": {"enum": ["none", "synthetic_fixture_git"]}
+          }
+        },
+        "files": {"type": "array", "items": {"$ref": "#/$defs/file"}},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "raw_sha256", "bytes", "lines", "encoding", "newline_style"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "raw_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "lines": {"type": "integer", "minimum": 0},
+        "encoding": {"type": "string", "minLength": 1},
+        "newline_style": {"enum": ["CRLF", "LF", "CR", "MIXED", "NONE", "BINARY"]}
+      }
+    }
+  }
+}
