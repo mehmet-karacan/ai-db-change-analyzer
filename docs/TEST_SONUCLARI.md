@@ -21,10 +21,10 @@ Ortam:
 | `.venv/Scripts/python.exe -m pytest -q tests/test_release_manifest_portability.py` | PASS — 1 test; temiz index checkout üzerinde 38 girdilik manifest kontrolü PASS |
 | Windows `core.autocrlf=true` ile temiz clone, `tools/check_release_manifest.py` | PASS — 38 dosya doğrulandı |
 | `py -3 <onaylı paket>/tools/check_package.py` | PASS — 115 sunum/paket kontrolü, 0 hata |
-| `.venv/Scripts/python.exe -m build --wheel --outdir dist` | PASS — `ai_db_change_analyzer-0.1.0-py3-none-any.whl` |
-| Ayrı `--system-site-packages` venv, `pip install --no-deps <wheel>` | PASS |
-| Ayrı venv, `python -m db_change_analyzer --version` | PASS — `0.1.0` |
-| `pip check` | PASS — broken requirement yok |
+| `.venv/Scripts/python.exe -m build --wheel --outdir dist` | PASS — son model-birim eşleme değişikliğini içeren `ai_db_change_analyzer-0.1.0-py3-none-any.whl` yeniden üretildi |
+| Ayrı CPython 3.13 venv, `pip install --no-deps <wheel>` ve `pip install --require-hashes -r requirements.lock` | PASS |
+| Ayrı venv, `python -I -m db_change_analyzer --version` | PASS — `0.1.0` |
+| Ayrı venv, `pip check` | PASS — broken requirement yok |
 
 Suite varsayılan olarak dış ağ kullanmadı. Git senaryoları yerel fixture repository/bare cache, model HTTP senaryoları `httpx.MockTransport`, SMTP senaryoları fake transport ile çalıştı. V5 testleri pinlenmiş hedefi, geçersiz AI yanıtı sonrası aynı run ile sürmeyi, retry'daki eski/yeni dönen model etiketlerini ve süreçler arası süre temelini, SMTP hatası sonrası kayıtlı MIME'ı, operatör retry/resolve checkpoint'ini, SQLite rollback'ini, V5 manifest/MIME bağını, yarım çıktı onarımını, biçim/sıra kaynak farkında modelsiz raporlamayı, INDEX/PACKAGE ham aralıklarında biçim ayrımını, INDEX partition clause/paralellik derecesi/sıkıştırma, VIEW JOIN türü/analitik aralık, TABLE kısmi MODIFY/sanal sütun/bileşen sınırı/çoklu DROP/fiziksel özellik düzeyi, aynı/ayrı dosyadaki ALTER bağlamı farkını ve `COMMENT ... IS ''` ile yorum silinmesi fact'ini, net sıfır olan commit/revert geçmişini ve PACKAGE overload imza/sınırlı coverage farkını kapsar. Oracle bağlantısı veya SQL execution yolu yoktur.
 
