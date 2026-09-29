@@ -81,6 +81,15 @@ def test_absence_without_complete_scope_is_not_called_added() -> None:
     assert "ABSENCE_SCOPE_UNVERIFIED" in result.diagnostics
 
 
+def test_sequence_change_is_not_limited_by_workflow_source_families() -> None:
+    old = _projection("CREATE SEQUENCE S.Q START WITH 1 INCREMENT BY 1;")
+    new = _projection("CREATE SEQUENCE S.Q START WITH 2 INCREMENT BY 1;")
+    result = compare_projections(old, new, old_evidence_ids=("ev-old",), new_evidence_ids=("ev-new",))
+    assert {fact.taxonomy_id for fact in result.facts} == {"sequence.sequence_property.start_with"}
+    assert "common.object.presence" not in result.unsupported_families
+    assert not any(item.startswith("common.source.") for item in result.unsupported_families)
+
+
 def test_table_constraint_enable_change_has_its_own_taxonomy_fact() -> None:
     old = _projection("CREATE TABLE S.T (ID NUMBER, CONSTRAINT PK_T PRIMARY KEY (ID) ENABLE);")
     new = _projection("CREATE TABLE S.T (ID NUMBER, CONSTRAINT PK_T PRIMARY KEY (ID) DISABLE);")

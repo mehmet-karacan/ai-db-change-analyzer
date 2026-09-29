@@ -2,7 +2,7 @@
 
 Oracle DDL snapshot’larının sabit Git revision’ları arasındaki değişikliklerini kaynak kanıtından ayırmadan analiz eden, tek süreçli CPython 3.13 CLI ürünüdür. Ürün kaynak repository’ye yazmaz, Oracle SQL çalıştırmaz ve mevcut DB Sync pipeline’ını değiştirmez.
 
-Repository'deki Analyzer `Jenkinsfile` devre dışı no-op pipeline'dır. Tetiklense bile analiz, model ve e-posta aşamalarını çalıştırmaz; Jenkins sunucusunda tanımlı harici tetikleyiciler ayrıca yönetilir. `docs/Jenkinsfile.txt` ayrı DB Sync referansıdır ve değiştirilmemiştir.
+Repository'deki Analyzer `Jenkinsfile` yerel kabul boyunca no-op pipeline'dır. Kurumdaki Jenkins job'u korunur; yerel doğrulama tamamlandığında yalnız Analyzer CLI tetikleyicisi olarak düzenlenecektir. Tetiklense bile mevcut no-op dosya analiz, model ve e-posta aşamalarını çalıştırmaz. `docs/Jenkinsfile.txt` ayrı DB Sync referansıdır ve değiştirilmemiştir.
 
 Geliştirme kurulumu:
 

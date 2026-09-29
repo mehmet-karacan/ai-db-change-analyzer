@@ -40,4 +40,4 @@ dosya raporda `limited` olarak görünür.
 
 ## Exit özeti
 
-0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Repository'deki Analyzer `Jenkinsfile` şu anda devre dışı no-op pipeline'dır; Analyzer CLI'yi çalıştırmaz ve bu exit kodlarını Jenkins sonucuna eşlemez. Jenkins sunucusundaki harici tetikleyici ayarları ayrıca kapatılmalıdır.
+0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Repository'deki Analyzer `Jenkinsfile` yerel kabul sırasında no-op kalır; Analyzer CLI'yi çalıştırmaz ve bu exit kodlarını Jenkins sonucuna eşlemez. Kurumdaki Jenkins job'u korunur; yerel tetikleme provası tamamlandıktan sonra yalnız CLI tetikleyicisi olacak biçimde düzenlenir. İş kuralları ve state/teslimat kararı CLI'da kalır.

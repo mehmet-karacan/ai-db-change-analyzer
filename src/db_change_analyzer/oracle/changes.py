@@ -281,7 +281,18 @@ def compare_projections(
             context_only=context_only, verification="verified",
         ))
         covered.add(taxonomy_id)
-    unsupported = tuple(sorted(family.taxonomy_id for family in catalog.values() if representative.object_type in family.object_types and (family.taxonomy_id not in covered or family.taxonomy_id in overload_limited or family.taxonomy_id in scoped_families)))
+    # Presence is only applicable to added/removed objects. Source presentation
+    # facts are handled by the workflow from file evidence, not by projections.
+    external_or_inapplicable = {
+        "common.object.presence", "common.source.text", "common.source.format",
+        "common.source.occurrence_order", "common.source.path",
+    }
+    unsupported = tuple(sorted(
+        family.taxonomy_id for family in catalog.values()
+        if representative.object_type in family.object_types
+        and family.taxonomy_id not in external_or_inapplicable
+        and (family.taxonomy_id not in covered or family.taxonomy_id in overload_limited or family.taxonomy_id in scoped_families)
+    ))
     return ChangeSet(representative.object_key, representative.object_type, operation, tuple(facts), unsupported, tuple(dict.fromkeys(diagnostics)))
 
 
