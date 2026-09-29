@@ -1,0 +1,16 @@
+{% if index_objects %}
+<tr><td class="px" style="padding:6px 34px 28px;">
+<h2 style="margin:0 0 12px;font-size:21px;line-height:29px;color:#24211F;">Değişen nesneler</h2>
+<table aria-label="Değişen Oracle nesneleri" border="0" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;border-collapse:collapse;border-top:2px solid #24211F;" width="100%">
+<thead><tr><th align="left" scope="col" style="width:68%;padding:11px 0;font-size:14px;line-height:21px;border-bottom:1px solid #D7CCC1;color:#5F5954;" width="68%">Nesne</th><th align="left" scope="col" style="width:32%;padding:11px 0;font-size:14px;line-height:21px;border-bottom:1px solid #D7CCC1;color:#5F5954;" width="32%">Değişiklik</th></tr></thead>
+<tbody>{% for obj in index_objects %}<tr>
+<th align="left" class="index-name" scope="row" style="padding:14px 12px 14px 0;font-weight:normal;border-bottom:1px solid #D7CCC1;font-size:15px;line-height:23px;" valign="top">
+<span style="font-size:14px;color:#A84426;font-weight:bold;">{{ obj.number }} &nbsp;{{ obj.type }}</span><br/>
+{% if obj.has_detail %}<a class="wrap" href="#{{ obj.anchor }}" style="color:#24211F;text-decoration:underline;font-weight:bold;word-wrap:break-word;overflow-wrap:anywhere;">{{ obj.display_name }}</a>{% else %}<strong class="wrap" style="color:#24211F;word-wrap:break-word;overflow-wrap:anywhere;">{{ obj.display_name }}</strong><br><span style="font-size:13px;color:#5F5954;">Detay bu e-postada kısaltıldı</span>{% endif %}
+</th>
+<td align="left" class="index-status" style="padding:14px 0;border-bottom:1px solid #D7CCC1;font-size:15px;line-height:23px;color:{{ obj.action.fg }};font-weight:bold;" valign="top"><span aria-hidden="true">{{ obj.action.symbol }} </span>{{ obj.action.label }}{% if obj.limited %}<br><span style="font-weight:normal;color:#5F5954">Ayrıntı sınırlı</span>{% endif %}</td>
+</tr>{% endfor %}</tbody></table>
+<p style="margin:10px 0 0;font-size:13px;line-height:20px;color:#5F5954;">Nesne numarası listede ve detayda aynıdır. Renkler risk düzeyini değil, değişiklik türünü gösterir.{% if omitted_index %} {{ omitted_index }} nesne listede gösterilmedi.{% endif %}{% if omitted_details %} {{ omitted_details }} nesnenin ayrıntısı bu e-postada kısaltıldı.{% endif %}</p>
+</td></tr>
+{% endif %}
+{% if not index_objects and (omitted_index or omitted_details) %}<tr><td class="px" style="padding:8px 34px 24px;font-size:14px;line-height:23px;color:#5F5954;">Boyut sınırı nedeniyle {{ omitted_index }} nesne listede, {{ omitted_details }} nesne ayrıntıda gösterilmedi. Üst toplamlar karşılaştırmanın tamamına aittir.</td></tr>{% endif %}

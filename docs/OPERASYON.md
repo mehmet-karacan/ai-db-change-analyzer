@@ -27,6 +27,7 @@ dosya raporda `limited` olarak görünür.
 - `NO_CHANGE` ve `OUT_OF_SCOPE_ONLY` model/mail açmaz. `RETRY_PENDING` checkpoint'i korur; sonraki çağrı aynı pinned aralığı tamamlamalıdır.
 - Divergence veya eksik ancestry exit 22'dir. Geçmiş kasıtlı kapatılacaksa iki SHA doğrulandıktan sonra `state rebaseline --expected-base ... --target ... --reason ... --ack-unanalysed-history` kullanılır.
 - `UNKNOWN` SMTP otomatik retry edilmez. Relay kaydı kontrol edilir; kanıt varsa `notification resolve`, yeniden gönderim kararı varsa `notification retry --ack-duplicate-risk` kullanılır.
+- `notification retry`, FAILED/PARTIAL bildirimin henüz kabul edilmemiş alıcılarına kayıtlı MIME'ı gönderir; `replace-envelope` sonrası READY bildirimi de aynı komutla gönderilir. V5 envelope değişiminde yeni render manifesti oluşur. Yeni bildirim kimliği stderr `notification_outbox` olayında görünür. AUTO raporunda tüm alıcılar kabul edildiğinde run durumu ve checkpoint, SMTP kabulü veya kanıtlı `resolve` ile aynı SQLite transaction'ında tamamlanır; blocked kalite insan incelemesinde kalır.
 - Bildirilmiş blocked rapor için parser/kaynak düzeltmesinden sonra `state retry-blocked`; insanın zorunlu açığı kabul etmesi için `state acknowledge-limits` kullanılır. Her ikisi report digest ve expected base ister.
 - Pending run fingerprint'i değiştiyse `state migrate-run --reason ...`; immutable rapor/outbox varsa migration reddedilir.
 - Key rotation secret store/Jenkins credential üzerinde yapılır. Config'e veya Git'e key yazılmaz; bitmiş raporlar yeni model etiketi almaz.
@@ -39,4 +40,4 @@ dosya raporda `limited` olarak görünür.
 
 ## Exit özeti
 
-0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Jenkins 10/11'i UNSTABLE, diğer sıfır dışını FAILURE yapar.
+0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Repository'deki Analyzer `Jenkinsfile` şu anda devre dışı no-op pipeline'dır; Analyzer CLI'yi çalıştırmaz ve bu exit kodlarını Jenkins sonucuna eşlemez. Jenkins sunucusundaki harici tetikleyici ayarları ayrıca kapatılmalıdır.

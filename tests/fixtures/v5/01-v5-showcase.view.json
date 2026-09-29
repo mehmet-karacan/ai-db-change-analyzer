@@ -1,0 +1,1162 @@
+{
+  "schema_version": "mail-view/2.0",
+  "template_version": "v5.0",
+  "taxonomy_version": "oracle-taxonomy/1.0",
+  "report_id": "34af36f4-be37-5271-8d46-dfc8b4abf9c1",
+  "synthetic": true,
+  "language": "tr",
+  "source": {
+    "origin": "synthetic",
+    "repository": "gpu-db (örnek)",
+    "branch": "master",
+    "base_label": "a1b2c3d",
+    "target_label": "e4f5a6b",
+    "base_sha": null,
+    "target_sha": null,
+    "observed_at": "2026-09-29T09:12:08+03:00",
+    "snapshot_captured_at": null,
+    "actual_db_change_at": null,
+    "sync_build": null,
+    "comparison_mode": "net"
+  },
+  "changed_files": 5,
+  "coverage": {
+    "analysis_status": "limited",
+    "export_scope": "unknown",
+    "unknown_artifacts": 0,
+    "object_count_complete": true,
+    "limitations_tr": [
+      "Canlı veritabanı ve kapsam dışı tüketiciler doğrulanmadı."
+    ],
+    "identity_scan_complete_base": true,
+    "identity_scan_complete_target": true,
+    "field_coverage_complete": false
+  },
+  "evidence_registry": [
+    {
+      "evidence_id": "ev-001-base",
+      "kind": "source",
+      "side": "base",
+      "path": "synthetic/table/CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-001",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-001-target",
+      "kind": "source",
+      "side": "target",
+      "path": "synthetic/table/CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-001",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-001-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Canlı veritabanı ve kaynak dışı tüketici bilgisi yok.",
+      "synthetic": true,
+      "object_id": "obj-001",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-001-2-base-abs",
+      "kind": "snapshot_absence",
+      "side": "base",
+      "path": "synthetic/table/CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik olarak tam taranan parent tanımında alt bileşen bulunmuyor.",
+      "synthetic": true,
+      "object_id": "obj-001",
+      "scope_complete": true,
+      "scope_kind": "component"
+    },
+    {
+      "evidence_id": "ev-001-3-target-abs",
+      "kind": "snapshot_absence",
+      "side": "target",
+      "path": "synthetic/table/CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik olarak tam taranan parent tanımında alt bileşen bulunmuyor.",
+      "synthetic": true,
+      "object_id": "obj-001",
+      "scope_complete": true,
+      "scope_kind": "component"
+    },
+    {
+      "evidence_id": "ev-002-base",
+      "kind": "snapshot_absence",
+      "side": "base",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-002",
+      "scope_complete": true,
+      "scope_kind": "snapshot"
+    },
+    {
+      "evidence_id": "ev-002-target",
+      "kind": "source",
+      "side": "target",
+      "path": "synthetic/view/VW_CUSTOMER_ACTIVE.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-002",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-002-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Canlı veritabanı ve kaynak dışı tüketici bilgisi yok.",
+      "synthetic": true,
+      "object_id": "obj-002",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-003-base",
+      "kind": "snapshot_absence",
+      "side": "base",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-003",
+      "scope_complete": true,
+      "scope_kind": "snapshot"
+    },
+    {
+      "evidence_id": "ev-003-target",
+      "kind": "source",
+      "side": "target",
+      "path": "synthetic/index/IX_CUSTOMER_EMAIL.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-003",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-003-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Canlı veritabanı ve kaynak dışı tüketici bilgisi yok.",
+      "synthetic": true,
+      "object_id": "obj-003",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-004-base",
+      "kind": "source",
+      "side": "base",
+      "path": "synthetic/sequence/SEQ_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-004",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-004-target",
+      "kind": "source",
+      "side": "target",
+      "path": "synthetic/sequence/SEQ_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-004",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-004-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Canlı veritabanı ve kaynak dışı tüketici bilgisi yok.",
+      "synthetic": true,
+      "object_id": "obj-004",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-005-base",
+      "kind": "source",
+      "side": "base",
+      "path": "synthetic/package_spec/PCK_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-005",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-005-target",
+      "kind": "source",
+      "side": "target",
+      "path": "synthetic/package_spec/PCK_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-005",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-005-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Canlı veritabanı ve kaynak dışı tüketici bilgisi yok.",
+      "synthetic": true,
+      "object_id": "obj-005",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-005-1-base-abs",
+      "kind": "snapshot_absence",
+      "side": "base",
+      "path": "synthetic/package_spec/PCK_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik olarak tam taranan parent tanımında alt bileşen bulunmuyor.",
+      "synthetic": true,
+      "object_id": "obj-005",
+      "scope_complete": true,
+      "scope_kind": "component"
+    },
+    {
+      "evidence_id": "ev-006-base",
+      "kind": "source",
+      "side": "base",
+      "path": "synthetic/package_body/PCK_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-006",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-006-target",
+      "kind": "source",
+      "side": "target",
+      "path": "synthetic/package_body/PCK_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-006",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-006-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Değişen bölüm dinamik SQL içeriyor. Çalışma anında oluşacak SQL, hedef nesneler ve etki bu kaynak çiftinden kesinleştirilemedi. Doğrulanamayan ayrıntılar değer gibi sunulmadı.",
+      "synthetic": true,
+      "object_id": "obj-006",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-007-base",
+      "kind": "source",
+      "side": "base",
+      "path": "synthetic/table/CUSTOMER_ARCHIVE.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-007",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-007-target",
+      "kind": "snapshot_absence",
+      "side": "target",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-007",
+      "scope_complete": true,
+      "scope_kind": "snapshot"
+    },
+    {
+      "evidence_id": "ev-007-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Canlı veritabanı ve kaynak dışı tüketici bilgisi yok.",
+      "synthetic": true,
+      "object_id": "obj-007",
+      "scope_complete": null,
+      "scope_kind": "none"
+    }
+  ],
+  "objects": [
+    {
+      "object_id": "obj-001",
+      "identity": {
+        "namespace": "SCHEMA_OBJECT",
+        "schema_name": "GPU_USER",
+        "name": "CUSTOMER",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "TABLE",
+        "parent_object_id": null,
+        "raw_object_type": "TABLE",
+        "identity_confidence": "known"
+      },
+      "operation": "modified",
+      "pattern": "structured",
+      "verification": "verified",
+      "source_paths": [
+        "synthetic/table/CUSTOMER.sql"
+      ],
+      "evidence_ids": [
+        "ev-001-base",
+        "ev-001-target",
+        "ev-001-scope",
+        "ev-001-2-base-abs",
+        "ev-001-3-target-abs"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-001-1",
+          "taxonomy_id": "table.column.length",
+          "subject_name": "PHONE",
+          "subject_kind": "Kolon",
+          "component_path": [
+            "PHONE"
+          ],
+          "change_action": "modified",
+          "category": "contract",
+          "before": {
+            "state": "present",
+            "value": "VARCHAR2(20)",
+            "evidence_ids": [
+              "ev-001-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "VARCHAR2(30)",
+            "evidence_ids": [
+              "ev-001-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        },
+        {
+          "fact_id": "fact-001-2",
+          "taxonomy_id": "table.column.definition",
+          "subject_name": "EMAIL",
+          "subject_kind": "Kolon",
+          "component_path": [
+            "EMAIL"
+          ],
+          "change_action": "added",
+          "category": "structural",
+          "before": {
+            "state": "absent_in_snapshot",
+            "value": null,
+            "evidence_ids": [
+              "ev-001-2-base-abs"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "VARCHAR2(200)",
+            "evidence_ids": [
+              "ev-001-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        },
+        {
+          "fact_id": "fact-001-3",
+          "taxonomy_id": "table.column.definition",
+          "subject_name": "LEGACY_CODE",
+          "subject_kind": "Kolon",
+          "component_path": [
+            "LEGACY_CODE"
+          ],
+          "change_action": "removed",
+          "category": "structural",
+          "before": {
+            "state": "present",
+            "value": "VARCHAR2(10)",
+            "evidence_ids": [
+              "ev-001-base"
+            ]
+          },
+          "after": {
+            "state": "absent_in_snapshot",
+            "value": null,
+            "evidence_ids": [
+              "ev-001-3-target-abs"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        }
+      ],
+      "deterministic_summary_tr": "1 kolon eklendi, 1 kolon çıkarıldı, 1 kolonun uzunluğu değişti.",
+      "limitations_tr": [],
+      "ai_comments": [
+        {
+          "text_tr": "PHONE kolonunun tanımındaki uzunluk 20’den 30’a çıkarıldı. EMAIL eklendi; LEGACY_CODE sonraki kaynak tanımında bulunmuyor.",
+          "kind": "summary",
+          "evidence_ids": [
+            "ev-001-base",
+            "ev-001-target",
+            "ev-001-scope"
+          ],
+          "origin": "validated_ai",
+          "gate": "accepted",
+          "fact_ids": [
+            "fact-001-1",
+            "fact-001-2",
+            "fact-001-3"
+          ],
+          "unit_id": "unit-001",
+          "input_digest": "f5b8c00d5f9b65761b4524c50493b343b661b90aec9ee6bbf2d6b41267801b62",
+          "acceptance_method": "synthetic_fixture"
+        }
+      ],
+      "recommended_checks": [
+        {
+          "code": "SOURCE_REFERENCES",
+          "text_tr": "LEGACY_CODE kullanan, erişim kapsamındaki kaynak referanslarını inceleyin. Snapshot dışındaki tüketiciler bu örnekte doğrulanmadı.",
+          "evidence_ids": [
+            "ev-001-scope"
+          ],
+          "origin": "deterministic_rule"
+        }
+      ],
+      "ai_status": "displayed",
+      "unit_ids": [
+        "unit-001"
+      ],
+      "source_checks": {
+        "identity_match": "verified",
+        "presence_comparison": "verified",
+        "start_with_only_proved": false,
+        "remainder_equal": null,
+        "conflict_detected": false
+      }
+    },
+    {
+      "object_id": "obj-002",
+      "identity": {
+        "namespace": "SCHEMA_OBJECT",
+        "schema_name": "GPU_USER",
+        "name": "VW_CUSTOMER_ACTIVE",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "VIEW",
+        "parent_object_id": null,
+        "raw_object_type": "VIEW",
+        "identity_confidence": "known"
+      },
+      "operation": "added",
+      "pattern": "structured",
+      "verification": "verified",
+      "source_paths": [
+        "synthetic/view/VW_CUSTOMER_ACTIVE.sql"
+      ],
+      "evidence_ids": [
+        "ev-002-base",
+        "ev-002-target",
+        "ev-002-scope"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-002-1",
+          "taxonomy_id": "common.object.presence",
+          "subject_name": "View tanımı",
+          "subject_kind": "Nesne",
+          "component_path": [
+            "View tanımı"
+          ],
+          "change_action": "added",
+          "category": "presence",
+          "before": {
+            "state": "absent_in_snapshot",
+            "value": null,
+            "evidence_ids": [
+              "ev-002-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "Var",
+            "evidence_ids": [
+              "ev-002-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        },
+        {
+          "fact_id": "fact-002-2",
+          "taxonomy_id": "view.query_property.output_order",
+          "subject_name": "Çıktı kolonları",
+          "subject_kind": "View özelliği",
+          "component_path": [
+            "Çıktı kolonları"
+          ],
+          "change_action": "added",
+          "category": "logic",
+          "before": {
+            "state": "not_applicable",
+            "value": null,
+            "evidence_ids": [
+              "ev-002-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "ID, NAME, EMAIL",
+            "evidence_ids": [
+              "ev-002-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": true
+        },
+        {
+          "fact_id": "fact-002-3",
+          "taxonomy_id": "view.query_property.source_references",
+          "subject_name": "Kaynak tablo",
+          "subject_kind": "View özelliği",
+          "component_path": [
+            "Kaynak tablo"
+          ],
+          "change_action": "added",
+          "category": "logic",
+          "before": {
+            "state": "not_applicable",
+            "value": null,
+            "evidence_ids": [
+              "ev-002-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "GPU_USER.CUSTOMER",
+            "evidence_ids": [
+              "ev-002-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": true
+        }
+      ],
+      "deterministic_summary_tr": "View tanımı sonraki snapshot’ta ilk kez görünüyor.",
+      "limitations_tr": [],
+      "ai_comments": [
+        {
+          "text_tr": "Yeni view tanımı CUSTOMER kaynağından ID, NAME ve EMAIL alanlarını seçiyor. Bu gözlem, görünümün hangi uygulamada kullanıldığını kanıtlamaz.",
+          "kind": "summary",
+          "evidence_ids": [
+            "ev-002-base",
+            "ev-002-target",
+            "ev-002-scope"
+          ],
+          "origin": "validated_ai",
+          "gate": "accepted",
+          "fact_ids": [
+            "fact-002-1",
+            "fact-002-2",
+            "fact-002-3"
+          ],
+          "unit_id": "unit-002",
+          "input_digest": "d4b12b2c956fdd421d520633c9d72ada6d07a07fb1580b7c84ce58d6447d21a3",
+          "acceptance_method": "synthetic_fixture"
+        }
+      ],
+      "recommended_checks": [],
+      "ai_status": "displayed",
+      "unit_ids": [
+        "unit-002"
+      ],
+      "source_checks": {
+        "identity_match": "not_applicable",
+        "presence_comparison": "verified",
+        "start_with_only_proved": false,
+        "remainder_equal": null,
+        "conflict_detected": false
+      }
+    },
+    {
+      "object_id": "obj-003",
+      "identity": {
+        "namespace": "INDEX",
+        "schema_name": "GPU_USER",
+        "name": "IX_CUSTOMER_EMAIL",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "INDEX",
+        "parent_object_id": null,
+        "raw_object_type": "INDEX",
+        "identity_confidence": "known"
+      },
+      "operation": "added",
+      "pattern": "structured",
+      "verification": "verified",
+      "source_paths": [
+        "synthetic/index/IX_CUSTOMER_EMAIL.sql"
+      ],
+      "evidence_ids": [
+        "ev-003-base",
+        "ev-003-target",
+        "ev-003-scope"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-003-1",
+          "taxonomy_id": "common.object.presence",
+          "subject_name": "İndeks tanımı",
+          "subject_kind": "Nesne",
+          "component_path": [
+            "İndeks tanımı"
+          ],
+          "change_action": "added",
+          "category": "presence",
+          "before": {
+            "state": "absent_in_snapshot",
+            "value": null,
+            "evidence_ids": [
+              "ev-003-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "Var",
+            "evidence_ids": [
+              "ev-003-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        },
+        {
+          "fact_id": "fact-003-2",
+          "taxonomy_id": "index.index_property.keys",
+          "subject_name": "Hedef ve kolon",
+          "subject_kind": "İndeks özelliği",
+          "component_path": [
+            "Hedef ve kolon"
+          ],
+          "change_action": "added",
+          "category": "structural",
+          "before": {
+            "state": "not_applicable",
+            "value": null,
+            "evidence_ids": [
+              "ev-003-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "CUSTOMER (EMAIL)",
+            "evidence_ids": [
+              "ev-003-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": true
+        },
+        {
+          "fact_id": "fact-003-3",
+          "taxonomy_id": "index.index_property.unique",
+          "subject_name": "UNIQUE",
+          "subject_kind": "Benzersizlik",
+          "component_path": [
+            "UNIQUE"
+          ],
+          "change_action": "added",
+          "category": "structural",
+          "before": {
+            "state": "not_applicable",
+            "value": null,
+            "evidence_ids": [
+              "ev-003-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "Hayır",
+            "evidence_ids": [
+              "ev-003-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": true
+        }
+      ],
+      "deterministic_summary_tr": "EMAIL kolonu için yeni bir indeks tanımı bulunuyor.",
+      "limitations_tr": [],
+      "ai_comments": [
+        {
+          "text_tr": "Yeni indeksin hedefi CUSTOMER tablosundaki EMAIL kolonu. Tanım UNIQUE değil. Sorgu performansına etkisi ölçülmedi.",
+          "kind": "summary",
+          "evidence_ids": [
+            "ev-003-base",
+            "ev-003-target",
+            "ev-003-scope"
+          ],
+          "origin": "validated_ai",
+          "gate": "accepted",
+          "fact_ids": [
+            "fact-003-1",
+            "fact-003-2",
+            "fact-003-3"
+          ],
+          "unit_id": "unit-003",
+          "input_digest": "6291cf52c68f70aca54981188d3567b14415fc69b0ece028a0d3b54728bc1cbd",
+          "acceptance_method": "synthetic_fixture"
+        }
+      ],
+      "recommended_checks": [],
+      "ai_status": "displayed",
+      "unit_ids": [
+        "unit-003"
+      ],
+      "source_checks": {
+        "identity_match": "not_applicable",
+        "presence_comparison": "verified",
+        "start_with_only_proved": false,
+        "remainder_equal": null,
+        "conflict_detected": false
+      }
+    },
+    {
+      "object_id": "obj-004",
+      "identity": {
+        "namespace": "SCHEMA_OBJECT",
+        "schema_name": "GPU_USER",
+        "name": "SEQ_CUSTOMER",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "SEQUENCE",
+        "parent_object_id": null,
+        "raw_object_type": "SEQUENCE",
+        "identity_confidence": "known"
+      },
+      "operation": "modified",
+      "pattern": "start_with_only",
+      "verification": "verified",
+      "source_paths": [
+        "synthetic/sequence/SEQ_CUSTOMER.sql"
+      ],
+      "evidence_ids": [
+        "ev-004-base",
+        "ev-004-target",
+        "ev-004-scope"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-004-1",
+          "taxonomy_id": "sequence.sequence_property.start_with",
+          "subject_name": "START WITH",
+          "subject_kind": "DDL başlangıç değeri",
+          "component_path": [
+            "START WITH"
+          ],
+          "change_action": "modified",
+          "category": "observed_value",
+          "before": {
+            "state": "present",
+            "value": "15200",
+            "evidence_ids": [
+              "ev-004-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "15480",
+            "evidence_ids": [
+              "ev-004-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        }
+      ],
+      "deterministic_summary_tr": "Yalnız START WITH değeri değişti. Diğer tanım metni aynı.",
+      "limitations_tr": [
+        "START WITH, Git’teki DDL tanımında görülen değerdir. Canlı NEXTVAL veya deployment sonucu değildir. Sayılar arasındaki fark kullanım adedi olarak yorumlanmaz."
+      ],
+      "ai_comments": [],
+      "recommended_checks": [],
+      "ai_status": "not_requested",
+      "unit_ids": [],
+      "source_checks": {
+        "identity_match": "verified",
+        "presence_comparison": "verified",
+        "start_with_only_proved": true,
+        "remainder_equal": true,
+        "conflict_detected": false
+      }
+    },
+    {
+      "object_id": "obj-005",
+      "identity": {
+        "namespace": "SCHEMA_OBJECT",
+        "schema_name": "GPU_USER",
+        "name": "PCK_CUSTOMER",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "PACKAGE_SPEC",
+        "parent_object_id": null,
+        "raw_object_type": "PACKAGE_SPEC",
+        "identity_confidence": "known"
+      },
+      "operation": "modified",
+      "pattern": "structured",
+      "verification": "verified",
+      "source_paths": [
+        "synthetic/package_spec/PCK_CUSTOMER.sql"
+      ],
+      "evidence_ids": [
+        "ev-005-base",
+        "ev-005-target",
+        "ev-005-scope",
+        "ev-005-1-base-abs"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-005-1",
+          "taxonomy_id": "package_spec.parameter.definition",
+          "subject_name": "P_INCLUDE_HISTORY",
+          "subject_kind": "GET_CUSTOMER parametresi",
+          "component_path": [
+            "GET_CUSTOMER",
+            "P_INCLUDE_HISTORY"
+          ],
+          "change_action": "added",
+          "category": "contract",
+          "before": {
+            "state": "absent_in_snapshot",
+            "value": null,
+            "evidence_ids": [
+              "ev-005-1-base-abs"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "IN NUMBER DEFAULT 0",
+            "evidence_ids": [
+              "ev-005-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        }
+      ],
+      "deterministic_summary_tr": "GET_CUSTOMER rutinine 1 parametre eklendi.",
+      "limitations_tr": [],
+      "ai_comments": [
+        {
+          "text_tr": "GET_CUSTOMER arayüzüne varsayılanı 0 olan P_INCLUDE_HISTORY parametresi eklendi. Çağıran kodların uyumluluğu ayrıca incelenmeli.",
+          "kind": "summary",
+          "evidence_ids": [
+            "ev-005-base",
+            "ev-005-target",
+            "ev-005-scope"
+          ],
+          "origin": "validated_ai",
+          "gate": "accepted",
+          "fact_ids": [
+            "fact-005-1"
+          ],
+          "unit_id": "unit-005",
+          "input_digest": "ba57c90486533a372848626579a0e4f379e56e1318c9ee49fbb054f92c2bbc53",
+          "acceptance_method": "synthetic_fixture"
+        }
+      ],
+      "recommended_checks": [
+        {
+          "code": "CALL_SIGNATURE",
+          "text_tr": "İlgili rutin çağrılarını ve varsa overload eşleşmelerini kaynak kapsamı içinde kontrol edin.",
+          "evidence_ids": [
+            "ev-005-scope"
+          ],
+          "origin": "deterministic_rule"
+        }
+      ],
+      "ai_status": "displayed",
+      "unit_ids": [
+        "unit-005"
+      ],
+      "source_checks": {
+        "identity_match": "verified",
+        "presence_comparison": "verified",
+        "start_with_only_proved": false,
+        "remainder_equal": null,
+        "conflict_detected": false
+      }
+    },
+    {
+      "object_id": "obj-006",
+      "identity": {
+        "namespace": "PACKAGE_BODY",
+        "schema_name": "GPU_USER",
+        "name": "PCK_CUSTOMER",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "PACKAGE_BODY",
+        "parent_object_id": null,
+        "raw_object_type": "PACKAGE_BODY",
+        "identity_confidence": "known"
+      },
+      "operation": "modified",
+      "pattern": "text_only",
+      "verification": "limited",
+      "source_paths": [
+        "synthetic/package_body/PCK_CUSTOMER.sql"
+      ],
+      "evidence_ids": [
+        "ev-006-base",
+        "ev-006-target",
+        "ev-006-scope"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-006-1",
+          "taxonomy_id": "common.source.text",
+          "subject_name": "SAVE_CUSTOMER",
+          "subject_kind": "Rutin gövdesi",
+          "component_path": [
+            "SAVE_CUSTOMER"
+          ],
+          "change_action": "modified",
+          "category": "source_text",
+          "before": {
+            "state": "present",
+            "value": "Önceki rutin tanımı",
+            "evidence_ids": [
+              "ev-006-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "Yeni rutin tanımı",
+            "evidence_ids": [
+              "ev-006-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        }
+      ],
+      "deterministic_summary_tr": "Kaynak farkı bulundu. Ayrıntılı etki sınıflandırması sınırlı.",
+      "limitations_tr": [
+        "Değişen bölüm dinamik SQL içeriyor. Çalışma anında oluşacak SQL, hedef nesneler ve etki bu kaynak çiftinden kesinleştirilemedi. Doğrulanamayan ayrıntılar değer gibi sunulmadı."
+      ],
+      "ai_comments": [],
+      "recommended_checks": [
+        {
+          "code": "DYNAMIC_SQL",
+          "text_tr": "Dinamik SQL’i oluşturan ifade ve parametreleri inceleyin; gereken çalışma zamanı kontrollerini yetkili ortamda planlayın.",
+          "evidence_ids": [
+            "ev-006-scope"
+          ],
+          "origin": "deterministic_rule"
+        }
+      ],
+      "ai_status": "not_requested",
+      "unit_ids": [],
+      "source_checks": {
+        "identity_match": "verified",
+        "presence_comparison": "verified",
+        "start_with_only_proved": false,
+        "remainder_equal": null,
+        "conflict_detected": false
+      }
+    },
+    {
+      "object_id": "obj-007",
+      "identity": {
+        "namespace": "SCHEMA_OBJECT",
+        "schema_name": "GPU_USER",
+        "name": "CUSTOMER_ARCHIVE",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "TABLE",
+        "parent_object_id": null,
+        "raw_object_type": "TABLE",
+        "identity_confidence": "known"
+      },
+      "operation": "removed",
+      "pattern": "structured",
+      "verification": "verified",
+      "source_paths": [
+        "synthetic/table/CUSTOMER_ARCHIVE.sql"
+      ],
+      "evidence_ids": [
+        "ev-007-base",
+        "ev-007-target",
+        "ev-007-scope"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-007-1",
+          "taxonomy_id": "common.object.presence",
+          "subject_name": "Tablo tanımı",
+          "subject_kind": "Nesne",
+          "component_path": [
+            "Tablo tanımı"
+          ],
+          "change_action": "removed",
+          "category": "presence",
+          "before": {
+            "state": "present",
+            "value": "Var",
+            "evidence_ids": [
+              "ev-007-base"
+            ]
+          },
+          "after": {
+            "state": "absent_in_snapshot",
+            "value": null,
+            "evidence_ids": [
+              "ev-007-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        }
+      ],
+      "deterministic_summary_tr": "Önceki snapshot’taki tablo tanımı sonraki snapshot’ta yok.",
+      "limitations_tr": [
+        "“Çıkarıldı” ifadesi yalnız karşılaştırılan Git snapshot’larını anlatır. Canlı veritabanında DROP çalıştırıldığını veya veri silindiğini kanıtlamaz."
+      ],
+      "ai_comments": [],
+      "recommended_checks": [],
+      "ai_status": "not_requested",
+      "unit_ids": [],
+      "source_checks": {
+        "identity_match": "not_applicable",
+        "presence_comparison": "verified",
+        "start_with_only_proved": false,
+        "remainder_equal": null,
+        "conflict_detected": false
+      }
+    }
+  ],
+  "artifact_notices": [],
+  "analysis": {
+    "record_origin": "synthetic",
+    "started_at": "2026-09-29T09:12:08+03:00",
+    "completed_at": "2026-09-29T09:12:31+03:00",
+    "elapsed_ms": 23000,
+    "duration_basis": "synthetic",
+    "display_timezone": "Europe/Istanbul",
+    "ai": {
+      "status": "complete",
+      "phase_started_at": "2026-09-29T09:12:11+03:00",
+      "phase_completed_at": "2026-09-29T09:12:29+03:00",
+      "phase_elapsed_ms": 18000,
+      "request_duration_sum_ms": null,
+      "http_attempts": 4,
+      "requested_units": 4,
+      "models": [
+        {
+          "configured_model": "Kimi-K2.7-Code",
+          "returned_models": [],
+          "resolved_model_version": null,
+          "version_verification": "not_reported",
+          "verification_record_id": null,
+          "unit_ids": [
+            "unit-001",
+            "unit-002",
+            "unit-003",
+            "unit-005"
+          ]
+        }
+      ]
+    }
+  }
+}

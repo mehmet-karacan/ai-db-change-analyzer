@@ -6,6 +6,7 @@ import pytest
 
 from db_change_analyzer.git_client import GitClient
 from db_change_analyzer.history import HistoryError, HistoryPlanner
+from db_change_analyzer.workflow import _commit_rows, _history_events
 from tests.helpers.git_fixture import GitFixture
 
 
@@ -28,6 +29,7 @@ def test_g01_no_change_and_g02_out_of_scope(tmp_path: Path) -> None:
     plan = planner.automatic(base, target)
     assert target == expected
     assert plan.outcome == "OUT_OF_SCOPE_ONLY"
+    assert _history_events(plan) == []
 
 
 def test_g05_revert_has_empty_net_but_two_history_transitions(tmp_path: Path) -> None:
@@ -45,6 +47,12 @@ def test_g05_revert_has_empty_net_but_two_history_transitions(tmp_path: Path) ->
     assert len(plan.event_deltas) == 2
     assert len(plan.net_deltas) == 0
     assert plan.outcome == "ANALYZE"
+    events = _history_events(plan)
+    assert len(events) == 2
+    assert [item["commit_sha"] for item in events] == [item.sha for item in plan.commits]
+    assert [item["parent_sha"] for item in events] == [base, plan.commits[0].sha]
+    assert all(item["operation"] == "modified" for item in events)
+    assert len({item["event_id"] for item in events}) == 2
 
 
 def test_g09_manual_root_uses_empty_tree_and_rejects_non_root(tmp_path: Path) -> None:
@@ -54,6 +62,7 @@ def test_g09_manual_root_uses_empty_tree_and_rejects_non_root(tmp_path: Path) ->
     client, _ = fetched(tmp_path, fixture)
     plan = HistoryPlanner(client, ["gpu_user"]).manual_root(root)
     assert len(plan.net_deltas) == 1
+    assert _commit_rows(plan)[0]["delta_kind"] == "root"
     fixture.write("gpu_user/u.sql", "CREATE TABLE GPU_USER.U (ID NUMBER);\n")
     child = fixture.commit("child")
     client.fetch(str(fixture.root), "main")
@@ -77,6 +86,9 @@ def test_g10_side_commit_and_merge_are_in_reachable_ledger(tmp_path: Path) -> No
     assert side in [item.sha for item in plan.commits]
     assert len(plan.commits) == 3
     assert plan.outcome == "ANALYZE"
+    roles = {item["sha"]: item["integration_role"] for item in _commit_rows(plan)}
+    assert roles[side] == "other_reachable"
+    assert roles[target] == "target_first_parent_chain"
 
 
 def test_g16_divergence_fails_closed(tmp_path: Path) -> None:

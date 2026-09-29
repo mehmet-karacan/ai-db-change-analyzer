@@ -4,6 +4,8 @@ import hashlib
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from db_change_analyzer.config import load_config
 from db_change_analyzer.notification import canonical_recipients, persist_notification, send_persisted_notification
 from db_change_analyzer.smtp_transport import SmtpTransport
@@ -92,6 +94,18 @@ def test_disconnect_after_data_started_becomes_unknown_and_is_not_auto_retried()
         assert "explicit operator" in str(exc)
     else:
         raise AssertionError("UNKNOWN notification was retried")
+
+
+def test_corrupted_persisted_mime_is_not_sent() -> None:
+    connection = database()
+    mime = b"message"
+    persist_notification(connection, notification_id="n-corrupt", report_id="report", generation=0,
+                         recipients=["ok@example.test"], message_id="<n-corrupt@example.test>",
+                         mime_bytes=mime, mime_sha256=hashlib.sha256(mime).hexdigest())
+    connection.execute("UPDATE notifications SET mime_bytes=? WHERE notification_id='n-corrupt'", (b"changed",))
+    with pytest.raises(ValueError, match="MIME hash mismatch"):
+        send_persisted_notification(connection, "n-corrupt", transport(FakeSmtp), username="user", password="pass")
+    assert connection.execute("SELECT COUNT(*) FROM notification_attempts").fetchone()[0] == 0
 
 
 def test_receipt_and_checkpoint_callback_share_one_transaction() -> None:

@@ -1,0 +1,45 @@
+AI DB CHANGE ANALYZER
+Oracle DDL incelemesi: {{ report_date }}
+{% if synthetic %}SENTETİK ÖRNEK. Gerçek model çağrısı ve gönderim yapılmadı.
+{% endif %}
+{{ counts.primary_total }} Oracle nesnesinde kaynak değişikliği
+{{ counts.added }} Eklendi | {{ counts.modified }} Değiştirildi | {{ counts.removed }} Çıkarıldı
+{{ summary_tr }}
+{{ coverage_display }}
+
+DEĞİŞEN NESNELER
+{% for obj in index_objects %}{{ obj.number }} {{ obj.type }} {{ obj.display_name }}: {{ obj.action.label }}{% if obj.limited %} (Ayrıntı sınırlı){% endif %}
+{% endfor %}{% if omitted_index %}{{ omitted_index }} nesne listede gösterilmedi.
+{% endif %}{% if omitted_details %}{{ omitted_details }} nesnenin detayı bu e-postada gösterilmedi.
+{% endif %}
+{% for obj in detail_objects %}
+{{ obj.number }} {{ obj.type }}: {{ obj.display_name }}
+Durum: {{ obj.action.label }}
+{{ obj.summary }}
+{% for fact in obj.rows %}
+Değişen alan: {{ fact.field }} ({{ fact.subject }})
+Değişiklik: {{ fact.change }}
+Önceki değer: {{ fact.before }}
+Yeni değer: {{ fact.after }}
+{% endfor %}{% if obj.omitted_facts %}{{ obj.omitted_facts }} alan gösterilmedi.
+{% endif %}{% for comment in obj.comments %}{{ comment.label }}: {{ comment.text }}
+{% endfor %}{% for check in obj.checks %}Önerilen kontrol: {{ check }}
+{% endfor %}{% for note in obj.notes %}Kapsam notu: {{ note }}
+{% endfor %}Analiz yöntemi: {{ obj.method }}
+{% endfor %}
+{% for notice in artifact_notices %}Kaynak kaydı: {{ notice.path_display }}: {{ notice.detail_tr }}
+{% endfor %}
+{% for note in critical_notes %}Sınırlı kayıt: {{ note }}
+{% endfor %}{% for note in coverage_notes %}Karşılaştırma kapsamı: {{ note }}
+{% endfor %}
+ANALİZ KAYDI
+{% for row in ledger_rows %}{{ row.label }}: {{ row.value }}
+{% endfor %}
+KARŞILAŞTIRMA BİLGİSİ
+{% for row in comparison_rows %}{{ row.label }}: {{ row.value }}
+{% endfor %}{% if report_url %}Yetkili tam rapor: {{ report_url }}
+{% endif %}
+KAPSAM VE SORUMLULUK BEYANI
+Rapor, belirtilen Git snapshot'ları arasındaki kaynak tanım farklılıklarıyla sınırlıdır. Canlı veritabanı durumu, deployment sonucu, çalışma zamanı değerleri ve kapsam dışındaki uygulama veya tüketici bağımlılıkları doğrulanmaz.
+AI yorumları yardımcı değerlendirmelerdir; eksik veya hatalı olabilir. Tek başına hata, operasyonel etki, güvenlik veya deployment onayı olarak kullanılmamalıdır. Uygulama kararları, yetkili kişilerin kaynak incelemesi ve uygun testleriyle doğrulanmalıdır.
+Eklendi ve Çıkarıldı ifadeleri Git'teki tanımın varlığını anlatır; canlı veritabanında CREATE veya DROP çalıştığını kanıtlamaz. Rapor, değişikliğin risksiz olduğunu garanti etmez.

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+
+<html dir="ltr" lang="tr" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta name="x-apple-disable-message-reformatting"/>
+<title>AI DB Change Analyzer: Oracle DDL değişiklik incelemesi</title>
+<!--[if mso]>
+<xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+<style type="text/css">body,table,td,th,p,h1,h2,h3,a{font-family:Arial,Helvetica,sans-serif!important}.wrap{word-break:break-all!important}</style>
+<![endif]-->
+<style type="text/css">
+html,body{margin:0!important;padding:0!important;width:100%!important}
+body,table,td,th,p,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
+table,td,th{mso-table-lspace:0pt;mso-table-rspace:0pt}
+a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
+a:focus{outline:2px solid #A84426;outline-offset:3px}
+@media only screen and (max-width:600px){
+.outer-pad{padding:0!important}.px{padding-left:18px!important;padding-right:18px!important}
+.top-left,.top-right{display:block!important;width:auto!important;text-align:left!important}.top-right{padding-top:8px!important}
+.hero-number{width:56px!important;font-size:54px!important;line-height:58px!important}.hero-copy{padding-left:12px!important}
+.hero-title{font-size:25px!important;line-height:32px!important}
+.stat{padding:12px 6px!important}.stat-label{font-size:14px!important;line-height:21px!important}.stat-value{font-size:24px!important;line-height:30px!important}
+.obj-title{font-size:20px!important;line-height:28px!important}
+.object-type,.object-status{display:block!important;width:auto!important;text-align:left!important}.object-status{padding-top:10px!important}
+.index-name,.index-status{display:block!important;width:auto!important;text-align:left!important}.index-name{padding-bottom:4px!important;border-bottom:0!important}.index-status{padding-top:3px!important}
+.diff-table,.diff-table tbody{display:block!important;width:100%!important}.diff-table thead{display:none!important}
+.diff-row{display:block!important;width:100%!important;border-top:1px solid #D7CCC1!important;font-size:0!important}
+.diff-field,.diff-action{display:block!important;width:100%!important;box-sizing:border-box!important;border-top:0!important}
+.diff-field{padding:12px 12px 5px!important}.diff-action{padding:3px 12px 10px!important}
+.diff-before,.diff-after{display:inline-block!important;vertical-align:top!important;width:50%!important;box-sizing:border-box!important;border-top:0!important;padding:10px 12px 14px!important}
+.mobile-label{display:block!important;font-size:14px!important;line-height:20px!important;font-weight:bold!important;margin-bottom:5px!important}
+.meta-key,.meta-value{display:block!important;width:auto!important}.meta-key{border-bottom:0!important;padding-bottom:2px!important}.meta-value{padding-top:0!important}
+}
+@media only screen and (max-width:360px){.px{padding-left:14px!important;padding-right:14px!important}.stat{padding-left:3px!important;padding-right:3px!important}}
+</style>
+</head>
+<body bgcolor="#F4F0EA" style="margin:0;padding:0;background-color:#F4F0EA;color:#24211F;font-family:Arial,Helvetica,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;">{{ preheader }}</div>
+<table bgcolor="#F4F0EA" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background-color:#F4F0EA;border-collapse:collapse;" width="100%">
+<tr><td align="center" class="outer-pad" style="padding:28px 12px;">
+<!--[if mso]><table role="presentation" width="760" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table bgcolor="#FFFEFC" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:760px;background-color:#FFFEFC;border-collapse:collapse;" width="100%"><tr><td bgcolor="#A84426" height="5" style="height:5px;line-height:5px;font-size:0;background-color:#A84426;"> </td></tr>
+<tr><td class="px" style="padding:22px 34px;border-bottom:1px solid #D7CCC1;">
+<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;border-collapse:collapse;" width="100%"><tr>
+<td align="left" class="top-left" style="font-size:14px;line-height:21px;font-weight:bold;letter-spacing:1px;color:#A84426;">AI DB CHANGE ANALYZER</td>
+<td align="right" class="top-right" style="font-size:13px;line-height:20px;color:#5F5954;">Oracle DDL incelemesi<br/>{{ report_date }}</td>
+</tr></table>
+</td></tr>
+{% if synthetic %}<tr><td bgcolor="#F3EEE7" class="px" style="padding:12px 34px;background-color:#F3EEE7;font-size:14px;line-height:21px;color:#5F5954;">
+<strong style="color:#24211F;">Tasarım örneği.</strong> Nesneler, değerler, AI yorumları ve süreler sentetiktir. Gerçek model çağrısı yapılmadı.
+</td></tr>{% endif %}
+{% include 'components/summary.html.j2' %}
+{% include 'components/object_list.html.j2' %}
+{% for obj in detail_objects %}{% include obj.renderer %}{% endfor %}
+{% if artifact_notices %}<tr><td class="px" style="padding:8px 34px 24px;"><h2 style="font-size:21px;color:#24211F;">Çözümlenemeyen kaynak kayıtları</h2>{% for notice in artifact_notices %}<p style="font-size:14px;line-height:23px;color:#5F5954;"><strong>{{ notice.path_display }}:</strong> {{ notice.detail_tr }}</p>{% endfor %}</td></tr>{% endif %}
+{% if critical_notes %}<tr><td class="px" style="padding:8px 34px 20px;font-size:14px;line-height:23px;color:#24211F;"><strong>Ayrıntısı kısaltılan sınırlı kayıtlar</strong>{% for note in critical_notes %}<p style="margin:8px 0;">{{ note }}</p>{% endfor %}</td></tr>{% endif %}
+{% if coverage_notes %}<tr><td class="px" style="padding:8px 34px 20px;font-size:14px;line-height:23px;color:#5F5954;"><strong>Karşılaştırmanın kapsam sınırları</strong>{% for note in coverage_notes %}<p style="margin:8px 0;">{{ note }}</p>{% endfor %}</td></tr>{% endif %}
+{% include 'components/analysis_record.html.j2' %}
+{% include 'components/comparison_info.html.j2' %}
+{% set in_object = false %}{% include 'components/scope_notes.html.j2' %}
+<tr><td class="px" style="padding:17px 34px;border-top:1px solid #D7CCC1;font-size:13px;line-height:21px;color:#5F5954;">AI DB Change Analyzer<br/>{% if synthetic %}V5 sentetik tasarım incelemesi; gönderilmedi.{% else %}Git snapshot tabanlı kaynak analizi.{% endif %}</td></tr></table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr></table>
+</body>
+</html>

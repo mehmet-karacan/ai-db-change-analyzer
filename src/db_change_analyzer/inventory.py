@@ -75,7 +75,8 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
         for item in result.occurrences
     )
     status = "parsed" if parse_ok else "text_fallback" if result.occurrences else "unresolved"
-    return result, projections, status, tuple((*result.diagnostics, *parse_diagnostics))
+    extraction_diagnostics = tuple(code for projection in projections for code in projection.diagnostics) if parse_ok else ()
+    return result, projections, status, tuple((*result.diagnostics, *parse_diagnostics, *extraction_diagnostics))
 
 
 def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, max_file_bytes: int, timeout_seconds: int, parse_paths: set[bytes] | None = None) -> list[FileInventory]:

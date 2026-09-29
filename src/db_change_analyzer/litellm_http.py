@@ -30,7 +30,8 @@ class ModelReply:
 
 def response_format(mode: str, schema: dict[str, Any]) -> dict[str, Any] | None:
     if mode == "json_schema":
-        return {"type": "json_schema", "json_schema": {"name": "db_change_unit", "strict": True, "schema": schema}}
+        name = "db_change_mail_commentary" if schema.get("properties", {}).get("schema_version", {}).get("const") == "mail-commentary/1.1" else "db_change_unit"
+        return {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}}
     if mode == "json_object":
         return {"type": "json_object"}
     return None
@@ -99,12 +100,13 @@ class LiteLLMClient:
             response_schema=response_schema, output_tokens=output_tokens,
         )
 
-    def probe_synthetic(self, *, api_key: str, response_schema: dict[str, Any], output_tokens: int) -> ModelReply:
+    def probe_synthetic(self, *, api_key: str, response_schema: dict[str, Any], output_tokens: int,
+                        user_payload: dict[str, Any] | None = None, system_message: str | None = None) -> ModelReply:
         """Probe an unverified route with fixed synthetic content only."""
         return self._complete_request(
             api_key=api_key,
-            system_message="Return only the requested JSON for this synthetic smoke input.",
-            user_payload=synthetic_probe_payload(),
+            system_message=system_message or "Return only the requested JSON for this synthetic smoke input.",
+            user_payload=user_payload if user_payload is not None else synthetic_probe_payload(),
             response_schema=response_schema,
             output_tokens=output_tokens,
         )

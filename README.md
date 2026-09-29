@@ -2,6 +2,8 @@
 
 Oracle DDL snapshot’larının sabit Git revision’ları arasındaki değişikliklerini kaynak kanıtından ayırmadan analiz eden, tek süreçli CPython 3.13 CLI ürünüdür. Ürün kaynak repository’ye yazmaz, Oracle SQL çalıştırmaz ve mevcut DB Sync pipeline’ını değiştirmez.
 
+Repository'deki Analyzer `Jenkinsfile` devre dışı no-op pipeline'dır. Tetiklense bile analiz, model ve e-posta aşamalarını çalıştırmaz; Jenkins sunucusunda tanımlı harici tetikleyiciler ayrıca yönetilir. `docs/Jenkinsfile.txt` ayrı DB Sync referansıdır ve değiştirilmemiştir.
+
 Geliştirme kurulumu:
 
 ```text
@@ -24,6 +26,10 @@ db-change-analyzer --config gpu.toml run --dry-run --offline
 ```
 
 `run --allow-ai --allow-mail` yalnız verified model profile ve hazırlanmış SMTP config ile açılır. `manual` otomatik checkpoint'i değiştirmez; `notification resend` yeni AI analizi yapmaz. CLI stdout'ta tek satır `ResultRecord` JSON, stderr'de kaynak/secret içermeyen JSONL işletim olayları üretir.
+
+Yeni raporlar canonical `report/1.0` kaydına bağlı `mail-view/2.0` ve `render-manifest/1.0` yan kayıtlarıyla V5 HTML/plain text/MIME üretir. Altı desteklenen Oracle nesne türünde doğrulanamayan özellik aileleri görünümde sınırlı kapsam olarak işaretlenir. Model yalnız temizlenmiş `mail-unit-input/1.0` alır; `mail-commentary/1.1` yanıtındaki serbest yorumlar kanıtlı deterministik kabul kapısından geçmedikçe mailde gösterilmez. Önceden hazırlanmış bildirim tekrar denendiğinde kayıtlı MIME aynen kullanılır.
+
+Mevcut schema v1 state için kapsam kilidi altında ve yedek alarak `db-change-analyzer --config gpu.toml state migrate-v5` çalıştırılır. Eski rapor ve pending bildirim byte'ları korunur. `docs/V5_UYGULAMA_DURUMU.md` uygulama kapsamını ve henüz yapılmamış kurum kabul adımlarını listeler.
 
 Doğrulama:
 

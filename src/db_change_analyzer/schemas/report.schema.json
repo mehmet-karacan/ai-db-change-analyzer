@@ -1,0 +1,1617 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DB Change Analyzer Report 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "synthetic": {
+      "type": "boolean"
+    },
+    "report_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "supersedes_report_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "AUTO",
+            "MANUAL"
+          ]
+        },
+        "repository_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "scope_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "base_sha": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_sha": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "planned_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "analysis_started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "analysis_completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "analysis_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_git_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "snapshot_captured_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actual_db_change_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originating_analyzer_build": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "job_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "build_number": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                },
+                "build_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "job_name",
+                "build_number",
+                "build_url"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sync_build": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "run_id",
+        "mode",
+        "repository_id",
+        "branch",
+        "scope_hash",
+        "epoch",
+        "base_sha",
+        "target_sha",
+        "planned_at",
+        "analysis_started_at",
+        "analysis_completed_at",
+        "analysis_generation",
+        "observed_git_at",
+        "snapshot_captured_at",
+        "actual_db_change_at",
+        "originating_analyzer_build",
+        "sync_build"
+      ]
+    },
+    "quality": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "limited",
+        "blocked"
+      ]
+    },
+    "automatic_commit_eligible": {
+      "type": "boolean"
+    },
+    "summary_tr": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "overall_ai_risk": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "net_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "history_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "net_known_objects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "history_known_objects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "change_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ai_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ai_http_attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "analyzed_objects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "limited_objects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_objects": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_artifacts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "has_unknown_object_count": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "net_files",
+        "history_files",
+        "net_known_objects",
+        "history_known_objects",
+        "change_events",
+        "ai_units",
+        "ai_http_attempts",
+        "analyzed_objects",
+        "limited_objects",
+        "unresolved_objects",
+        "unknown_artifacts",
+        "has_unknown_object_count"
+      ]
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "analyzer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "grammar_commit": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "parser_adapter": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "unit_response_schema": {
+          "const": "1.0"
+        },
+        "report_schema": {
+          "const": "1.0"
+        },
+        "configured_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "returned_model": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolved_model_version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "config_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "analyzer",
+        "grammar_commit",
+        "parser_adapter",
+        "prompt",
+        "unit_response_schema",
+        "report_schema",
+        "configured_model",
+        "returned_model",
+        "resolved_model_version",
+        "config_digest"
+      ]
+    },
+    "commits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sha": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+            },
+            "minItems": 0,
+            "maxItems": 32
+          },
+          "git_author_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "git_committer_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "delta_kind": {
+            "type": "string",
+            "enum": [
+              "first_parent",
+              "root"
+            ]
+          },
+          "integration_role": {
+            "type": "string",
+            "enum": [
+              "target_first_parent_chain",
+              "other_reachable"
+            ]
+          }
+        },
+        "required": [
+          "sha",
+          "parents",
+          "git_author_time",
+          "git_committer_time",
+          "position",
+          "delta_kind",
+          "integration_role"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 100000
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "commit_sha": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+          },
+          "parent_sha": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "object_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_paths_b64": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 12000
+            },
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "removed",
+              "unchanged",
+              "relocated",
+              "unknown"
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "structural",
+                "contract",
+                "logic",
+                "transaction",
+                "exception",
+                "physical_configuration",
+                "sequence_observed_value",
+                "documentation",
+                "format_only",
+                "source_order_only",
+                "source_relocation",
+                "artifact_metadata",
+                "unknown"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "before_evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "minItems": 0,
+            "maxItems": 1000
+          },
+          "after_evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "minItems": 0,
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "event_id",
+          "commit_sha",
+          "parent_sha",
+          "object_key",
+          "artifact_paths_b64",
+          "operation",
+          "categories",
+          "before_evidence_ids",
+          "after_evidence_ids"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 100000
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path_display": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "path_b64": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000
+          },
+          "net_operation": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "removed",
+              "unchanged",
+              "relocated",
+              "unknown"
+            ]
+          },
+          "old_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 6
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "new_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 6
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "old_blob": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "new_blob": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "known_objects": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parse_status": {
+            "type": "string",
+            "enum": [
+              "parsed",
+              "limited",
+              "unresolved",
+              "metadata_only"
+            ]
+          },
+          "diagnostic_codes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "minItems": 0,
+            "maxItems": 1000
+          },
+          "assessments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "unit_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "source_pair": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "old_revision": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "new_revision": {
+                      "type": "string",
+                      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                    }
+                  },
+                  "required": [
+                    "old_revision",
+                    "new_revision"
+                  ]
+                },
+                "view_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "net",
+                      "history"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 2
+                },
+                "event_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "minItems": 0,
+                  "maxItems": 1000
+                },
+                "context_digest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "coverage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "mandatory_spans_total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "mandatory_spans_covered": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "optional_omissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "minItems": 0,
+                      "maxItems": 1000
+                    }
+                  },
+                  "required": [
+                    "mandatory_spans_total",
+                    "mandatory_spans_covered",
+                    "optional_omissions"
+                  ]
+                },
+                "response": {
+                  "$ref": "#/$defs/UnitResponse"
+                }
+              },
+              "required": [
+                "unit_id",
+                "source_pair",
+                "view_tags",
+                "event_ids",
+                "context_digest",
+                "coverage",
+                "response"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 10000
+          }
+        },
+        "required": [
+          "path_display",
+          "path_b64",
+          "net_operation",
+          "old_mode",
+          "new_mode",
+          "old_blob",
+          "new_blob",
+          "known_objects",
+          "parse_status",
+          "diagnostic_codes",
+          "assessments"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 100000
+    },
+    "evidence_registry": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "source"
+              },
+              "evidence_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              "path_display": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "path_b64": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000
+              },
+              "blob_oid": {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              "source_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "start_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "start_byte": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_byte_exclusive": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fragment_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "snippet": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 65536
+              },
+              "redacted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "evidence_id",
+              "revision",
+              "path_display",
+              "path_b64",
+              "blob_oid",
+              "source_sha256",
+              "start_line",
+              "end_line",
+              "start_byte",
+              "end_byte_exclusive",
+              "fragment_sha256",
+              "snippet",
+              "redacted"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "artifact_metadata"
+              },
+              "evidence_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              "path_display": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "path_b64": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000
+              },
+              "git_mode": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 6
+              },
+              "blob_oid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "size_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              }
+            },
+            "required": [
+              "kind",
+              "evidence_id",
+              "revision",
+              "path_display",
+              "path_b64",
+              "git_mode",
+              "blob_oid",
+              "size_bytes",
+              "detail"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "context_limit"
+              },
+              "evidence_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 3000
+              },
+              "related_evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "minItems": 0,
+                "maxItems": 64
+              }
+            },
+            "required": [
+              "kind",
+              "evidence_id",
+              "code",
+              "detail",
+              "related_evidence_ids"
+            ]
+          }
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 100000
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "object_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "namespace": {
+                "type": "string",
+                "enum": [
+                  "SCHEMA",
+                  "PUBLIC",
+                  "GLOBAL",
+                  "UNKNOWN"
+                ]
+              },
+              "schema_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "object_type": {
+                "type": "string",
+                "enum": [
+                  "TABLE",
+                  "VIEW",
+                  "MATERIALIZED_VIEW",
+                  "MATERIALIZED_VIEW_LOG",
+                  "SEQUENCE",
+                  "INDEX",
+                  "CONSTRAINT",
+                  "TRIGGER",
+                  "PACKAGE_SPEC",
+                  "PACKAGE_BODY",
+                  "PROCEDURE",
+                  "FUNCTION",
+                  "TYPE",
+                  "TYPE_BODY",
+                  "SYNONYM",
+                  "GRANT",
+                  "REVOKE",
+                  "COMMENT",
+                  "DIRECTORY",
+                  "DATABASE_LINK",
+                  "USER",
+                  "ROLE",
+                  "JOB",
+                  "OTHER"
+                ]
+              },
+              "raw_schema": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "raw_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "schema_quoted": {
+                "type": "boolean"
+              },
+              "name_quoted": {
+                "type": "boolean"
+              },
+              "identity_confidence": {
+                "type": "string",
+                "enum": [
+                  "known",
+                  "uncertain"
+                ]
+              },
+              "parent_key": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "routine_signature": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "object_key",
+              "namespace",
+              "schema_name",
+              "name",
+              "object_type",
+              "raw_schema",
+              "raw_name",
+              "schema_quoted",
+              "name_quoted",
+              "identity_confidence",
+              "parent_key",
+              "routine_signature"
+            ]
+          },
+          "net_operation": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "removed",
+              "unchanged",
+              "relocated",
+              "unknown"
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "structural",
+                "contract",
+                "logic",
+                "transaction",
+                "exception",
+                "physical_configuration",
+                "sequence_observed_value",
+                "documentation",
+                "format_only",
+                "source_order_only",
+                "source_relocation",
+                "artifact_metadata",
+                "unknown"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "limited",
+              "unresolved"
+            ]
+          },
+          "parser_level": {
+            "type": "string",
+            "enum": [
+              "structural",
+              "limited",
+              "text_fallback",
+              "unresolved"
+            ]
+          },
+          "old_evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "minItems": 0,
+            "maxItems": 1000
+          },
+          "new_evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "minItems": 0,
+            "maxItems": 1000
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "fact_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "property": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "before": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 6000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "after": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 6000
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "structural",
+                    "contract",
+                    "logic",
+                    "transaction",
+                    "exception",
+                    "physical_configuration",
+                    "sequence_observed_value",
+                    "documentation",
+                    "format_only",
+                    "source_order_only",
+                    "source_relocation",
+                    "artifact_metadata",
+                    "unknown"
+                  ]
+                },
+                "evidence_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "minItems": 1,
+                  "maxItems": 64
+                },
+                "source_pair": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "old_revision": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "new_revision": {
+                      "type": "string",
+                      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                    }
+                  },
+                  "required": [
+                    "old_revision",
+                    "new_revision"
+                  ]
+                },
+                "event_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "minItems": 0,
+                  "maxItems": 1000
+                },
+                "view_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "net",
+                      "history"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 2
+                }
+              },
+              "required": [
+                "fact_id",
+                "property",
+                "before",
+                "after",
+                "category",
+                "evidence_ids",
+                "source_pair",
+                "event_ids",
+                "view_tags"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 10000
+          },
+          "assessments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "unit_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "source_pair": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "old_revision": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "new_revision": {
+                      "type": "string",
+                      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                    }
+                  },
+                  "required": [
+                    "old_revision",
+                    "new_revision"
+                  ]
+                },
+                "view_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "net",
+                      "history"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 2
+                },
+                "event_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "minItems": 0,
+                  "maxItems": 1000
+                },
+                "context_digest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "coverage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "mandatory_spans_total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "mandatory_spans_covered": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "optional_omissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "minItems": 0,
+                      "maxItems": 1000
+                    }
+                  },
+                  "required": [
+                    "mandatory_spans_total",
+                    "mandatory_spans_covered",
+                    "optional_omissions"
+                  ]
+                },
+                "response": {
+                  "$ref": "#/$defs/UnitResponse"
+                }
+              },
+              "required": [
+                "unit_id",
+                "source_pair",
+                "view_tags",
+                "event_ids",
+                "context_digest",
+                "coverage",
+                "response"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 10000
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "minItems": 0,
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "identity",
+          "net_operation",
+          "categories",
+          "status",
+          "parser_level",
+          "old_evidence_ids",
+          "new_evidence_ids",
+          "facts",
+          "assessments",
+          "diagnostics"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 100000
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 3000
+      },
+      "minItems": 0,
+      "maxItems": 10000
+    }
+  },
+  "required": [
+    "schema_version",
+    "synthetic",
+    "report_id",
+    "supersedes_report_id",
+    "run",
+    "quality",
+    "automatic_commit_eligible",
+    "summary_tr",
+    "overall_ai_risk",
+    "counts",
+    "versions",
+    "commits",
+    "events",
+    "artifacts",
+    "evidence_registry",
+    "objects",
+    "limitations"
+  ],
+  "$defs": {
+    "UnitResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "unit_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "summary_tr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1500
+        },
+        "summary_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "interpretation",
+                  "possible_impact",
+                  "recommended_check",
+                  "uncertainty"
+                ]
+              },
+              "claim": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1400
+              },
+              "risk": {
+                "type": "string",
+                "enum": [
+                  "unknown",
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              },
+              "evidence_level": {
+                "type": "string",
+                "enum": [
+                  "source_backed_inference",
+                  "hypothesis"
+                ]
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "minItems": 1,
+                "maxItems": 64
+              }
+            },
+            "required": [
+              "kind",
+              "claim",
+              "risk",
+              "evidence_level",
+              "evidence_ids"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 20
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1200
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "minItems": 1,
+                "maxItems": 64
+              }
+            },
+            "required": [
+              "code",
+              "detail",
+              "evidence_ids"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "schema_version",
+        "unit_id",
+        "summary_tr",
+        "summary_evidence_ids",
+        "findings",
+        "limitations"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "quality": {
+            "const": "blocked"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "automatic_commit_eligible": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
+}

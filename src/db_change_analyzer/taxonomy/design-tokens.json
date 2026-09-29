@@ -1,0 +1,82 @@
+{
+  "schema_version": "design-tokens/1.0",
+  "template_version": "v5.0",
+  "palette": {
+    "outer": "#F4F0EA",
+    "paper": "#FFFEFC",
+    "ink": "#24211F",
+    "muted": "#5F5954",
+    "copper": "#A84426",
+    "line": "#D7CCC1",
+    "tint": "#F3EEE7",
+    "added": "#24583D",
+    "added_bg": "#EDF5EF",
+    "modified": "#8C4817",
+    "modified_bg": "#FBF0E2",
+    "removed": "#8E343A",
+    "removed_bg": "#FBEFF0",
+    "ai": "#694074",
+    "ai_bg": "#F6F0F8",
+    "dark": "#2B2724",
+    "dark_text": "#FFFEFC",
+    "dark_muted": "#DDD3CA"
+  },
+  "actions": {
+    "added": {
+      "label": "Eklendi",
+      "symbol": "+",
+      "fg": "#24583D",
+      "bg": "#EDF5EF"
+    },
+    "modified": {
+      "label": "Değiştirildi",
+      "symbol": "~",
+      "fg": "#8C4817",
+      "bg": "#FBF0E2"
+    },
+    "removed": {
+      "label": "Çıkarıldı",
+      "symbol": "-",
+      "fg": "#8E343A",
+      "bg": "#FBEFF0"
+    }
+  },
+  "labels": {
+    "table_headers": [
+      "Değişen alan",
+      "Değişiklik",
+      "Önceki değer",
+      "Yeni değer"
+    ],
+    "limited": "Ayrıntı sınırlı",
+    "unknown": "Doğrulanamadı",
+    "relocated": "Kaynak konumu değişti",
+    "ai": "AI Yorumu",
+    "check": "Önerilen kontrol",
+    "method": "Analiz yöntemi"
+  },
+  "font": {
+    "family": "Arial, Helvetica, sans-serif",
+    "body_px": 15,
+    "minimum_content_px": 14,
+    "minimum_metadata_px": 13,
+    "line_height_px": 23
+  },
+  "geometry": {
+    "max_width_px": 760,
+    "desktop_padding_px": 34,
+    "mobile_padding_px": 18,
+    "columns_percent": [
+      25,
+      25,
+      25,
+      25
+    ]
+  },
+  "budgets": {
+    "html_bytes": 90000,
+    "mime_bytes": 150000
+  },
+  "long_dashes_in_generated_prose": false,
+  "color_is_risk_score": false
+}

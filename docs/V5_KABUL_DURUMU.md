@@ -1,0 +1,14 @@
+# V5 kabul durumu
+
+Kaynak: onaylı paketin `TEST_PLANI.md` dosyasındaki P/A/M/R/S matrisi. `PASS`, yalnız belirtilen yerel mock/fixture kapısının geçtiğini ifade eder. Kurum ve istemci kabulü ayrıca gerekir.
+
+| Grup | Yerel durum | Açık kalan kabul |
+|---|---|---|
+| P01-P10: altı Oracle türünün kaynak farkları | Kısmi. P01'in altı tür × üç operasyon = 18 gerçek SQL fixture kombinasyonu parser ve taxonomy kanıtıyla geçiyor; her türün ayrıca özellik testleri var. TABLE için ayrı ALTER/COMMENT dosyaları parent nesneye bağlanıyor. P03 için iki eşdeğer INDEX kaynağı tek nesne değişikliği üretiyor; farklı tekrar tanımı `CONFLICTING_DEFINITIONS` ile incelemeye kalıyor. | Tüm katalog özellik aileleri kapanmadı; karmaşık partition, LOB, domain index, VIEW ve PL/SQL sınırları `V5_UYGULAMA_DURUMU.md` içinde. |
+| P11-P12: eksik kapsam/konum | Yerel PASS. Eksik identity taraması yokluk çıkarımını engelliyor; bilinmeyen tür generic görünümde kalıyor. Dosya yolu, salt biçim, kaynak metni ve doğrulanmış tanım sırası ayrı fact; salt biçim ve sıra ana yapısal toplamdan ayrılıyor. | Normatif K3 corpus kimliği mevcut yerel arşivle uyuşmadığı için gerçek snapshot çifti kabulü bekliyor. |
+| A01-A04: AI kapısı | Yerel PASS. Şema/digest/evidence/secret ve geçerli ama desteklenmeyen iddia senaryoları, iki deneme sonrası exit 31, checkpoint koruması testli. | Kurum LiteLLM route, gerçek model kalitesi ve gizlilik kabulü çalıştırılmadı. |
+| M01-M02: model ve süre kaydı | Kısmi. Configured/returned etiketi, model birimi ve ayrı AI/toplam süre alanları yerel akışta var; geçersiz yanıtın dönen model etiketi aynı digest ile devam eden run'da korunuyor. Süreçler arası toplam süre `timestamp_difference`, tek süreç süresi `monotonic` olarak etiketleniyor. | Paralel çağrı ve çoklu model sağlayıcı kabulü ayrıca ölçülmeli. |
+| R01-R04: render/güvenlik | Kısmi. V5 HTML/text/MIME aynı view'dan; 0/1/7/120/1000 nesne, tam/kompakt/minimal profil, gerçek toplamlar, atlanan kayıt sayıları, canlı anchor, ayrı HTML/MIME sınırı, escaping ve URL allowlist yerel testleri geçti. Paketin 115 sunum kontrolü de geçti. | Native Outlook, gateway, ekran okuyucu ve 200% zoom kabulü tamamlanmadı. |
+| S01-S05: state/history/outbox | Kısmi. Baseline/no-change, pinli AUTO retry, yeni uzak commit karşısında sabit hedef, commit bazlı geçmiş olayları ve net sıfır olan revert, SMTP hata sonrası aynı MIME, operatör retry/resolve ile AUTO checkpoint, blocked review, yarım rapor rollback'i, eksik çıktı onarımı ve V5 MIME/manifest bağı yerel testli. | Gerçek SMTP receipt/crash, eski üretim pending MIME ve kurum iş zamanlayıcı kabulü çalıştırılmadı. |
+
+Canlı model, e-posta, DB, kaynak repository yazma, deployment veya push bu görevde yetkilendirilmedi ve çalıştırılmadı. Eski `KABUL_MATRISI.md` V5 matrisi değildir.

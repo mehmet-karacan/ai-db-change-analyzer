@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -8,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Callable
 
 from .smtp_transport import SmtpDeliveryError, SmtpResult, SmtpTransport
+from .state import StateError
 
 
 def _now() -> str:
@@ -48,16 +50,74 @@ def persist_notification(
     mime_bytes: bytes,
     mime_sha256: str,
 ) -> None:
-    addresses = canonical_recipients(recipients)
     with connection:
-        connection.execute(
-            "INSERT INTO notifications(notification_id,report_id,generation,envelope_json,message_id,mime_bytes,mime_sha256,status) VALUES (?,?,?,?,?,?,?,'READY')",
-            (notification_id, report_id, generation, json.dumps(addresses, separators=(",", ":")), message_id, mime_bytes, mime_sha256),
+        insert_notification(
+            connection, notification_id=notification_id, report_id=report_id,
+            generation=generation, recipients=recipients, message_id=message_id,
+            mime_bytes=mime_bytes, mime_sha256=mime_sha256,
         )
-        connection.executemany(
-            "INSERT INTO notification_recipients(notification_id,address,status) VALUES (?,?,'PENDING')",
-            [(notification_id, address) for address in addresses],
-        )
+
+
+def insert_notification(
+    connection: sqlite3.Connection,
+    *,
+    notification_id: str,
+    report_id: str,
+    generation: int,
+    recipients: list[str],
+    message_id: str,
+    mime_bytes: bytes,
+    mime_sha256: str,
+) -> None:
+    """Insert an immutable outbox row inside the caller's transaction."""
+    addresses = canonical_recipients(recipients)
+    connection.execute(
+        "INSERT INTO notifications(notification_id,report_id,generation,envelope_json,message_id,mime_bytes,mime_sha256,status) VALUES (?,?,?,?,?,?,?,'READY')",
+        (notification_id, report_id, generation, json.dumps(addresses, separators=(",", ":")), message_id, mime_bytes, mime_sha256),
+    )
+    connection.executemany(
+        "INSERT INTO notification_recipients(notification_id,address,status) VALUES (?,?,'PENDING')",
+        [(notification_id, address) for address in addresses],
+    )
+
+
+def finalize_auto_delivery(connection: sqlite3.Connection, notification_id: str, scope_hash: str) -> None:
+    """Advance an active AUTO run only after its immutable envelope is accepted.
+
+    Call inside the transaction that records SMTP acceptance or operator
+    resolution. Manual reports and later resends of committed runs are inert.
+    """
+    row = connection.execute(
+        """SELECT r.run_id,r.mode,r.status,r.scope_hash,r.epoch,r.base_sha,r.target_sha,
+                  r.report_id AS current_report_id,p.report_id,
+                  p.quality,n.status AS notification_status
+           FROM notifications n
+           JOIN reports p ON p.report_id=n.report_id
+           JOIN runs r ON r.run_id=p.run_id
+           WHERE n.notification_id=?""",
+        (notification_id,),
+    ).fetchone()
+    if row is None:
+        raise StateError("notification is not linked to its current report")
+    if row["scope_hash"] != scope_hash:
+        raise StateError("notification scope mismatch")
+    if (row["current_report_id"] != row["report_id"] or row["mode"] != "AUTO"
+            or row["status"] != "REPORTED" or row["notification_status"] != "ACCEPTED"):
+        return
+    if row["quality"] == "blocked":
+        connection.execute("UPDATE runs SET status='REVIEW_REQUIRED' WHERE run_id=?", (row["run_id"],))
+        return
+    cursor = connection.execute(
+        "UPDATE scopes SET checkpoint_sha=? WHERE scope_hash=? AND epoch=? AND checkpoint_sha IS ?",
+        (row["target_sha"], scope_hash, row["epoch"], row["base_sha"]),
+    )
+    if cursor.rowcount != 1:
+        raise StateError("checkpoint compare-and-swap failed during delivery commit")
+    connection.execute("UPDATE runs SET status='COMMITTED' WHERE run_id=?", (row["run_id"],))
+    connection.execute(
+        "INSERT INTO audit_events(scope_hash,run_id,action,actor,expected_base,target,created_at) VALUES (?,?,'CHECKPOINT_ADVANCED','system',?,?,?)",
+        (scope_hash, row["run_id"], row["base_sha"], row["target_sha"], _now()),
+    )
 
 
 def send_persisted_notification(
@@ -79,6 +139,8 @@ def send_persisted_notification(
     ).fetchone()
     if row is None:
         raise ValueError("notification does not exist")
+    if hashlib.sha256(row["mime_bytes"]).hexdigest() != row["mime_sha256"]:
+        raise ValueError("persisted notification MIME hash mismatch")
     if row["status"] == "UNKNOWN":
         raise ValueError("unknown delivery requires explicit operator resolution")
     recipients = [item["address"] for item in connection.execute(

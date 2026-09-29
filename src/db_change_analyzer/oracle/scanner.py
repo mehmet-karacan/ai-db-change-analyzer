@@ -64,6 +64,10 @@ def _mask_sql(text: str) -> tuple[str, list[str]]:
         if state == "normal":
             prefix = text[index : index + 3].lower()
             nq_prefix = text[index : index + 4].lower()
+            if char == '"':
+                state = "double"
+                index += 1
+                continue
             if char == "-" and following == "-":
                 masked[index] = masked[index + 1] = " "
                 state = "line_comment"
@@ -98,6 +102,15 @@ def _mask_sql(text: str) -> tuple[str, list[str]]:
                 masked[index] = " "
             index += 1
             continue
+        if state == "double":
+            if char == '"' and following == '"':
+                index += 2
+            elif char == '"':
+                state = "normal"
+                index += 1
+            else:
+                index += 1
+            continue
         if state == "block_comment":
             if char == "*" and following == "/":
                 masked[index] = masked[index + 1] = " "
@@ -130,6 +143,38 @@ def _mask_sql(text: str) -> tuple[str, list[str]]:
     if state not in {"normal", "line_comment"}:
         diagnostics.append(f"UNTERMINATED_{state.upper()}")
     return "".join(masked), diagnostics
+
+
+def mask_sql_code(text: str) -> str:
+    """Preserve character offsets while hiding non-code and quoted names.
+
+    This is for finding SQL keywords only. It does not parse Oracle syntax.
+    Empty output indicates an unterminated literal, comment or identifier.
+    """
+    masked, diagnostics = _mask_sql(text)
+    if diagnostics:
+        return ""
+    chars = list(masked)
+    index = 0
+    while index < len(chars):
+        if chars[index] != '"':
+            index += 1
+            continue
+        start = index
+        index += 1
+        while index < len(chars):
+            if chars[index] == '"':
+                if index + 1 < len(chars) and chars[index + 1] == '"':
+                    index += 2
+                    continue
+                index += 1
+                break
+            index += 1
+        else:
+            return ""
+        for position in range(start, index):
+            chars[position] = " "
+    return "".join(chars)
 
 
 def _identifier(value: str) -> tuple[str, bool]:

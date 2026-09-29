@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Immutable V5 render binding",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "render-manifest/1.0"
+    },
+    "report_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "synthetic": {
+      "type": "boolean"
+    },
+    "render_generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_report_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mail_view_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "template_pack_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "template_version": {
+      "const": "v5.0"
+    },
+    "taxonomy_version": {
+      "const": "oracle-taxonomy/1.0"
+    },
+    "profile": {
+      "enum": [
+        "full",
+        "compact",
+        "summary",
+        "minimal"
+      ]
+    },
+    "html_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "text_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "mime_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "html_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mime_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "index_object_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+      },
+      "uniqueItems": true
+    },
+    "detail_object_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+      },
+      "uniqueItems": true
+    },
+    "omitted_index_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "omitted_detail_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ai_objects_displayed": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "report_id",
+    "synthetic",
+    "render_generation",
+    "source_report_sha256",
+    "mail_view_sha256",
+    "template_pack_sha256",
+    "template_version",
+    "taxonomy_version",
+    "profile",
+    "html_sha256",
+    "text_sha256",
+    "mime_sha256",
+    "html_bytes",
+    "mime_bytes",
+    "index_object_ids",
+    "detail_object_ids",
+    "omitted_index_objects",
+    "omitted_detail_objects",
+    "ai_objects_displayed"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "synthetic": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_report_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

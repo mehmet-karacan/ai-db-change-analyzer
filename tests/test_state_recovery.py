@@ -30,6 +30,38 @@ def test_g07_init_creates_empty_checkpoint_and_verified_identity(tmp_path: Path)
     assert store.paths.lock.exists()
 
 
+def test_explicit_v1_to_v5_migration_preserves_state_and_creates_backup(tmp_path: Path) -> None:
+    store = SqliteStateStore(config_for(tmp_path))
+    with store.lock():
+        store.initialize()
+        connection = store.connection()
+        try:
+            with connection:
+                connection.execute("INSERT INTO audit_events(action,actor,reason,created_at) VALUES ('LEGACY_EVENT','test','preserve','2026-09-29T00:00:00+00:00')")
+                connection.execute("DROP TABLE report_render_sidecars")
+                connection.execute("ALTER TABLE units DROP COLUMN returned_models_json")
+                connection.execute("ALTER TABLE runs DROP COLUMN ai_phase_started_at")
+                connection.execute("ALTER TABLE runs DROP COLUMN analysis_started_at")
+                connection.execute("UPDATE installation SET schema_version=1 WHERE singleton=1")
+                connection.execute("PRAGMA user_version=1")
+        finally:
+            connection.close()
+        with pytest.raises(StateError):
+            store.verify()
+        backup = store.migrate_v5()
+        assert backup.is_file()
+        assert store.verify()["schema_version"] == 2
+        connection = store.connection()
+        try:
+            assert connection.execute("SELECT COUNT(*) FROM audit_events WHERE action='LEGACY_EVENT'").fetchone()[0] == 1
+            assert connection.execute("SELECT name FROM sqlite_master WHERE name='report_render_sidecars'").fetchone()[0] == "report_render_sidecars"
+            assert "returned_models_json" in {row[1] for row in connection.execute("PRAGMA table_info(units)")}
+            assert "ai_phase_started_at" in {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
+            assert "analysis_started_at" in {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
+        finally:
+            connection.close()
+
+
 def test_g08_run_open_does_not_recreate_missing_database(tmp_path: Path) -> None:
     store = SqliteStateStore(config_for(tmp_path))
     with store.lock():

@@ -14,7 +14,7 @@ from .config import AppConfig
 from .locking import ScopeLock
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class StateError(RuntimeError):
@@ -119,6 +119,8 @@ class SqliteStateStore:
         try:
             migration = (Path(__file__).parent / "migrations" / "001_initial.sql").read_text(encoding="utf-8")
             connection.executescript(migration)
+            v5_migration = (Path(__file__).parent / "migrations" / "002_v5_sidecars.sql").read_text(encoding="utf-8")
+            connection.executescript(v5_migration)
             with connection:
                 connection.execute(
                     "INSERT INTO installation(singleton, installation_uuid, schema_version, created_at) VALUES (1, ?, ?, ?)",
@@ -155,7 +157,9 @@ class SqliteStateStore:
     def _connect(self, *, create: bool = False) -> sqlite3.Connection:
         if not create and not self.paths.database.is_file():
             raise StateError("state database is missing")
-        connection = sqlite3.connect(self.paths.database, isolation_level=None, timeout=self.config.state.busy_timeout_ms / 1000)
+        # DML under `with connection:` must be a real transaction. Explicit
+        # BEGIN IMMEDIATE in state transitions still overrides this default.
+        connection = sqlite3.connect(self.paths.database, isolation_level="DEFERRED", timeout=self.config.state.busy_timeout_ms / 1000)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = DELETE")
@@ -220,6 +224,41 @@ class SqliteStateStore:
         if row["installation_uuid"] != installation_uuid or row["schema_version"] != SCHEMA_VERSION:
             raise StateError("database installation identity mismatch")
         return {"installation_uuid": installation_uuid, "schema_version": version, "epoch": scope["epoch"], "checkpoint_sha": scope["checkpoint_sha"]}
+
+    def migrate_v5(self) -> Path:
+        """Upgrade a verified v1 state in place after a SQLite backup.
+
+        The caller holds the scope lock. Existing reports and MIME rows are
+        untouched; only a linked sidecar table and the schema version change.
+        """
+        installation_uuid = self.verify_markers()
+        connection = self._connect()
+        try:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            row = connection.execute("SELECT installation_uuid,schema_version FROM installation WHERE singleton=1").fetchone()
+            if version != 1 or row is None or row["schema_version"] != 1 or row["installation_uuid"] != installation_uuid:
+                raise StateError("v1 state migration preconditions failed")
+            if connection.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise StateError("state integrity check failed before migration")
+            self.paths.backups.mkdir(parents=True, exist_ok=True, mode=0o700)
+            backup_path = self.paths.backups / f"pre-v5-{uuid.uuid4().hex}.sqlite3"
+            backup_connection = sqlite3.connect(backup_path)
+            try:
+                connection.backup(backup_connection)
+            finally:
+                backup_connection.close()
+            os.chmod(backup_path, 0o600)
+            migration = (Path(__file__).parent / "migrations" / "002_v5_sidecars.sql").read_text(encoding="utf-8")
+            try:
+                connection.executescript(migration)
+            except sqlite3.Error as exc:
+                if connection.in_transaction:
+                    connection.rollback()
+                raise StateError("v5 state migration failed") from exc
+        finally:
+            connection.close()
+        self.verify()
+        return backup_path
 
     def recover_inflight_notifications(self) -> int:
         connection = self._connect()

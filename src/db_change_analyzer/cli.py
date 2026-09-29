@@ -119,6 +119,9 @@ def state_command(args: argparse.Namespace) -> int:
         elif args.state_command == "migrate-run":
             generation = store.migrate_run(args.run_id, args.reason)
             details, outcome = {"analysis_generation": generation}, "RUN_MIGRATED"
+        elif args.state_command == "migrate-v5":
+            backup = store.migrate_v5()
+            details, outcome, emitted = {"backup": str(backup)}, "STATE_V5_MIGRATED", [str(backup)]
         else:
             raise StateError("unsupported state command")
     _json_line({"event": "state_details", "details": details}, stream=sys.stderr)
@@ -193,7 +196,23 @@ def run_command(args: argparse.Namespace) -> int:
     store = SqliteStateStore(config)
     with store.lock():
         store.recover_inflight_notifications()
-        plan = _automatic_plan(config, store, offline=args.offline)
+        state = store.verify()
+        connection = store.connection()
+        try:
+            unfinished = connection.execute(
+                "SELECT * FROM runs WHERE scope_hash=? AND epoch=? AND mode='AUTO' AND status NOT IN ('BASELINED','NO_CHANGE','OUT_OF_SCOPE_ONLY','COMMITTED','CLOSED')",
+                (config.scope_hash, state["epoch"]),
+            ).fetchone()
+        finally:
+            connection.close()
+        if unfinished is not None:
+            if unfinished["base_sha"] != state["checkpoint_sha"] or unfinished["config_digest"] != config.config_digest:
+                return _finish(args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20, error_code="PINNED_RUN_CONTEXT_CHANGED", checkpoint_before=state["checkpoint_sha"], checkpoint_after=state["checkpoint_sha"], run_id=unfinished["run_id"])
+            git = _client(config, store)
+            git.ensure_cache()
+            plan = HistoryPlanner(git, [root.path for root in config.scope.roots], config.git.max_new_commits).automatic(unfinished["base_sha"], unfinished["target_sha"])
+        else:
+            plan = _automatic_plan(config, store, offline=args.offline)
         _json_line({"event": "range_plan", "plan": _plan_projection(plan)}, stream=sys.stderr)
         if args.dry_run:
             return _finish(args, mode="RUN", outcome="DRY_RUN", checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
@@ -211,7 +230,125 @@ def run_command(args: argparse.Namespace) -> int:
             return _finish(args, mode="RUN", outcome="CONFIG_INVALID", exit_code=ExitCode.CONFIG, error_code="MODEL_CAPABILITY_UNVERIFIED", checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
         # Stateful analysis is intentionally entered only through a verified profile.
         from .workflow import execute_analysis
-        return execute_analysis(args, config, store, plan, _client(config, store))
+        if unfinished is not None and unfinished["report_id"]:
+            return _resume_reported_run(args, config, store, plan, unfinished)
+        return execute_analysis(args, config, store, plan, _client(config, store), resume_run_id=unfinished["run_id"] if unfinished is not None else None)
+
+
+def _resume_reported_run(args, config, store, plan: RangePlan, run) -> int:
+    from .notification import finalize_auto_delivery, send_persisted_notification
+    from .smtp_transport import SmtpTransport
+
+    connection = store.connection()
+    try:
+        report = connection.execute("SELECT canonical_json,content_sha256,rendered_version,quality FROM reports WHERE report_id=? AND run_id=?", (run["report_id"], run["run_id"])).fetchone()
+        notification = connection.execute("SELECT notification_id,status,generation,mime_bytes,mime_sha256 FROM notifications WHERE report_id=? ORDER BY generation DESC LIMIT 1", (run["report_id"],)).fetchone()
+        if report is None or notification is None:
+            raise StateError("pinned run is missing its persisted report or notification")
+        _verify_v5_notification_binding(connection, run["report_id"], report, notification)
+        emitted = _restore_v5_outputs(args, config, connection, run["report_id"], report)
+        if notification["status"] == "UNKNOWN":
+            return _finish(args, mode="RUN", outcome="NOTIFICATION_UNKNOWN", exit_code=41, error_code="DUPLICATE_RISK_REQUIRES_RESOLUTION", emitted_files=emitted, checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha, run_id=run["run_id"], report_id=run["report_id"], report_sha256=report["content_sha256"], notification_status="UNKNOWN", quality=report["quality"])
+        if notification["status"] == "ACCEPTED":
+            with connection:
+                finalize_auto_delivery(connection, notification["notification_id"], config.scope_hash)
+            return _finish(args, mode="RUN", outcome="REVIEW_REQUIRED" if report["quality"] == "blocked" else "NOTIFICATION_ACCEPTED", exit_code=11 if report["quality"] == "blocked" else 0, emitted_files=emitted, checkpoint_before=plan.base_sha, checkpoint_after=store.verify()["checkpoint_sha"], run_id=run["run_id"], report_id=run["report_id"], report_sha256=report["content_sha256"], notification_status="ACCEPTED", quality=report["quality"])
+        if notification["status"] in {"FAILED", "PARTIAL"}:
+            with connection:
+                connection.execute("UPDATE notifications SET status='READY' WHERE notification_id=?", (notification["notification_id"],))
+                connection.execute("UPDATE notification_recipients SET status='PENDING',smtp_code=NULL WHERE notification_id=? AND status!='ACCEPTED'", (notification["notification_id"],))
+        elif notification["status"] not in {"READY", "HELD"}:
+            raise StateError("pinned notification is not safe to retry")
+
+        def finalize(transaction, delivery_status: str) -> None:
+            if delivery_status == "ACCEPTED":
+                finalize_auto_delivery(transaction, notification["notification_id"], config.scope_hash)
+
+        outcome = send_persisted_notification(connection, notification["notification_id"], SmtpTransport(config.smtp), username=os.environ.get("DB_ANALYZER_SMTP_USERNAME"), password=os.environ.get("DB_ANALYZER_SMTP_PASSWORD"), on_accepted_transaction=finalize)
+        after = plan.target_sha if outcome.status == "ACCEPTED" and report["quality"] != "blocked" else plan.base_sha
+        exit_code = 41 if outcome.status == "UNKNOWN" else 40 if outcome.status != "ACCEPTED" else 11 if report["quality"] == "blocked" else 10 if report["quality"] == "limited" else 0
+        name = "NOTIFICATION_UNKNOWN" if exit_code == 41 else "NOTIFICATION_FAILED_OR_HELD" if exit_code == 40 else "REVIEW_REQUIRED" if exit_code == 11 else "LIMITED_NOTIFIED" if exit_code == 10 else "SUCCEEDED"
+        return _finish(args, mode="RUN", outcome=name, exit_code=exit_code, error_code=outcome.error_code, emitted_files=emitted, checkpoint_before=plan.base_sha, checkpoint_after=after, run_id=run["run_id"], report_id=run["report_id"], report_sha256=report["content_sha256"], notification_status=outcome.status, quality=report["quality"], smtp_attempts=outcome.smtp_attempts, smtp_accepted_transactions=outcome.accepted_transactions)
+    finally:
+        connection.close()
+
+
+def _restore_v5_outputs(args, config, connection, report_id: str, report) -> list[str]:
+    if report["rendered_version"] != "v5.0":
+        return []
+    import hashlib
+    from .workflow import _stage_file
+
+    sidecar = connection.execute(
+        "SELECT source_report_sha256,mail_view_json,mail_view_sha256,manifest_json,manifest_sha256,html,text FROM report_render_sidecars WHERE report_id=? AND render_generation=0",
+        (report_id,),
+    ).fetchone()
+    if sidecar is None:
+        raise StateError("pinned V5 report sidecar is missing")
+    try:
+        manifest = json.loads(sidecar["manifest_json"])
+    except (TypeError, ValueError) as exc:
+        raise StateError("pinned V5 manifest is invalid") from exc
+    expected = {
+        "source_report_sha256": report["content_sha256"],
+        "mail_view_sha256": sidecar["mail_view_sha256"],
+        "html_sha256": hashlib.sha256(sidecar["html"]).hexdigest(),
+        "text_sha256": hashlib.sha256(sidecar["text"]).hexdigest(),
+    }
+    if (hashlib.sha256(report["canonical_json"]).hexdigest() != report["content_sha256"]
+            or sidecar["source_report_sha256"] != report["content_sha256"]
+            or hashlib.sha256(sidecar["mail_view_json"]).hexdigest() != sidecar["mail_view_sha256"]
+            or hashlib.sha256(sidecar["manifest_json"]).hexdigest() != sidecar["manifest_sha256"]
+            or any(manifest.get(key) != value for key, value in expected.items())):
+        raise StateError("pinned V5 report or sidecar hash mismatch")
+    directory = Path(args.emit_dir or config.reports.emit_dir).resolve()
+    outputs = {
+        directory / "report.json": report["canonical_json"] + b"\n",
+        directory / "report.html": sidecar["html"],
+        directory / "report.txt": sidecar["text"],
+        directory / "mail-view.json": sidecar["mail_view_json"] + b"\n",
+        directory / "render-manifest.json": sidecar["manifest_json"] + b"\n",
+    }
+    staged: list[tuple[Path, Path]] = []
+    emitted: list[str] = []
+    try:
+        for destination, data in outputs.items():
+            if destination.is_file() and destination.read_bytes() == data:
+                continue
+            staged.append((_stage_file(destination, data), destination))
+        for temporary, destination in staged:
+            os.replace(temporary, destination)
+            emitted.append(str(destination))
+    finally:
+        for temporary, _ in staged:
+            temporary.unlink(missing_ok=True)
+    return emitted
+
+
+def _verify_v5_notification_binding(connection, report_id: str, report, notification) -> None:
+    if report["rendered_version"] != "v5.0":
+        return
+    import hashlib
+
+    sidecar = connection.execute(
+        "SELECT manifest_json,manifest_sha256,mime FROM report_render_sidecars WHERE report_id=? AND render_generation=?",
+        (report_id, notification["generation"]),
+    ).fetchone()
+    if sidecar is None:
+        raise StateError("V5 notification has no matching render generation")
+    try:
+        manifest = json.loads(sidecar["manifest_json"])
+    except (TypeError, ValueError) as exc:
+        raise StateError("V5 notification manifest is invalid") from exc
+    digest = hashlib.sha256(notification["mime_bytes"]).hexdigest()
+    if (hashlib.sha256(sidecar["manifest_json"]).hexdigest() != sidecar["manifest_sha256"]
+            or digest != notification["mime_sha256"]
+            or sidecar["mime"] != notification["mime_bytes"]
+            or manifest.get("report_id") != report_id
+            or manifest.get("render_generation") != notification["generation"]
+            or manifest.get("source_report_sha256") != report["content_sha256"]
+            or manifest.get("mime_sha256") != digest):
+        raise StateError("V5 notification manifest or MIME binding mismatch")
 
 
 def manual_command(args: argparse.Namespace) -> int:
@@ -250,15 +387,18 @@ def cleanup_command(args: argparse.Namespace) -> int:
 
 
 def _new_outbox(connection, config, report_id: str, *, recipients: list[str] | None = None) -> str:
+    import hashlib
     from datetime import UTC, datetime
-    from .notification import persist_notification
+    from .notification import insert_notification, persist_notification
     from .reporting import RenderedReport, build_message
+    from .v5_rendering import build_render_manifest, render_v5_view
 
     row = connection.execute("""SELECT
         canonical_json,
         content_sha256,
         html,
-        text
+        text,
+        rendered_version
     FROM reports
     WHERE report_id=?""", (report_id,)).fetchone()
     if row is None:
@@ -271,6 +411,34 @@ def _new_outbox(connection, config, report_id: str, *, recipients: list[str] | N
     notification_id = str(uuid.uuid4())
     selected = recipients or config.smtp.recipients
     message_id = f"<{notification_id}@{config.smtp.message_id_domain}>"
+    if row["rendered_version"] == "v5.0":
+        sidecar = connection.execute("SELECT mail_view_json,mail_view_sha256,manifest_json,manifest_sha256,source_report_sha256 FROM report_render_sidecars WHERE report_id=? AND render_generation=0", (report_id,)).fetchone()
+        if sidecar is None:
+            raise StateError("V5 report sidecar is missing")
+        generation = max(generation, connection.execute(
+            "SELECT COALESCE(MAX(render_generation),-1)+1 FROM report_render_sidecars WHERE report_id=?",
+            (report_id,),
+        ).fetchone()[0])
+        if (sidecar["source_report_sha256"] != row["content_sha256"]
+                or hashlib.sha256(sidecar["mail_view_json"]).hexdigest() != sidecar["mail_view_sha256"]
+                or hashlib.sha256(sidecar["manifest_json"]).hexdigest() != sidecar["manifest_sha256"]):
+            raise StateError("V5 report sidecar hash mismatch")
+        view = json.loads(sidecar["mail_view_json"])
+        v5 = render_v5_view(
+            view, sender=config.smtp.sender, recipients=selected, message_id=message_id,
+            date=datetime.now(UTC), mime_limit=config.reports.mail_max_bytes,
+        )
+        manifest = build_render_manifest(view, v5, source_report_sha256=sidecar["source_report_sha256"], generation=generation)
+        manifest_json = json.dumps(manifest, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        with connection:
+            connection.execute(
+                "INSERT INTO report_render_sidecars(report_id,render_generation,source_report_sha256,mail_view_json,mail_view_sha256,manifest_json,manifest_sha256,html,text,mime,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (report_id, generation, sidecar["source_report_sha256"], sidecar["mail_view_json"], v5.view_sha256,
+                 manifest_json, hashlib.sha256(manifest_json).hexdigest(), v5.html, v5.text, v5.mime, datetime.now(UTC).isoformat()),
+            )
+            insert_notification(connection, notification_id=notification_id, report_id=report_id, generation=generation,
+                                recipients=selected, message_id=message_id, mime_bytes=v5.mime, mime_sha256=manifest["mime_sha256"])
+        return notification_id
     rendered = RenderedReport(row["canonical_json"], row["content_sha256"], row["html"], row["text"])
     message = build_message(report, rendered, sender=config.smtp.sender, recipients=selected, message_id=message_id, date=datetime.now(UTC), job_short_name=os.environ.get("JOB_NAME", "MANUAL"), current_build_number=os.environ.get("BUILD_NUMBER"), max_bytes=config.reports.mail_max_bytes)
     persist_notification(connection, notification_id=notification_id, report_id=report_id, generation=generation, recipients=selected, message_id=message_id, mime_bytes=message.mime_bytes, mime_sha256=message.sha256)
@@ -278,16 +446,21 @@ def _new_outbox(connection, config, report_id: str, *, recipients: list[str] | N
 
 
 def _send_outbox(connection, config, notification_id: str):
-    from .notification import send_persisted_notification
+    from .notification import finalize_auto_delivery, send_persisted_notification
     from .smtp_transport import SmtpTransport
-    return send_persisted_notification(connection, notification_id, SmtpTransport(config.smtp), username=os.environ.get("DB_ANALYZER_SMTP_USERNAME"), password=os.environ.get("DB_ANALYZER_SMTP_PASSWORD"))
+    return send_persisted_notification(
+        connection, notification_id, SmtpTransport(config.smtp),
+        username=os.environ.get("DB_ANALYZER_SMTP_USERNAME"),
+        password=os.environ.get("DB_ANALYZER_SMTP_PASSWORD"),
+        on_accepted_transaction=lambda transaction, status: finalize_auto_delivery(transaction, notification_id, config.scope_hash) if status == "ACCEPTED" else None,
+    )
 
 
 def notification_command(args: argparse.Namespace) -> int:
     import hashlib
     from email import policy
     from email.parser import BytesParser
-    from .notification import canonical_recipients, persist_notification
+    from .notification import canonical_recipients, finalize_auto_delivery, persist_notification
 
     config = load_config(args.config)
     store = SqliteStateStore(config)
@@ -299,6 +472,7 @@ def notification_command(args: argparse.Namespace) -> int:
                 if not args.allow_mail:
                     return _finish(args, mode="NOTIFICATION", outcome="LIVE_PERMISSION_REQUIRED", exit_code=20, error_code="LIVE_PERMISSION_REQUIRED")
                 notification_id = _new_outbox(connection, config, args.report_id)
+                _json_line({"event": "notification_outbox", "notification_id": notification_id, "report_id": args.report_id}, stream=sys.stderr)
                 outcome = _send_outbox(connection, config, notification_id)
             elif command == "retry":
                 if not args.allow_mail:
@@ -307,7 +481,7 @@ def notification_command(args: argparse.Namespace) -> int:
                     status
                 FROM notifications
                 WHERE notification_id=?""", (args.notification_id,)).fetchone()
-                if row is None or row["status"] not in {"FAILED", "PARTIAL", "UNKNOWN"}:
+                if row is None or row["status"] not in {"READY", "HELD", "FAILED", "PARTIAL", "UNKNOWN"}:
                     raise StateError("notification is not retryable")
                 if row["status"] == "UNKNOWN" and not args.ack_duplicate_risk:
                     raise StateError("unknown retry requires duplicate-risk acknowledgement")
@@ -336,6 +510,8 @@ def notification_command(args: argparse.Namespace) -> int:
                     WHERE notification_id=? AND status!='ACCEPTED'""", (args.notification_id,)).fetchone()[0]
                     connection.execute("UPDATE notifications SET status=? WHERE notification_id=?", ("ACCEPTED" if pending == 0 else "UNKNOWN", args.notification_id))
                     connection.execute("INSERT INTO audit_events(scope_hash,action,actor,reason,evidence_reference,created_at) VALUES (?,'NOTIFICATION_RESOLVED','operator',?,?,datetime('now'))", (config.scope_hash, args.reason, args.evidence))
+                    if pending == 0:
+                        finalize_auto_delivery(connection, args.notification_id, config.scope_hash)
                 return _finish(args, mode="NOTIFICATION", outcome="NOTIFICATION_RESOLVED")
             elif command == "replace-envelope":
                 selected = canonical_recipients(args.to)
@@ -345,6 +521,15 @@ def notification_command(args: argparse.Namespace) -> int:
                 WHERE notification_id=?""", (args.notification_id,)).fetchone()
                 if old is None or old["status"] not in {"FAILED", "PARTIAL", "UNKNOWN", "HELD"}:
                     raise StateError("notification envelope is not replaceable")
+                report_kind = connection.execute("SELECT rendered_version FROM reports WHERE report_id=?", (old["report_id"],)).fetchone()
+                if report_kind is None:
+                    raise StateError("notification report is missing")
+                if report_kind["rendered_version"] == "v5.0":
+                    notification_id = _new_outbox(connection, config, old["report_id"], recipients=selected)
+                    _json_line({"event": "notification_outbox", "notification_id": notification_id, "report_id": old["report_id"]}, stream=sys.stderr)
+                    with connection:
+                        connection.execute("INSERT INTO audit_events(scope_hash,action,actor,reason,evidence_reference,created_at) VALUES (?,'ENVELOPE_REPLACED','operator',?,?,datetime('now'))", (config.scope_hash, args.reason, args.notification_id))
+                    return _finish(args, mode="NOTIFICATION", outcome="ENVELOPE_REPLACED")
                 parsed = BytesParser(policy=policy.SMTP).parsebytes(old["mime_bytes"])
                 parsed.replace_header("To", ", ".join(selected))
                 notification_id = str(uuid.uuid4())
@@ -355,6 +540,7 @@ def notification_command(args: argparse.Namespace) -> int:
                 FROM notifications
                 WHERE report_id=?""", (old["report_id"],)).fetchone()[0]
                 persist_notification(connection, notification_id=notification_id, report_id=old["report_id"], generation=generation, recipients=selected, message_id=parsed["Message-ID"], mime_bytes=mime, mime_sha256=hashlib.sha256(mime).hexdigest())
+                _json_line({"event": "notification_outbox", "notification_id": notification_id, "report_id": old["report_id"]}, stream=sys.stderr)
                 with connection:
                     connection.execute("INSERT INTO audit_events(scope_hash,action,actor,reason,evidence_reference,created_at) VALUES (?,'ENVELOPE_REPLACED','operator',?,?,datetime('now'))", (config.scope_hash, args.reason, args.notification_id))
                 return _finish(args, mode="NOTIFICATION", outcome="ENVELOPE_REPLACED")
@@ -370,17 +556,23 @@ def notification_command(args: argparse.Namespace) -> int:
 
 
 def smoke_model_command(args: argparse.Namespace) -> int:
-    from .litellm_http import LiteLLMClient, ModelTransportError, synthetic_probe_payload
-    from .models import AnalysisUnit
-    from .validation import ResponseValidationError, validate_unit_response
+    from .litellm_http import LiteLLMClient, ModelTransportError
+    from .mail_commentary import accept_commentary, synthetic_probe_input
+    from .validation import ResponseValidationError
     config = load_config(args.config)
     if not args.allow_ai:
         return _finish(args, mode="SMOKE_MODEL", outcome="LIVE_PERMISSION_REQUIRED", exit_code=20, error_code="LIVE_PERMISSION_REQUIRED")
-    schema = json.loads((Path(__file__).resolve().parents[2] / "schemas" / "unit-response.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads((Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json").read_text(encoding="utf-8"))
+    unit_input = synthetic_probe_input()
     try:
         with LiteLLMClient(config.model) as client:
-            reply = client.probe_synthetic(api_key=os.environ["LITELLM_API_KEY"], response_schema=schema, output_tokens=config.analysis.output_tokens)
-        validate_unit_response(reply.content, AnalysisUnit.model_validate_json(json.dumps(synthetic_probe_payload()), strict=True), prompt_json=config.model.output_mode == "prompt_json")
+            reply = client.probe_synthetic(
+                api_key=os.environ["LITELLM_API_KEY"], response_schema=schema,
+                output_tokens=config.analysis.output_tokens, user_payload=unit_input,
+                system_message=(Path(__file__).parent / "prompts" / "mail_commentary.tr.txt").read_text(encoding="utf-8"),
+            )
+        accept_commentary(reply.content, unit_input, prompt_json=config.model.output_mode == "prompt_json",
+                          extra_secret_patterns=config.security.extra_secret_patterns)
     except ModelTransportError as exc:
         return _finish(args, mode="SMOKE_MODEL", outcome="AI_TRANSPORT_OR_AUTH", exit_code=30, error_code=exc.code)
     except ResponseValidationError as exc:
@@ -506,6 +698,8 @@ def build_parser() -> argparse.ArgumentParser:
     migrate.add_argument("--run-id", required=True)
     migrate.add_argument("--reason", required=True)
     migrate.set_defaults(handler=state_command)
+    migrate_v5 = state_commands.add_parser("migrate-v5")
+    migrate_v5.set_defaults(handler=state_command)
     return parser
 
 

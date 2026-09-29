@@ -37,6 +37,16 @@ def test_p08_readable_unknown_ddl_is_visible_fallback() -> None:
     assert scanned.unresolved_non_whitespace_bytes == len(raw.strip())
 
 
+def test_table_create_alter_and_comment_are_linked_after_real_parser_check() -> None:
+    raw = b"CREATE TABLE S.T (ID NUMBER);\nALTER TABLE S.T ADD (NAME VARCHAR2(20));\nCOMMENT ON COLUMN S.T.NAME IS 'label';"
+    scanned, projections, status, diagnostics = inventory_bytes(raw, default_schema="S")
+    assert status == "parsed", diagnostics
+    assert len(scanned.occurrences) == 1
+    table = projections[0].properties
+    assert table["columns"]["U:NAME"]["length"] == "20"
+    assert table["comments"]["U:NAME"] == "'label'"
+
+
 def test_n01_whitespace_only_vs_n02_literal_change() -> None:
     assert classify_text_change("SELECT 1 FROM DUAL", "SELECT   1\nFROM DUAL") == "format_only"
     assert classify_text_change("SELECT 'a b' FROM DUAL", "SELECT 'ab' FROM DUAL") == "structural_or_logic"

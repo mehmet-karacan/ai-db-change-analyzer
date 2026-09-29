@@ -1,0 +1,115 @@
+{
+  "schema_version": "oracle-taxonomy/1.0",
+  "status": "approved_scope_implementation_required",
+  "types": [
+    {
+      "id": "TABLE",
+      "label_tr": "Tablo",
+      "renderer": "objects/table.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "COLUMN",
+        "COMMENT",
+        "CONSTRAINT",
+        "OBJECT",
+        "PARTITION",
+        "SOURCE",
+        "TABLE_PROPERTY"
+      ]
+    },
+    {
+      "id": "INDEX",
+      "label_tr": "İndeks",
+      "renderer": "objects/index.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "INDEX_PROPERTY",
+        "OBJECT",
+        "SOURCE"
+      ]
+    },
+    {
+      "id": "SEQUENCE",
+      "label_tr": "Sayı üreteci",
+      "renderer": "objects/sequence.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "OBJECT",
+        "SEQUENCE_PROPERTY",
+        "SOURCE"
+      ]
+    },
+    {
+      "id": "VIEW",
+      "label_tr": "Görünüm",
+      "renderer": "objects/view.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "OBJECT",
+        "OUTPUT_COLUMN",
+        "QUERY_PROPERTY",
+        "SOURCE"
+      ]
+    },
+    {
+      "id": "PACKAGE_SPEC",
+      "label_tr": "Paket arayüzü",
+      "renderer": "objects/package_spec.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "CONSTANT",
+        "CURSOR",
+        "EXCEPTION_DECLARATION",
+        "OBJECT",
+        "PACKAGE_PROPERTY",
+        "PARAMETER",
+        "PRAGMA",
+        "ROUTINE",
+        "SOURCE",
+        "TYPE_DECLARATION",
+        "VARIABLE"
+      ]
+    },
+    {
+      "id": "PACKAGE_BODY",
+      "label_tr": "Paket gövdesi",
+      "renderer": "objects/package_body.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "BODY_PROPERTY",
+        "CONSTANT",
+        "CURSOR",
+        "EXCEPTION_DECLARATION",
+        "OBJECT",
+        "PARAMETER",
+        "PRAGMA",
+        "ROUTINE",
+        "SOURCE",
+        "TYPE_DECLARATION",
+        "VARIABLE"
+      ]
+    }
+  ],
+  "unknown_types": "Detect and report as safe UNKNOWN fallback; do not silently omit or auto-load a template.",
+  "primary_operations": [
+    "added",
+    "modified",
+    "removed"
+  ],
+  "technical_operations": [
+    "relocated",
+    "unknown"
+  ],
+  "internal_only_operation": "unchanged",
+  "quality_independent": [
+    "complete",
+    "limited",
+    "blocked"
+  ]
+}

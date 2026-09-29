@@ -35,12 +35,8 @@ class RenderedMessage:
     object_cards: int
 
 
-def _root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
 def validate_report(report: dict[str, Any], schema_path: Path | None = None) -> None:
-    schema = json.loads((schema_path or (_root() / "schemas" / "report.schema.json")).read_text(encoding="utf-8"))
+    schema = json.loads((schema_path or (Path(__file__).parent / "schemas" / "report.schema.json")).read_text(encoding="utf-8"))
     errors = sorted(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(report), key=lambda error: list(error.path))
     if errors:
         location = "/".join(str(item) for item in errors[0].path) or "$"

@@ -14,7 +14,9 @@ dependencies = [
   "antlr4-python3-runtime==4.13.2",
   "httpx==0.28.1",
   "Jinja2==3.1.6",
+  "jsonschema==4.26.0",
   "pydantic==2.13.4",
+  "tzdata==2026.4",
 ]
 
 [project.scripts]
@@ -32,7 +34,13 @@ db_change_analyzer = [
   "migrations/*.sql",
   "prompts/*.txt",
   "templates/*.j2",
+  "templates/v5/*.j2",
+  "templates/v5/components/*.j2",
+  "templates/v5/objects/*.j2",
   "oracle/generated/*.json",
+  "taxonomy/*.json",
+  "schemas/*.json",
+  "schemas/v5/*.json",
 ]
 
 [tool.pytest.ini_options]

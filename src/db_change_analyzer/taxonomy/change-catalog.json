@@ -1,0 +1,2977 @@
+{
+  "schema_version": "oracle-change-catalog/1.0",
+  "entries": [
+    {
+      "id": "common.object.presence",
+      "object_types": [
+        "TABLE",
+        "INDEX",
+        "SEQUENCE",
+        "VIEW",
+        "PACKAGE_SPEC",
+        "PACKAGE_BODY"
+      ],
+      "component": "OBJECT",
+      "property_key": "presence",
+      "label_tr": "Nesne tanımı",
+      "change_kind": "OBJECT_PRESENCE",
+      "allowed_change_actions": [
+        "added",
+        "removed"
+      ],
+      "category": "presence",
+      "evidence_basis": "identity_and_scope",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Önceki/sonraki kapsam taraması ve varlık/yokluk kanıtı gerekir. CREATE/DROP çalıştırıldığı söylenmez.",
+      "source_refs": [
+        "O1",
+        "O2",
+        "O3",
+        "O4",
+        "O5",
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "common.source.text",
+      "object_types": [
+        "TABLE",
+        "INDEX",
+        "SEQUENCE",
+        "VIEW",
+        "PACKAGE_SPEC",
+        "PACKAGE_BODY"
+      ],
+      "component": "SOURCE",
+      "property_key": "text",
+      "label_tr": "Kaynak metni",
+      "change_kind": "SOURCE_TEXT_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "source_text",
+      "evidence_basis": "source_span",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Kaynak değişikliği doğrulanır; davranış değişikliği veya eşdeğerlik iddiası değildir.",
+      "source_refs": [
+        "O1",
+        "O2",
+        "O3",
+        "O4",
+        "O5",
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "common.source.format",
+      "object_types": [
+        "TABLE",
+        "INDEX",
+        "SEQUENCE",
+        "VIEW",
+        "PACKAGE_SPEC",
+        "PACKAGE_BODY"
+      ],
+      "component": "SOURCE",
+      "property_key": "format",
+      "label_tr": "Biçimlendirme",
+      "change_kind": "FORMAT_ONLY",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "presentation",
+      "evidence_basis": "token_equality",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Literal, quoted identifier ve hint korunur; token eşitliği gerekir.",
+      "source_refs": [
+        "O1",
+        "O2",
+        "O3",
+        "O4",
+        "O5",
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "common.source.occurrence_order",
+      "object_types": [
+        "TABLE",
+        "INDEX",
+        "SEQUENCE",
+        "VIEW",
+        "PACKAGE_SPEC",
+        "PACKAGE_BODY"
+      ],
+      "component": "SOURCE",
+      "property_key": "occurrence_order",
+      "label_tr": "Tanım sırası",
+      "change_kind": "SOURCE_ORDER_ONLY",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "presentation",
+      "evidence_basis": "occurrence_multiset",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Nesne tanımlarının dosyadaki sırası; kolon veya parametre sırası değildir.",
+      "source_refs": [
+        "O1",
+        "O2",
+        "O3",
+        "O4",
+        "O5",
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "common.source.path",
+      "object_types": [
+        "TABLE",
+        "INDEX",
+        "SEQUENCE",
+        "VIEW",
+        "PACKAGE_SPEC",
+        "PACKAGE_BODY"
+      ],
+      "component": "SOURCE",
+      "property_key": "path",
+      "label_tr": "Kaynak konumu",
+      "change_kind": "SOURCE_RELOCATED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "relocation",
+      "evidence_basis": "identity_and_content",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Ad değişimini rename olarak varsayma; dosya yolu değişimi nesne yaşam döngüsü değildir.",
+      "source_refs": [
+        "O1",
+        "O2",
+        "O3",
+        "O4",
+        "O5",
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "common.object.editionable",
+      "object_types": [
+        "VIEW",
+        "PACKAGE_SPEC",
+        "PACKAGE_BODY"
+      ],
+      "component": "OBJECT",
+      "property_key": "editionable",
+      "label_tr": "Editionable bildirimi",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O5",
+        "O6"
+      ]
+    },
+    {
+      "id": "table.column.definition",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "definition",
+      "label_tr": "Kolon tanımı",
+      "change_kind": "COLUMN_PRESENCE",
+      "allowed_change_actions": [
+        "added",
+        "removed"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.data_type",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "data_type",
+      "label_tr": "Veri tipi",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.length",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "length",
+      "label_tr": "Tanımdaki uzunluk",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sadece DDL bildirimi. BYTE/CHAR belirtilmemişse NLS ayarı tahmin edilmez.",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.length_semantics",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "length_semantics",
+      "label_tr": "Uzunluk birimi (BYTE/CHAR)",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sadece DDL bildirimi. BYTE/CHAR belirtilmemişse NLS ayarı tahmin edilmez.",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.precision",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "precision",
+      "label_tr": "Hassasiyet (precision)",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.scale",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "scale",
+      "label_tr": "Ondalık basamak (scale)",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.nullable",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "nullable",
+      "label_tr": "NULL kabulü",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.default",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "default",
+      "label_tr": "Varsayılan değer",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.default_on_null",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "default_on_null",
+      "label_tr": "DEFAULT ON NULL",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.identity",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "identity",
+      "label_tr": "Kimlik üretimi",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.virtual_expression",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "virtual_expression",
+      "label_tr": "Sanal kolon ifadesi",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.visibility",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "visibility",
+      "label_tr": "Kolon görünürlüğü",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.position",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "position",
+      "label_tr": "Kolon sırası",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.column.collation",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COLUMN",
+      "property_key": "collation",
+      "label_tr": "Karşılaştırma kuralı (collation)",
+      "change_kind": "COLUMN_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.definition",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "definition",
+      "label_tr": "Kısıt tanımı",
+      "change_kind": "CONSTRAINT_PRESENCE",
+      "allowed_change_actions": [
+        "added",
+        "removed"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.kind",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "kind",
+      "label_tr": "Kısıt türü",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.columns",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "columns",
+      "label_tr": "Kısıt kolonları ve sırası",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.reference",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "reference",
+      "label_tr": "FK hedefi ve kolonları",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.condition",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "condition",
+      "label_tr": "CHECK koşulu",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.delete_rule",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "delete_rule",
+      "label_tr": "FK silme kuralı",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.enabled",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "enabled",
+      "label_tr": "ENABLE/DISABLE bildirimi",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.validation",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "validation",
+      "label_tr": "VALIDATE/NOVALIDATE bildirimi",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.deferrable",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "deferrable",
+      "label_tr": "Ertelenebilirlik",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.initially",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "initially",
+      "label_tr": "Başlangıç erteleme modu",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.rely",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "rely",
+      "label_tr": "RELY/NORELY",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.constraint.index_association",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "CONSTRAINT",
+      "property_key": "index_association",
+      "label_tr": "Açık USING INDEX bağlantısı",
+      "change_kind": "CONSTRAINT_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.organization",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "organization",
+      "label_tr": "Tablo organizasyonu",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.temporary",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "temporary",
+      "label_tr": "Geçicilik bildirimi",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.on_commit",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "on_commit",
+      "label_tr": "ON COMMIT bildirimi",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.tablespace",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "tablespace",
+      "label_tr": "Tablespace",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.storage",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "storage",
+      "label_tr": "Storage",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.logging",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "logging",
+      "label_tr": "Logging",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.compression",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "compression",
+      "label_tr": "Sıkıştırma",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.parallel",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "parallel",
+      "label_tr": "Paralellik",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.partitioning",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "partitioning",
+      "label_tr": "Partition tanımı",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.lob_storage",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "lob_storage",
+      "label_tr": "LOB saklama tanımı",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.table_property.external",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "TABLE_PROPERTY",
+      "property_key": "external",
+      "label_tr": "External tablo tanımı",
+      "change_kind": "TABLE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.partition.definition",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "PARTITION",
+      "property_key": "definition",
+      "label_tr": "Partition / subpartition tanımı",
+      "change_kind": "PARTITION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Kaynakta bölüm tanımı var/yok; veri taşındı veya silindi değildir.",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "table.comment.text",
+      "object_types": [
+        "TABLE"
+      ],
+      "component": "COMMENT",
+      "property_key": "text",
+      "label_tr": "Tablo / kolon açıklaması",
+      "change_kind": "COMMENT_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "documentation",
+      "evidence_basis": "safe_comment_metadata",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "COMMENT ON SQL ile geliştirici yorum tokenını ayır; hassas içerik mailde maskelenir.",
+      "source_refs": [
+        "O1",
+        "O2"
+      ]
+    },
+    {
+      "id": "index.index_property.target",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "target",
+      "label_tr": "Hedef tablo",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.unique",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "unique",
+      "label_tr": "Benzersizlik (UNIQUE)",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.kind",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "kind",
+      "label_tr": "İndeks türü",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.keys",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "keys",
+      "label_tr": "Sıralı kolon / ifade anahtarları",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.direction",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "direction",
+      "label_tr": "ASC/DESC yönleri",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.visibility",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "visibility",
+      "label_tr": "VISIBLE/INVISIBLE",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.partitioning",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "partitioning",
+      "label_tr": "Partition / LOCAL / GLOBAL",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.tablespace",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "tablespace",
+      "label_tr": "Tablespace",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.storage",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "storage",
+      "label_tr": "Storage",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.compression",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "compression",
+      "label_tr": "Sıkıştırma",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.logging",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "logging",
+      "label_tr": "Logging",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.parallel",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "parallel",
+      "label_tr": "Paralellik",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "physical_configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "index.index_property.domain_parameters",
+      "object_types": [
+        "INDEX"
+      ],
+      "component": "INDEX_PROPERTY",
+      "property_key": "domain_parameters",
+      "label_tr": "Domain indeks parametreleri",
+      "change_kind": "INDEX_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "structural",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Plan, kullanım, hızlanma ve runtime VALID/UNUSABLE durumu bu tanımdan kanıtlanmaz.",
+      "source_refs": [
+        "O3"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.start_with",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "start_with",
+      "label_tr": "START WITH",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "observed_value",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.increment_by",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "increment_by",
+      "label_tr": "INCREMENT BY",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.min_value",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "min_value",
+      "label_tr": "MINVALUE / NOMINVALUE",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.max_value",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "max_value",
+      "label_tr": "MAXVALUE / NOMAXVALUE",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.cache",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "cache",
+      "label_tr": "CACHE / NOCACHE",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.cycle",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "cycle",
+      "label_tr": "CYCLE / NOCYCLE",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.order",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "order",
+      "label_tr": "ORDER / NOORDER",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.scale",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "scale",
+      "label_tr": "SCALE / NOSCALE",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.extend",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "extend",
+      "label_tr": "EXTEND / NOEXTEND",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.shard",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "shard",
+      "label_tr": "SHARD / NOSHARD",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.session",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "session",
+      "label_tr": "SESSION / GLOBAL",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "sequence.sequence_property.keep",
+      "object_types": [
+        "SEQUENCE"
+      ],
+      "component": "SEQUENCE_PROPERTY",
+      "property_key": "keep",
+      "label_tr": "KEEP / NOKEEP",
+      "change_kind": "SEQUENCE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "Sürüm/grammar desteği yoksa güvenli kaynak farkı. START WITH-only özel yolunda tek sayısal token ve kalan metin eşitliği gerekir.",
+      "source_refs": [
+        "O4"
+      ]
+    },
+    {
+      "id": "view.output_column.definition",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "OUTPUT_COLUMN",
+      "property_key": "definition",
+      "label_tr": "Çıktı kolonu",
+      "change_kind": "OUTPUT_COLUMN_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.output_order",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "output_order",
+      "label_tr": "Çıktı kolon sırası",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.projection",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "projection",
+      "label_tr": "SELECT ifadeleri",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.source_references",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "source_references",
+      "label_tr": "Açık kaynak referansları",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.join",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "join",
+      "label_tr": "JOIN türü ve koşulu",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.where",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "where",
+      "label_tr": "WHERE koşulu",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.group_by",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "group_by",
+      "label_tr": "GROUP BY",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.having",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "having",
+      "label_tr": "HAVING koşulu",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.set_operators",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "set_operators",
+      "label_tr": "UNION / INTERSECT / MINUS",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.distinct",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "distinct",
+      "label_tr": "DISTINCT",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.with_clause",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "with_clause",
+      "label_tr": "WITH tanımları",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.analytic",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "analytic",
+      "label_tr": "Analitik ifadeler",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.ordering",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "ordering",
+      "label_tr": "ORDER BY",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.row_limit",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "row_limit",
+      "label_tr": "Satır sınırlama ifadesi",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.check_option",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "check_option",
+      "label_tr": "WITH CHECK OPTION",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.read_only",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "read_only",
+      "label_tr": "READ ONLY",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.force",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "force",
+      "label_tr": "FORCE bildirimi",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "view.query_property.editioning",
+      "object_types": [
+        "VIEW"
+      ],
+      "component": "QUERY_PROPERTY",
+      "property_key": "editioning",
+      "label_tr": "EDITIONING bildirimi",
+      "change_kind": "VIEW_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "DDL varsayımsal sorgu sonucunu, satır sayısını veya gerçek uygulama tüketicisini kanıtlamaz.",
+      "source_refs": [
+        "O5"
+      ]
+    },
+    {
+      "id": "package_spec.routine.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "ROUTINE",
+      "property_key": "definition",
+      "label_tr": "Rutin tanımı",
+      "change_kind": "ROUTINE_PRESENCE",
+      "allowed_change_actions": [
+        "added",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İç içe scope ve overload ayrımı; belirsiz eşleşmeyi ekleme/silme diye kesinleştirme.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.routine.signature",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "ROUTINE",
+      "property_key": "signature",
+      "label_tr": "Rutin imzası",
+      "change_kind": "ROUTINE_SIGNATURE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.routine.return_type",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "ROUTINE",
+      "property_key": "return_type",
+      "label_tr": "Dönüş tipi",
+      "change_kind": "ROUTINE_SIGNATURE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.parameter.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PARAMETER",
+      "property_key": "definition",
+      "label_tr": "Parametre tanımı",
+      "change_kind": "PARAMETER_PRESENCE",
+      "allowed_change_actions": [
+        "added",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.parameter.name",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PARAMETER",
+      "property_key": "name",
+      "label_tr": "Parametre adı",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.parameter.position",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PARAMETER",
+      "property_key": "position",
+      "label_tr": "Parametre sırası",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.parameter.mode",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PARAMETER",
+      "property_key": "mode",
+      "label_tr": "IN / OUT / IN OUT",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.parameter.data_type",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PARAMETER",
+      "property_key": "data_type",
+      "label_tr": "Parametre tipi",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.parameter.default",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PARAMETER",
+      "property_key": "default",
+      "label_tr": "Parametre varsayılanı",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.parameter.nocopy",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PARAMETER",
+      "property_key": "nocopy",
+      "label_tr": "NOCOPY bildirimi",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.type_declaration.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "TYPE_DECLARATION",
+      "property_key": "definition",
+      "label_tr": "Paket içi tip tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.constant.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "CONSTANT",
+      "property_key": "definition",
+      "label_tr": "Sabit tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.variable.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "VARIABLE",
+      "property_key": "definition",
+      "label_tr": "Değişken tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.cursor.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "CURSOR",
+      "property_key": "definition",
+      "label_tr": "Cursor tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.exception_declaration.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "EXCEPTION_DECLARATION",
+      "property_key": "definition",
+      "label_tr": "Exception bildirimi tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.pragma.definition",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PRAGMA",
+      "property_key": "definition",
+      "label_tr": "Pragma tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_spec.package_property.authid",
+      "object_types": [
+        "PACKAGE_SPEC"
+      ],
+      "component": "PACKAGE_PROPERTY",
+      "property_key": "authid",
+      "label_tr": "AUTHID bildirimi",
+      "change_kind": "PACKAGE_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.routine.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "ROUTINE",
+      "property_key": "definition",
+      "label_tr": "Rutin tanımı",
+      "change_kind": "ROUTINE_PRESENCE",
+      "allowed_change_actions": [
+        "added",
+        "removed"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İç içe scope ve overload ayrımı; belirsiz eşleşmeyi ekleme/silme diye kesinleştirme.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.routine.signature",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "ROUTINE",
+      "property_key": "signature",
+      "label_tr": "Rutin imzası",
+      "change_kind": "ROUTINE_SIGNATURE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.routine.return_type",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "ROUTINE",
+      "property_key": "return_type",
+      "label_tr": "Dönüş tipi",
+      "change_kind": "ROUTINE_SIGNATURE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.parameter.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PARAMETER",
+      "property_key": "definition",
+      "label_tr": "Parametre tanımı",
+      "change_kind": "PARAMETER_PRESENCE",
+      "allowed_change_actions": [
+        "added",
+        "removed"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.parameter.name",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PARAMETER",
+      "property_key": "name",
+      "label_tr": "Parametre adı",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.parameter.position",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PARAMETER",
+      "property_key": "position",
+      "label_tr": "Parametre sırası",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.parameter.mode",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PARAMETER",
+      "property_key": "mode",
+      "label_tr": "IN / OUT / IN OUT",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.parameter.data_type",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PARAMETER",
+      "property_key": "data_type",
+      "label_tr": "Parametre tipi",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.parameter.default",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PARAMETER",
+      "property_key": "default",
+      "label_tr": "Parametre varsayılanı",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.parameter.nocopy",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PARAMETER",
+      "property_key": "nocopy",
+      "label_tr": "NOCOPY bildirimi",
+      "change_kind": "PARAMETER_MODIFIED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.type_declaration.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "TYPE_DECLARATION",
+      "property_key": "definition",
+      "label_tr": "Paket içi tip tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.constant.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "CONSTANT",
+      "property_key": "definition",
+      "label_tr": "Sabit tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.variable.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "VARIABLE",
+      "property_key": "definition",
+      "label_tr": "Değişken tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.cursor.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "CURSOR",
+      "property_key": "definition",
+      "label_tr": "Cursor tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.exception_declaration.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "EXCEPTION_DECLARATION",
+      "property_key": "definition",
+      "label_tr": "Exception bildirimi tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.pragma.definition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "PRAGMA",
+      "property_key": "definition",
+      "label_tr": "Pragma tanımı",
+      "change_kind": "DECLARATION_CHANGED",
+      "allowed_change_actions": [
+        "added",
+        "modified",
+        "removed"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.routine_body",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "routine_body",
+      "label_tr": "Rutin gövdesi",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.sql_statement",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "sql_statement",
+      "label_tr": "SQL ifadesi",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.condition",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "condition",
+      "label_tr": "Koşul",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.assignment",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "assignment",
+      "label_tr": "Atama / formül",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.control_flow",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "control_flow",
+      "label_tr": "Kontrol akışı",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.transaction_statement",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "transaction_statement",
+      "label_tr": "COMMIT / ROLLBACK / SAVEPOINT ifadesi",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "transaction",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.exception_handler",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "exception_handler",
+      "label_tr": "Exception handler",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "exception",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.raise",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "raise",
+      "label_tr": "RAISE ifadesi",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "exception",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.call_reference",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "call_reference",
+      "label_tr": "Açık çağrı referansı",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.dynamic_sql",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "dynamic_sql",
+      "label_tr": "Dinamik SQL oluşturma / EXECUTE IMMEDIATE",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.body_property.initialization",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "initialization",
+      "label_tr": "Paket başlangıç bloğu",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İfadenin kaynakta değişmesi, canlı yürütüldüğünü veya runtime hedefin bilindiğini göstermez.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "package_body.source.wrapped",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "SOURCE",
+      "property_key": "wrapped",
+      "label_tr": "Wrapped gövde",
+      "change_kind": "WRAPPED_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "source_text",
+      "evidence_basis": "source_span",
+      "implementation_status": "required_not_claimed_implemented",
+      "fallback": "Retain verified source difference; mark unparsed fields, never ask AI to fill values.",
+      "notes_tr": "İçerik çözülmez; hash/değişim ve kapsam notu gösterilir.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    }
+  ]
+}

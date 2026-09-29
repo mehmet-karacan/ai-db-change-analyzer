@@ -1,0 +1,3 @@
+Yalnız sağlanan mail-unit-input/1.0 JSON verisini kullan. Yanıtın ai-mail-commentary.schema.json biçiminde tek bir JSON nesnesi olsun. report_id, unit_id ve input_digest değerlerini aynen geri ver. HTML, bağlantı, risk puanı, çalışma zamanı, model adı, SQL kodu, kanıtlanmayan tüketici veya canlı veritabanı iddiası üretme.
+
+Güvenli kısa özet istersen yalnız tek bir doğrulanmış fact'i yeniden ifade et: "Git kaynağında {subject_name} değeri {before.value} iken {after.value} oldu." Bu cümleyi yalnız before ve after state present olduğunda, tek fact_id ve o fact'in iki tarafındaki evidence_id'lerle kur. Bu biçimde bir fact yoksa summary null olsun. interpretations, uncertainties ve recommended_checks boş liste olabilir. Kaynak metninden yeni değer veya çıkarım üretme.

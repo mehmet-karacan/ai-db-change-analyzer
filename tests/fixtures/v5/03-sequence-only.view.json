@@ -1,0 +1,169 @@
+{
+  "schema_version": "mail-view/2.0",
+  "template_version": "v5.0",
+  "taxonomy_version": "oracle-taxonomy/1.0",
+  "report_id": "34af36f4-be37-5271-8d46-dfc8b4abf9c1",
+  "synthetic": true,
+  "language": "tr",
+  "source": {
+    "origin": "synthetic",
+    "repository": "gpu-db (örnek)",
+    "branch": "master",
+    "base_label": "a1b2c3d",
+    "target_label": "e4f5a6b",
+    "base_sha": null,
+    "target_sha": null,
+    "observed_at": "2026-09-29T09:12:08+03:00",
+    "snapshot_captured_at": null,
+    "actual_db_change_at": null,
+    "sync_build": null,
+    "comparison_mode": "net"
+  },
+  "changed_files": 1,
+  "coverage": {
+    "analysis_status": "complete",
+    "export_scope": "unknown",
+    "unknown_artifacts": 0,
+    "object_count_complete": true,
+    "limitations_tr": [
+      "Canlı veritabanı ve kapsam dışı tüketiciler doğrulanmadı."
+    ],
+    "identity_scan_complete_base": true,
+    "identity_scan_complete_target": true,
+    "field_coverage_complete": true
+  },
+  "evidence_registry": [
+    {
+      "evidence_id": "ev-004-base",
+      "kind": "source",
+      "side": "base",
+      "path": "synthetic/sequence/SEQ_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-004",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-004-target",
+      "kind": "source",
+      "side": "target",
+      "path": "synthetic/sequence/SEQ_CUSTOMER.sql",
+      "start_line": 1,
+      "end_line": 12,
+      "sha256": null,
+      "detail_tr": "Sentetik kaynak konumu; gerçek SQL içermez.",
+      "synthetic": true,
+      "object_id": "obj-004",
+      "scope_complete": null,
+      "scope_kind": "none"
+    },
+    {
+      "evidence_id": "ev-004-scope",
+      "kind": "context_limit",
+      "side": "both",
+      "path": null,
+      "start_line": null,
+      "end_line": null,
+      "sha256": null,
+      "detail_tr": "Canlı veritabanı ve kaynak dışı tüketici bilgisi yok.",
+      "synthetic": true,
+      "object_id": "obj-004",
+      "scope_complete": null,
+      "scope_kind": "none"
+    }
+  ],
+  "objects": [
+    {
+      "object_id": "obj-004",
+      "identity": {
+        "namespace": "SCHEMA_OBJECT",
+        "schema_name": "GPU_USER",
+        "name": "SEQ_CUSTOMER",
+        "schema_quoted": false,
+        "name_quoted": false,
+        "object_type": "SEQUENCE",
+        "parent_object_id": null,
+        "raw_object_type": "SEQUENCE",
+        "identity_confidence": "known"
+      },
+      "operation": "modified",
+      "pattern": "start_with_only",
+      "verification": "verified",
+      "source_paths": [
+        "synthetic/sequence/SEQ_CUSTOMER.sql"
+      ],
+      "evidence_ids": [
+        "ev-004-base",
+        "ev-004-target",
+        "ev-004-scope"
+      ],
+      "facts": [
+        {
+          "fact_id": "fact-004-1",
+          "taxonomy_id": "sequence.sequence_property.start_with",
+          "subject_name": "START WITH",
+          "subject_kind": "DDL başlangıç değeri",
+          "component_path": [
+            "START WITH"
+          ],
+          "change_action": "modified",
+          "category": "observed_value",
+          "before": {
+            "state": "present",
+            "value": "15200",
+            "evidence_ids": [
+              "ev-004-base"
+            ]
+          },
+          "after": {
+            "state": "present",
+            "value": "15480",
+            "evidence_ids": [
+              "ev-004-target"
+            ]
+          },
+          "verification": "verified",
+          "context_only": false
+        }
+      ],
+      "deterministic_summary_tr": "Yalnız START WITH değeri değişti. Diğer tanım metni aynı.",
+      "limitations_tr": [
+        "START WITH, Git’teki DDL tanımında görülen değerdir. Canlı NEXTVAL veya deployment sonucu değildir. Sayılar arasındaki fark kullanım adedi olarak yorumlanmaz."
+      ],
+      "ai_comments": [],
+      "recommended_checks": [],
+      "ai_status": "not_requested",
+      "unit_ids": [],
+      "source_checks": {
+        "identity_match": "verified",
+        "presence_comparison": "verified",
+        "start_with_only_proved": true,
+        "remainder_equal": true,
+        "conflict_detected": false
+      }
+    }
+  ],
+  "artifact_notices": [],
+  "analysis": {
+    "record_origin": "synthetic",
+    "started_at": "2026-09-29T09:12:08+03:00",
+    "completed_at": "2026-09-29T09:12:31+03:00",
+    "elapsed_ms": 23000,
+    "duration_basis": "synthetic",
+    "display_timezone": "Europe/Istanbul",
+    "ai": {
+      "status": "not_used",
+      "phase_started_at": null,
+      "phase_completed_at": null,
+      "phase_elapsed_ms": null,
+      "request_duration_sum_ms": null,
+      "http_attempts": 0,
+      "requested_units": 0,
+      "models": []
+    }
+  }
+}
