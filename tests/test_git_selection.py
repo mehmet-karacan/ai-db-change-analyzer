@@ -16,6 +16,28 @@ def fetched(tmp_path: Path, fixture: GitFixture) -> tuple[GitClient, str]:
     return client, target
 
 
+def test_fetch_disables_http_redirects_even_with_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fixture = GitFixture(tmp_path / "source")
+    fixture.write("gpu_user/t.sql", "CREATE TABLE GPU_USER.T (ID NUMBER);\n")
+    fixture.commit("base")
+    client = GitClient(tmp_path / "cache.git", allow_file_protocol=True)
+    sentinel = tmp_path / ".git-askpass"
+    sentinel.write_text("keep", encoding="utf-8")
+    original_run = client._run
+    fetch_args: list[str] = []
+
+    def capture(args: list[str], **kwargs):
+        if "fetch" in args:
+            fetch_args.extend(args)
+        return original_run(args, **kwargs)
+
+    monkeypatch.setattr(client, "_run", capture)
+    client.fetch(str(fixture.root), "main", username="local-user", password="local-password")
+    assert fetch_args[fetch_args.index("fetch") - 2:fetch_args.index("fetch")] == ["-c", "http.followRedirects=false"]
+    assert sentinel.read_text(encoding="utf-8") == "keep"
+    assert not list(tmp_path.glob(".git-askpass-*"))
+
+
 def test_g01_no_change_and_g02_out_of_scope(tmp_path: Path) -> None:
     fixture = GitFixture(tmp_path / "source")
     fixture.write("gpu_user/t.sql", "CREATE TABLE GPU_USER.T (ID NUMBER);\n")

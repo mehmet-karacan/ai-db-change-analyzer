@@ -5,9 +5,9 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 class GitError(RuntimeError):
@@ -158,11 +158,12 @@ class GitClient:
         if username is not None or password is not None:
             if username is None or password is None:
                 raise GitError("CREDENTIAL_INCOMPLETE", "both Git credential fields are required")
-            helper = self.cache.parent / ".git-askpass"
-            helper.write_text(
-                "#!/bin/sh\ncase \"$1\" in *Username*) printf '%s\\n' \"$DB_ANALYZER_GIT_USERNAME\" ;; *) printf '%s\\n' \"$DB_ANALYZER_GIT_PASSWORD\" ;; esac\n",
-                encoding="utf-8",
-            )
+            descriptor, helper_name = tempfile.mkstemp(prefix=".git-askpass-", dir=self.cache.parent)
+            helper = Path(helper_name)
+            with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(
+                    "#!/bin/sh\ncase \"$1\" in *Username*) printf '%s\\n' \"$DB_ANALYZER_GIT_USERNAME\" ;; *) printf '%s\\n' \"$DB_ANALYZER_GIT_PASSWORD\" ;; esac\n"
+                )
             os.chmod(helper, 0o700)
             environment.update(
                 {
@@ -175,7 +176,8 @@ class GitClient:
         ref = f"refs/remotes/source/{branch}"
         refspec = f"+refs/heads/{branch}:{ref}"
         try:
-            args = ["-C", str(self.cache), "fetch", "--no-tags", "--no-recurse-submodules", "--no-auto-maintenance", url, refspec]
+            # Never forward a credential helper response to a redirect target.
+            args = ["-C", str(self.cache), "-c", "http.followRedirects=false", "fetch", "--no-tags", "--no-recurse-submodules", "--no-auto-maintenance", url, refspec]
             self._run(args, environment=environment)
         finally:
             if helper and helper.exists():

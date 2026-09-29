@@ -4,6 +4,8 @@ Oracle DDL snapshot’larının sabit Git revision’ları arasındaki değişik
 
 Repository'deki Analyzer `Jenkinsfile` yerel kabul boyunca no-op pipeline'dır. Kurumdaki Jenkins job'u korunur; yerel doğrulama tamamlandığında yalnız Analyzer CLI tetikleyicisi olarak düzenlenecektir. Tetiklense bile mevcut no-op dosya analiz, model ve e-posta aşamalarını çalıştırmaz. `docs/Jenkinsfile.txt` ayrı DB Sync referansıdır ve değiştirilmemiştir.
 
+Yerel güvenlik ve kalite denetimi: `docs/GUVENLIK_KALITE_DENETIMI.md`.
+
 Geliştirme kurulumu:
 
 ```text

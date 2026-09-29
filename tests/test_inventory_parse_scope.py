@@ -1,7 +1,18 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from db_change_analyzer.git_client import TreeEntry
-from db_change_analyzer.inventory import inventory_revision
+from db_change_analyzer.inventory import _parse_in_worker, inventory_revision
+
+
+def test_parser_worker_ignores_a_shadow_package_in_current_directory(tmp_path: Path, monkeypatch) -> None:
+    shadow = tmp_path / "db_change_analyzer"
+    shadow.mkdir()
+    (shadow / "__init__.py").write_text("raise RuntimeError('untrusted cwd executed')\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    ok, diagnostics = _parse_in_worker(b"CREATE TABLE T (ID NUMBER);", 20)
+    assert ok and diagnostics == ()
 
 
 def test_revision_only_structurally_parses_selected_paths(monkeypatch) -> None:

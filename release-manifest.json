@@ -4,8 +4,8 @@
   "files": {
     ".gitattributes": "b6ca9ff8e25a4df18461c7892fd1cb80550a6775523fb8a029040cf50ee378e0",
     "Jenkinsfile": "6ca7685e05373fcfd342bd8ab2c31e4c8d5ef9478c4043526682b2e7d43ae876",
-    "pyproject.toml": "8c8fe90927df66badd02589831db56048dd8ec6e3af835c326fdce5a9e2a445e",
-    "requirements-dev.lock": "305625f0279bdee6f54e56344dc26be3b20d05f9f061c14f2ccef66f0b459a29",
+    "pyproject.toml": "ad48db4bb50808b2324a892f1bdbff59cfca33dd7e7959ac398ac4e94bed07f8",
+    "requirements-dev.lock": "b4e9a6ce6c4b0c896c7c22e495af0a151bb1cdb354f89bb5953d6ecd162eef2e",
     "requirements.lock": "475e842ab021aec8d9187cf8be48a3afbe5b0f51878b8dc65daacabef927fcb8",
     "schemas/delivery.schema.json": "a70bba7ad17ac40c796d47423be41830e76f6e658267bdc41db49d249437e286",
     "schemas/report.schema.json": "b2871e3b9434e99a55ef91ea71624a63bebe9af47a4b353558d7cd173fa24a67",

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
 
 from .git_client import GitClient, GitError, TreeEntry
 from .oracle.projections import Projection, project
@@ -40,11 +38,9 @@ def _parse_in_worker(raw: bytes, timeout_seconds: int) -> tuple[bool, tuple[str,
         for key in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP")
         if (value := os.environ.get(key))
     }
-    source_root = str(Path(__file__).resolve().parents[1])
-    environment["PYTHONPATH"] = source_root
     try:
         completed = subprocess.run(
-            [sys.executable, "-m", "db_change_analyzer.oracle.parser_worker", "--encoding", "utf-8"],
+            [sys.executable, "-I", "-m", "db_change_analyzer.oracle.parser_worker", "--encoding", "utf-8"],
             input=raw,
             capture_output=True,
             timeout=timeout_seconds,

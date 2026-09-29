@@ -36,8 +36,10 @@ class RetentionManager:
                 continue
             cutoff = self._cutoff(days)
             for path in directory.iterdir():
+                if path.is_symlink():
+                    continue
                 resolved = contained_path(root, path)
-                if resolved.is_symlink() or not resolved.is_file() or resolved.stat().st_mtime >= cutoff:
+                if resolved.parent != directory.resolve(strict=True) or not resolved.is_file() or resolved.stat().st_mtime >= cutoff:
                     continue
                 # Backup database and its manifest are recoverable maintenance data;
                 # exports are deletable only when no pending run/report references them.
@@ -80,11 +82,20 @@ class RetentionManager:
         root = self.store.paths.scope.resolve(strict=True)
         removed: list[str] = []
         for item in manifest.get("candidates", []):
-            path = contained_path(root, Path(item["path"]))
-            if path.is_symlink() or not path.is_file():
+            original = Path(item["path"])
+            if original.is_symlink():
+                raise StateError("cleanup candidate changed since planning")
+            path = contained_path(root, original)
+            area = {"completed_export": (self.store.paths.exports, self.policy.completed_report_days),
+                    "old_backup": (self.store.paths.backups, self.policy.backup_days)}.get(item.get("kind"))
+            if area is None or area[0].is_symlink() or path.parent != area[0].resolve(strict=True):
+                raise StateError("cleanup candidate is outside its permitted area")
+            if not path.is_file() or path.stat().st_mtime >= self._cutoff(area[1]):
                 raise StateError("cleanup candidate changed since planning")
             if path.stat().st_size != item["bytes"]:
                 raise StateError("cleanup candidate size changed since planning")
+            if item["kind"] == "completed_export" and self._is_protected_export(path):
+                raise StateError("cleanup export became protected")
             path.unlink()
             removed.append(str(path))
         return {**manifest, "applied": True, "removed": removed}
