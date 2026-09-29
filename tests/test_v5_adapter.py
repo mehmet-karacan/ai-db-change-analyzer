@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import UTC, datetime
 
 from db_change_analyzer.oracle.changes import compare_projections
@@ -128,6 +129,45 @@ def test_ai_ledger_preserves_multiple_returned_labels_without_version_claim() ->
     assert ledger["models"][0]["returned_models"] == ["provider/a", "provider/b"]
     assert ledger["models"][0]["resolved_model_version"] is None
     assert ledger["models"][0]["version_verification"] == "reported_unverified"
+
+
+def test_ai_ledger_keeps_each_units_returned_model_labels() -> None:
+    report, changes = _report()
+    first_key = report["objects"][0]["identity"]["object_key"]
+    old = _projection("CREATE SEQUENCE S.R START WITH 1 NOCACHE;")
+    new = _projection("CREATE SEQUENCE S.R START WITH 2 NOCACHE;")
+    second_key = new.object_key
+    changes[second_key] = compare_projections(
+        old, new, old_evidence_ids=("ev-old-r",), new_evidence_ids=("ev-new-r",),
+    )
+    second_object = deepcopy(report["objects"][0])
+    second_object["identity"].update(object_key=second_key, name="R")
+    second_object["old_evidence_ids"] = ["ev-old-r"]
+    second_object["new_evidence_ids"] = ["ev-new-r"]
+    report["objects"].append(second_object)
+    for evidence_id, original_id in (("ev-old-r", "ev-old"), ("ev-new-r", "ev-new")):
+        evidence = deepcopy(next(item for item in report["evidence_registry"] if item["evidence_id"] == original_id))
+        evidence.update(evidence_id=evidence_id, path_display="s/r.sql")
+        report["evidence_registry"].append(evidence)
+    report["counts"].update(ai_http_attempts=2, ai_units=2)
+    unit_ids = {first_key: "unit-1", second_key: "unit-2"}
+    view = build_mail_view(
+        report, changes, analysis_elapsed_ms=1000,
+        ai_phase_started_at="2026-09-29T09:12:08+03:00",
+        ai_phase_completed_at="2026-09-29T09:12:09+03:00", ai_phase_elapsed_ms=1000,
+        returned_models_by_unit={"unit-1": {"provider/a"}, "unit-2": {"provider/b"}},
+        ai_unit_ids_by_key=unit_ids, ai_status_by_key={key: "withheld" for key in unit_ids},
+    )
+    models = view["analysis"]["ai"]["models"]
+    assert {tuple(model["unit_ids"]): model["returned_models"] for model in models} == {
+        ("unit-1",): ["provider/a"], ("unit-2",): ["provider/b"],
+    }
+    rendered = render_v5_view(
+        view, sender="analyzer@example.invalid", recipients=["review@example.invalid"],
+        message_id="<models@example.invalid>", date=datetime(2026, 9, 29, tzinfo=UTC),
+    )
+    assert b"unit-1" in rendered.html and b"unit-2" in rendered.html
+    assert b"unit-1" in rendered.text and b"unit-2" in rendered.text
 
 
 def test_editionable_value_is_visible_without_exposing_source_sql() -> None:

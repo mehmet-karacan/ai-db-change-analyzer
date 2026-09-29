@@ -217,6 +217,8 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
     if not ai["models"]:
         ledger.append({"label": "Model kullanımı", "value": "AI çağrısı yapılmadı" if ai["status"] == "not_used" else "Model bilgisi kaydedilmedi"})
     for model in ai["models"]:
+        if len(ai["models"]) > 1:
+            ledger.append({"label": "İlgili AI birimleri", "value": ", ".join(model["unit_ids"]) or "Kaydedilmedi"})
         ledger.extend((
             {"label": "Seçilen model", "value": model["configured_model"]},
             {"label": "Sağlayıcının bildirdiği model", "value": ", ".join(model["returned_models"]) or "Bildirilmedi"},

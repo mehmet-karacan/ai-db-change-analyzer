@@ -15,6 +15,7 @@ Ortam:
 | Komut | Sonuc |
 |---|---|
 | `.venv/Scripts/python.exe -m pytest -q` | PASS — 210 test, 444.99 s; kaynak biçimi/sırası, commit/revert geçmişi, package overload, INDEX yalnız boşluk farkı olan eşdeğer/çakışan tekrar tanımları ve partition/paralellik derecesi/sıkıştırma, VIEW JOIN/analitik aralık, TABLE kısmi MODIFY/sanal sütun/bileşen sınırı/çoklu DROP/fiziksel özellik ve ALTER bağlamı, boş literal ile yorum kaldırma, retry model etiketleri/süre temeli, büyük START WITH gösterimi ve Windows manifest taşınabilirliği testli |
+| `.venv/Scripts/python.exe -m pytest -q tests/test_v5_adapter.py tests/test_v5_rendering.py` | PASS — 26 test; iki AI biriminin farklı dönen model etiketleri eşlemesi de doğrulandı. Tam 210 testlik çalışma bu son kod değişikliğinden önceydi. |
 | `.venv/Scripts/python.exe tools/check_contracts.py` | PASS — 5 JSON schema + strict config example |
 | `.venv/Scripts/python.exe tools/check_release_manifest.py` | PASS — 38 release girdisi SHA-256; `.gitattributes` ile Windows checkout satır sonları sabit |
 | `.venv/Scripts/python.exe -m pytest -q tests/test_release_manifest_portability.py` | PASS — 1 test; temiz index checkout üzerinde 38 girdilik manifest kontrolü PASS |

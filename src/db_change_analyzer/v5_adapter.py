@@ -253,7 +253,14 @@ def build_mail_view(
             "http_attempts": 0, "requested_units": 0, "models": [],
         }
     else:
-        returned = sorted({label for labels in returned_models_by_unit.values() for label in labels})
+        model_units: dict[tuple[str, ...], list[str]] = {}
+        for unit_id in sorted(set(unit_map.values()) | set(returned_models_by_unit)):
+            labels = tuple(sorted(returned_models_by_unit.get(unit_id, set())))
+            model_units.setdefault(labels, []).append(unit_id)
+        if not model_units:
+            model_units[()] = []
+        if len(model_units) > 32:
+            raise ValueError("MODEL_UNIT_MAPPING_LIMIT")
         ai_status = "complete" if unit_map and len(unit_map) == report["counts"]["ai_units"] and all(
             status_map.get(key) in {"displayed", "withheld"} for key in unit_map
         ) else "partial"
@@ -264,11 +271,11 @@ def build_mail_view(
             "requested_units": report["counts"]["ai_units"],
             "models": [{
                 "configured_model": report["versions"]["configured_model"],
-                "returned_models": returned, "resolved_model_version": None,
-                "version_verification": "reported_unverified" if returned else "not_reported",
+                "returned_models": list(labels), "resolved_model_version": None,
+                "version_verification": "reported_unverified" if labels else "not_reported",
                 "verification_record_id": None,
-                "unit_ids": sorted(unit_map.values()) if unit_map else sorted(returned_models_by_unit),
-            }],
+                "unit_ids": unit_ids,
+            } for labels, unit_ids in sorted(model_units.items())],
         }
     limitations = list(report["limitations"])
     if not field_complete:
