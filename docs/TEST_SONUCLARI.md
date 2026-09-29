@@ -16,7 +16,8 @@ Ortam:
 |---|---|
 | `.venv/Scripts/python.exe -m pytest -q` | PASS — 209 test, 258.53 s; kaynak biçimi/sırası, commit/revert geçmişi, package overload, INDEX yalnız boşluk farkı olan eşdeğer/çakışan tekrar tanımları ve partition/paralellik derecesi/sıkıştırma, VIEW JOIN/analitik aralık, TABLE kısmi MODIFY/sanal sütun/bileşen sınırı/çoklu DROP/fiziksel özellik ve ALTER bağlamı, boş literal ile yorum kaldırma, retry model etiketleri/süre temeli, büyük START WITH gösterimi testli |
 | `.venv/Scripts/python.exe tools/check_contracts.py` | PASS — 5 JSON schema + strict config example |
-| `.venv/Scripts/python.exe tools/check_release_manifest.py` | PASS — 37 release girdisi SHA-256 |
+| `.venv/Scripts/python.exe tools/check_release_manifest.py` | PASS — 38 release girdisi SHA-256; `.gitattributes` ile Windows checkout satır sonları sabit |
+| `.venv/Scripts/python.exe -m pytest -q tests/test_release_manifest_portability.py` | PASS — 1 test; temiz index checkout üzerinde 38 girdilik manifest kontrolü PASS |
 | `py -3 <onaylı paket>/tools/check_package.py` | PASS — 115 sunum/paket kontrolü, 0 hata |
 | `.venv/Scripts/python.exe -m build --wheel --outdir dist` | PASS — `ai_db_change_analyzer-0.1.0-py3-none-any.whl` |
 | Ayrı `--system-site-packages` venv, `pip install --no-deps <wheel>` | PASS |
