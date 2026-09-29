@@ -18,6 +18,7 @@ Ortam:
 | `.venv/Scripts/python.exe tools/check_contracts.py` | PASS — 5 JSON schema + strict config example |
 | `.venv/Scripts/python.exe tools/check_release_manifest.py` | PASS — 38 release girdisi SHA-256; `.gitattributes` ile Windows checkout satır sonları sabit |
 | `.venv/Scripts/python.exe -m pytest -q tests/test_release_manifest_portability.py` | PASS — 1 test; temiz index checkout üzerinde 38 girdilik manifest kontrolü PASS |
+| Windows `core.autocrlf=true` ile temiz clone, `tools/check_release_manifest.py` | PASS — 38 dosya doğrulandı |
 | `py -3 <onaylı paket>/tools/check_package.py` | PASS — 115 sunum/paket kontrolü, 0 hata |
 | `.venv/Scripts/python.exe -m build --wheel --outdir dist` | PASS — `ai_db_change_analyzer-0.1.0-py3-none-any.whl` |
 | Ayrı `--system-site-packages` venv, `pip install --no-deps <wheel>` | PASS |
@@ -36,4 +37,4 @@ Saglanan metadata ZIP'i salt okunur olarak 2.340 SQL dosyasinin tamaminda tarand
 
 `docs/KABUL_MATRISI.md` ilk sürümün 129 ID'sini listeler ve V5 kapsamına göre henüz yeniden sınıflandırılmamıştır. V5 gruplarının yerel ve bekleyen kabul ayrımı `docs/V5_KABUL_DURUMU.md` içindedir. V5 yerel otomatik testleri tüm normatif K3 corpus, model kalite, gateway ve istemci render kabulünün yerine geçmez.
 
-Acik yetki olmadigi icin su live kapilar NOT RUN kaldı: kurum LiteLLM route/model/capability ve kalite eval'i; gercek SMTP relay kabul/ret/UNKNOWN provasi; Jenkins job kurulumu/cron; production gpu-db history/inventory; Oracle/canli DB (urun zaten Oracle'a baglanmaz). Bu sonuclar production onayi veya canli DB guvenligi iddiasi degildir.
+Acik yetki veya kurum ortamı olmadığı icin su live kapilar NOT RUN kaldı: kurum LiteLLM route/model/capability ve kalite eval'i; gercek SMTP relay kabul/ret/UNKNOWN provasi; Jenkins job/cron ortamı; production gpu-db history/inventory; Oracle/canli DB (urun zaten Oracle'a baglanmaz). Kullanıcının ayrı isteği üzerine Analyzer Jenkinsfile etkisizleştirildi ve commit'ler `origin/main` dalına gönderildi. Bu sonuclar production onayi veya canli DB guvenligi iddiasi degildir.
