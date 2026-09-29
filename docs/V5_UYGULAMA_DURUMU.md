@@ -28,7 +28,7 @@ Bu belge `AI_DB_ANALYZER_V5_ONAYLI_PAKET.zip` sözleşmesinin yerel ürün kodun
 
 ## Yetki ve ortam gerektiren kabul
 
-Gerçek kurum LiteLLM modeli/yanıt kalitesi, SMTP gateway ve native Outlook render, production `gpu-db` geçmişi ve Jenkins kurulumu bu yerel geliştirmede çalıştırılmadı. Bunlar açık kurum erişimi ve yetkiyle ayrı kabul adımlarıdır. Sentetik test, mock HTTP/SMTP ve yerel Git doğrulaması bu adımların yerine geçmez.
+Gerçek kurum LiteLLM modeli/yanıt kalitesi, SMTP gateway ve native Outlook render ile Jenkins kurulumu bu yerel geliştirmede çalıştırılmadı. Kaynak `gpu-db` Git geçmişindeki iki sabit revizyonun byte farkı salt okunur doğrulandı; tam production history/inventory akışı çalıştırılmadı. Sentetik test, mock HTTP/SMTP ve bu sınırlı Git doğrulaması diğer kurum kabul adımlarının yerine geçmez.
 
 ## Geri alma
 
