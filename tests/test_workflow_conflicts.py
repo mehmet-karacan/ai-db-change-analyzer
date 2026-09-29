@@ -25,6 +25,26 @@ def test_duplicate_definitions_are_checked_on_each_revision() -> None:
     assert _conflicting_definitions([first, other])
     assert _conflicting_definitions([first, ref("a", "context-b")])
     assert _conflicting_definitions([first, ref("a")])
+    first.context_evidence = ({"fragment_sha256": "context-a", "snippet": "ALTER TABLE S.T PARALLEL 4"},)
+    spaced = ref("a", "context-b")
+    spaced.context_evidence = ({"fragment_sha256": "context-b", "snippet": "ALTER  TABLE S.T PARALLEL 4"},)
+    changed = ref("a", "context-c")
+    changed.context_evidence = ({"fragment_sha256": "context-c", "snippet": "ALTER TABLE S.T PARALLEL 8"},)
+    assert not _conflicting_definitions([first, spaced])
+    assert _conflicting_definitions([first, changed])
+
+    def source_ref(sql: str) -> SimpleNamespace:
+        raw = sql.encode()
+        return SimpleNamespace(
+            occurrence=scan(raw, default_schema="S").occurrences[0],
+            raw=raw, inventory=SimpleNamespace(encoding="utf-8"),
+            context_evidence=(), projection=SimpleNamespace(support="structural", diagnostics=()),
+        )
+
+    base = source_ref("CREATE INDEX S.I ON S.T (ID ASC);")
+    assert not _conflicting_definitions([base, source_ref("CREATE  INDEX S.I ON S.T (ID  ASC);")])
+    assert _conflicting_definitions([base, source_ref("CREATE INDEX S.I ON S.T (ID DESC);")])
+    assert _conflicting_definitions([base, source_ref("CREATE INDEX S.I ON S.T (ID ASC) /* note */;")])
 
 
 def test_changed_partial_inventory_cannot_prove_absence() -> None:

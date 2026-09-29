@@ -182,12 +182,33 @@ def _verify_changed_refs(index: dict[str, list[OccurrenceRef]], keys: list[str],
 
 
 def _conflicting_definitions(items: list[OccurrenceRef]) -> bool:
-    return len({(
-        item.occurrence.fragment_sha256,
-        tuple(evidence["fragment_sha256"] for evidence in item.context_evidence),
-        item.projection.support,
-        item.projection.diagnostics,
-    ) for item in items}) > 1
+    if len(items) < 2:
+        return False
+    first = items[0]
+    for item in items[1:]:
+        if (item.projection.support != first.projection.support
+                or item.projection.diagnostics != first.projection.diagnostics
+                or len(item.context_evidence) != len(first.context_evidence)):
+            return True
+        if item.occurrence.fragment_sha256 != first.occurrence.fragment_sha256:
+            if first.projection.support != "structural":
+                return True
+            try:
+                old_fragment = first.raw[first.occurrence.start_byte:first.occurrence.end_byte_exclusive].decode(first.inventory.encoding or "utf-8")
+                new_fragment = item.raw[item.occurrence.start_byte:item.occurrence.end_byte_exclusive].decode(item.inventory.encoding or "utf-8")
+            except (AttributeError, UnicodeError):
+                return True
+            if not whitespace_only_source_change(old_fragment, new_fragment):
+                return True
+        for old_context, new_context in zip(first.context_evidence, item.context_evidence, strict=True):
+            if old_context["fragment_sha256"] == new_context["fragment_sha256"]:
+                continue
+            old_text, new_text = old_context.get("snippet"), new_context.get("snippet")
+            if (first.projection.support != "structural" or not isinstance(old_text, str)
+                    or not isinstance(new_text, str)
+                    or not whitespace_only_source_change(old_text, new_text)):
+                return True
+    return False
 
 
 def _incomplete_changed_paths(inventories: list[FileInventory], changed_paths: set[bytes]) -> set[bytes]:

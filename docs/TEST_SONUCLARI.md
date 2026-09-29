@@ -14,7 +14,7 @@ Ortam:
 
 | Komut | Sonuc |
 |---|---|
-| `.venv/Scripts/python.exe -m pytest -q` | PASS — 209 test, 257.92 s; kaynak biçimi/sırası, commit/revert geçmişi, package overload, INDEX eşdeğer/çakışan tekrar tanımları ve partition/paralellik derecesi/sıkıştırma, VIEW JOIN/analitik aralık, TABLE kısmi MODIFY/sanal sütun/bileşen sınırı/çoklu DROP/fiziksel özellik ve ALTER bağlamı, boş literal ile yorum kaldırma, retry model etiketleri/süre temeli, büyük START WITH gösterimi testli |
+| `.venv/Scripts/python.exe -m pytest -q` | PASS — 209 test, 258.53 s; kaynak biçimi/sırası, commit/revert geçmişi, package overload, INDEX yalnız boşluk farkı olan eşdeğer/çakışan tekrar tanımları ve partition/paralellik derecesi/sıkıştırma, VIEW JOIN/analitik aralık, TABLE kısmi MODIFY/sanal sütun/bileşen sınırı/çoklu DROP/fiziksel özellik ve ALTER bağlamı, boş literal ile yorum kaldırma, retry model etiketleri/süre temeli, büyük START WITH gösterimi testli |
 | `.venv/Scripts/python.exe tools/check_contracts.py` | PASS — 5 JSON schema + strict config example |
 | `.venv/Scripts/python.exe tools/check_release_manifest.py` | PASS — 37 release girdisi SHA-256 |
 | `py -3 <onaylı paket>/tools/check_package.py` | PASS — 115 sunum/paket kontrolü, 0 hata |

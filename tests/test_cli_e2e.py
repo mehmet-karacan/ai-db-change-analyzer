@@ -73,7 +73,7 @@ def test_dry_run_rejects_live_permissions_before_network(tmp_path: Path, capsys)
     assert result["error_code"] == "DRY_RUN_PERMISSION_CONFLICT"
 
 
-def test_duplicate_identical_index_definitions_keep_one_structural_change(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_format_equivalent_index_definitions_keep_one_structural_change(tmp_path: Path, capsys, monkeypatch) -> None:
     config = config_for(tmp_path)
     text = config.read_text(encoding="utf-8")
     for old, new in (
@@ -91,8 +91,8 @@ def test_duplicate_identical_index_definitions_keep_one_structural_change(tmp_pa
     capsys.readouterr()
     source = GitFixture(tmp_path / "repo")
     paths = ("gpu_user/index_a.sql", "gpu_user/index_b.sql")
-    for path in paths:
-        source.write(path, "CREATE INDEX S.I ON S.T (ID ASC);\n")
+    source.write(paths[0], "CREATE INDEX S.I ON S.T (ID ASC);\n")
+    source.write(paths[1], "CREATE  INDEX S.I ON S.T (ID  ASC);\n")
     first = source.commit("duplicate index baseline")
     scope_dir = next((tmp_path / "state" / "scopes").iterdir())
     cache = scope_dir / "source.git"
@@ -101,8 +101,8 @@ def test_duplicate_identical_index_definitions_keep_one_structural_change(tmp_pa
     git("update-ref", "refs/remotes/source/master", first, cwd=cache)
     assert main(["--config", str(config), "run", "--offline"]) == 0
     capsys.readouterr()
-    for path in paths:
-        source.write(path, "CREATE INDEX S.I ON S.T (ID DESC);\n")
+    source.write(paths[0], "CREATE INDEX S.I ON S.T (ID DESC);\n")
+    source.write(paths[1], "CREATE  INDEX S.I ON S.T (ID  DESC);\n")
     second = source.commit("duplicate index direction change")
     git("fetch", str(source.root), f"{second}:refs/remotes/source/master", cwd=cache)
 
