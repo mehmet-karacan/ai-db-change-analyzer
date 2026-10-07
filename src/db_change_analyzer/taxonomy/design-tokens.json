@@ -2,13 +2,13 @@
   "schema_version": "design-tokens/1.0",
   "template_version": "v5.0",
   "palette": {
-    "outer": "#F4F0EA",
-    "paper": "#FFFEFC",
-    "ink": "#24211F",
-    "muted": "#5F5954",
-    "copper": "#A84426",
-    "line": "#D7CCC1",
-    "tint": "#F3EEE7",
+    "outer": "#F2F5F8",
+    "paper": "#FFFFFF",
+    "ink": "#18283A",
+    "muted": "#5C6B7A",
+    "copper": "#E92231",
+    "line": "#D8E0E8",
+    "tint": "#EEF3F7",
     "added": "#24583D",
     "added_bg": "#EDF5EF",
     "modified": "#8C4817",
@@ -17,9 +17,9 @@
     "removed_bg": "#FBEFF0",
     "ai": "#694074",
     "ai_bg": "#F6F0F8",
-    "dark": "#2B2724",
-    "dark_text": "#FFFEFC",
-    "dark_muted": "#DDD3CA"
+    "dark": "#0B2239",
+    "dark_text": "#FFFFFF",
+    "dark_muted": "#D9E6F1"
   },
   "actions": {
     "added": {
@@ -31,14 +31,14 @@
     "modified": {
       "label": "Değiştirildi",
       "symbol": "~",
-      "fg": "#8C4817",
-      "bg": "#FBF0E2"
+      "fg": "#A95712",
+      "bg": "#FFF3E6"
     },
     "removed": {
       "label": "Çıkarıldı",
       "symbol": "-",
-      "fg": "#8E343A",
-      "bg": "#FBEFF0"
+      "fg": "#A8323B",
+      "bg": "#FDEDEF"
     }
   },
   "labels": {

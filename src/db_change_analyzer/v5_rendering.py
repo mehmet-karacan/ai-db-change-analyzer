@@ -23,6 +23,7 @@ from .taxonomy.catalog import change_catalog, supported_types
 
 
 _TEMPLATES = Path(__file__).parent / "templates" / "v5"
+_LOGO = Path(__file__).parent / "assets" / "innova-logo-beyaz.png"
 _TOKENS = json.loads((Path(__file__).parent / "taxonomy" / "design-tokens.json").read_text(encoding="utf-8"))
 _OBJECT_CATALOG = json.loads((Path(__file__).parent / "taxonomy" / "object-catalog.json").read_text(encoding="utf-8"))
 _TYPES = {item["id"]: item for item in _OBJECT_CATALOG["types"]}
@@ -297,6 +298,9 @@ def render_v5_view(
         mail["Message-ID"] = message_id
         mail.set_content(text.decode("utf-8"))
         mail.add_alternative(html.decode("utf-8"), subtype="html")
+        html_part = mail.get_body(preferencelist=("html",))
+        if html_part is not None and _LOGO.is_file():
+            html_part.add_related(_LOGO.read_bytes(), maintype="image", subtype="png", cid="<innova-logo>")
         mail.set_boundary("v5-" + hashlib.sha256(html).hexdigest()[:32])
         mime = mail.as_bytes()
         if len(mime) <= mime_limit:

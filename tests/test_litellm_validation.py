@@ -116,7 +116,7 @@ def test_http_request_shape_and_envelope_are_strict(tmp_path: Path) -> None:
     with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client:
         reply = client.complete(api_key="local-test-key", system_message="safe", user_payload=unit().model_dump(mode="json"), response_schema={"type": "object"}, output_tokens=64)
     assert reply.finish_reason == "stop"
-    assert captured["model"] == "Kimi-K2.7-Code"
+    assert captured["model"] == "GLM5.3-Flash-IT"
     assert "tools" not in captured and "temperature" not in captured
     assert captured["response_format"]["type"] == "json_schema"
 

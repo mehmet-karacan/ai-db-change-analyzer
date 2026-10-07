@@ -160,6 +160,18 @@ def _flatten(projection: Projection) -> dict[tuple[str, tuple[str, ...]], str | 
             if taxonomy_id in change_catalog():
                 for position, value in enumerate(values, 1):
                     _field(fields, taxonomy_id, (str(position),), value)
+    elif kind == "TRIGGER":
+        _field(fields, "trigger.trigger_property.target", (), properties.get("target"))
+        _field(fields, "trigger.trigger_property.enabled_state", (), properties.get("enabled_state"))
+    elif kind in {"PROCEDURE", "FUNCTION"}:
+        prefix = kind.lower()
+        for property_key in ("has_exception", "has_commit", "has_rollback"):
+            _field(fields, f"{prefix}.{prefix}_property.{property_key}", (), properties.get(property_key))
+    elif kind in {"TYPE", "TYPE_BODY"}:
+        # The Oracle grammar does not expose a stable typed projection for all
+        # standalone type declarations. Keep the generic source transition and
+        # avoid inventing semantic fields.
+        _field(fields, f"{kind.lower()}.type_property.raw_definition", (), properties.get("raw_clause"))
     return fields
 
 

@@ -1,8 +1,8 @@
 {% if in_object %}{% for note in obj.notes %}<p style="margin:13px 0 0;font-size:14px;line-height:23px;color:#24211F;"><strong>Kapsam notu:</strong> {{ note }}</p>{% endfor %}
 <p style="margin:13px 0 0;font-size:14px;line-height:22px;color:#5F5954;"><strong>Analiz yöntemi:</strong> {{ obj.method }}</p>
-{% else %}<tr><td bgcolor="#F3EEE7" class="px" style="padding:24px 34px 26px;background-color:#F3EEE7;border-top:3px solid #A84426;">
-<h2 style="margin:0 0 10px;font-size:19px;line-height:27px;color:#24211F;">Kapsam ve sorumluluk beyanı</h2>
-<p style="margin:0;font-size:14px;line-height:23px;color:#5F5954;">Rapor, belirtilen Git snapshot’ları arasındaki kaynak tanım farklılıklarıyla sınırlıdır. Canlı veritabanı durumu, deployment sonucu, çalışma zamanı değerleri ve kapsam dışındaki uygulama veya tüketici bağımlılıkları doğrulanmaz.</p>
-<p style="margin:10px 0 0;font-size:14px;line-height:23px;color:#5F5954;">AI yorumları yardımcı değerlendirmelerdir; eksik veya hatalı olabilir. Tek başına hata, operasyonel etki, güvenlik veya deployment onayı olarak kullanılmamalıdır. Uygulama kararları, yetkili kişilerin kaynak incelemesi ve uygun testleriyle doğrulanmalıdır.</p>
-<p style="margin:10px 0 0;font-size:14px;line-height:23px;color:#5F5954;">“Eklendi” ve “Çıkarıldı” ifadeleri Git’teki tanımın varlığını anlatır; canlı veritabanında CREATE veya DROP çalıştığını kanıtlamaz. Rapor, değişikliğin risksiz olduğunu garanti etmez.</p>
+{% else %}<tr><td bgcolor="#EEF3F7" class="px" style="padding:24px 34px 26px;background-color:#EEF3F7;border-top:3px solid #E92231;">
+<h2 style="margin:0 0 10px;font-size:19px;line-height:27px;color:#18283A;">Kapsam ve sorumluluk beyanı</h2>
+<p style="margin:0;font-size:14px;line-height:23px;color:#5C6B7A;">Rapor, belirtilen Git snapshot’ları arasındaki kaynak tanım farklılıklarıyla sınırlıdır. Canlı veritabanı durumu, deployment sonucu, çalışma zamanı değerleri ve kapsam dışındaki uygulama veya tüketici bağımlılıkları doğrulanmaz.</p>
+<p style="margin:10px 0 0;font-size:14px;line-height:23px;color:#5C6B7A;">AI yorumları yardımcı değerlendirmelerdir; eksik veya hatalı olabilir. Tek başına hata, operasyonel etki, güvenlik veya deployment onayı olarak kullanılmamalıdır. Uygulama kararları, yetkili kişilerin kaynak incelemesi ve uygun testleriyle doğrulanmalıdır.</p>
+<p style="margin:10px 0 0;font-size:14px;line-height:23px;color:#5C6B7A;">“Eklendi” ve “Çıkarıldı” ifadeleri Git’teki tanımın varlığını anlatır; canlı veritabanında CREATE veya DROP çalıştığını kanıtlamaz. Rapor, değişikliğin risksiz olduğunu garanti etmez.</p>
 </td></tr>{% endif %}

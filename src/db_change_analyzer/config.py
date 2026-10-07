@@ -192,6 +192,8 @@ class SmtpConfig(ConfigModel):
 
 class ReportsConfig(ConfigModel):
     emit_dir: str
+    archive_enabled: bool
+    archive_root: str
     mail_max_bytes: Annotated[int, Field(gt=0)]
     mail_max_object_details: Annotated[int, Field(ge=0)]
     commit_url_template: str

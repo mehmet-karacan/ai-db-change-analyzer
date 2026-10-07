@@ -37,6 +37,7 @@ db_change_analyzer = [
   "templates/v5/*.j2",
   "templates/v5/components/*.j2",
   "templates/v5/objects/*.j2",
+  "assets/*.png",
   "oracle/generated/*.json",
   "taxonomy/*.json",
   "schemas/*.json",

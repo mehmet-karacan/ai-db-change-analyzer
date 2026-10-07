@@ -9,7 +9,12 @@
         "SEQUENCE",
         "VIEW",
         "PACKAGE_SPEC",
-        "PACKAGE_BODY"
+        "PACKAGE_BODY",
+        "FUNCTION",
+        "PROCEDURE",
+        "TRIGGER",
+        "TYPE",
+        "TYPE_BODY"
       ],
       "component": "OBJECT",
       "property_key": "presence",
@@ -42,7 +47,12 @@
         "SEQUENCE",
         "VIEW",
         "PACKAGE_SPEC",
-        "PACKAGE_BODY"
+        "PACKAGE_BODY",
+        "FUNCTION",
+        "PROCEDURE",
+        "TRIGGER",
+        "TYPE",
+        "TYPE_BODY"
       ],
       "component": "SOURCE",
       "property_key": "text",
@@ -74,7 +84,12 @@
         "SEQUENCE",
         "VIEW",
         "PACKAGE_SPEC",
-        "PACKAGE_BODY"
+        "PACKAGE_BODY",
+        "FUNCTION",
+        "PROCEDURE",
+        "TRIGGER",
+        "TYPE",
+        "TYPE_BODY"
       ],
       "component": "SOURCE",
       "property_key": "format",
@@ -106,7 +121,12 @@
         "SEQUENCE",
         "VIEW",
         "PACKAGE_SPEC",
-        "PACKAGE_BODY"
+        "PACKAGE_BODY",
+        "FUNCTION",
+        "PROCEDURE",
+        "TRIGGER",
+        "TYPE",
+        "TYPE_BODY"
       ],
       "component": "SOURCE",
       "property_key": "occurrence_order",
@@ -138,7 +158,12 @@
         "SEQUENCE",
         "VIEW",
         "PACKAGE_SPEC",
-        "PACKAGE_BODY"
+        "PACKAGE_BODY",
+        "FUNCTION",
+        "PROCEDURE",
+        "TRIGGER",
+        "TYPE",
+        "TYPE_BODY"
       ],
       "component": "SOURCE",
       "property_key": "path",
@@ -2970,6 +2995,226 @@
       "notes_tr": "İçerik çözülmez; hash/değişim ve kapsam notu gösterilir.",
       "source_refs": [
         "O6",
+        "O7"
+      ]
+    },
+    {
+      "id": "trigger.trigger_property.target",
+      "object_types": [
+        "TRIGGER"
+      ],
+      "component": "TRIGGER_PROPERTY",
+      "property_key": "target",
+      "label_tr": "Tetikleyici hedefi",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "trigger.trigger_property.enabled_state",
+      "object_types": [
+        "TRIGGER"
+      ],
+      "component": "TRIGGER_PROPERTY",
+      "property_key": "enabled_state",
+      "label_tr": "Tetikleyici durumu",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "configuration",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "procedure.procedure_property.has_exception",
+      "object_types": [
+        "PROCEDURE"
+      ],
+      "component": "PROCEDURE_PROPERTY",
+      "property_key": "has_exception",
+      "label_tr": "Procedure exception bloğu",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "exception",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "procedure.procedure_property.has_commit",
+      "object_types": [
+        "PROCEDURE"
+      ],
+      "component": "PROCEDURE_PROPERTY",
+      "property_key": "has_commit",
+      "label_tr": "Procedure COMMIT kullanımı",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "transaction",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "procedure.procedure_property.has_rollback",
+      "object_types": [
+        "PROCEDURE"
+      ],
+      "component": "PROCEDURE_PROPERTY",
+      "property_key": "has_rollback",
+      "label_tr": "Procedure ROLLBACK kullanımı",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "transaction",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "function.function_property.has_exception",
+      "object_types": [
+        "FUNCTION"
+      ],
+      "component": "FUNCTION_PROPERTY",
+      "property_key": "has_exception",
+      "label_tr": "Function exception bloğu",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "exception",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "function.function_property.has_commit",
+      "object_types": [
+        "FUNCTION"
+      ],
+      "component": "FUNCTION_PROPERTY",
+      "property_key": "has_commit",
+      "label_tr": "Function COMMIT kullanımı",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "transaction",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "function.function_property.has_rollback",
+      "object_types": [
+        "FUNCTION"
+      ],
+      "component": "FUNCTION_PROPERTY",
+      "property_key": "has_rollback",
+      "label_tr": "Function ROLLBACK kullanımı",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "transaction",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "type.type_property.raw_definition",
+      "object_types": [
+        "TYPE"
+      ],
+      "component": "TYPE_PROPERTY",
+      "property_key": "raw_definition",
+      "label_tr": "Tip kaynak tanımı",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "type_body.type_property.raw_definition",
+      "object_types": [
+        "TYPE_BODY"
+      ],
+      "component": "TYPE_PROPERTY",
+      "property_key": "raw_definition",
+      "label_tr": "Tip gövdesi kaynak tanımı",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "logic",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
         "O7"
       ]
     }

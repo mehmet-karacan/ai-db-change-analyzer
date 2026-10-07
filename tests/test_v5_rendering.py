@@ -109,8 +109,7 @@ def test_scale_profiles_keep_totals_and_only_live_detail_links(count: int) -> No
     assert f"{count} nesne kaynak farkı" in html
     assert manifest["omitted_index_objects"] == count - len(rendered.index_object_ids)
     assert manifest["omitted_detail_objects"] == count - len(rendered.detail_object_ids)
-    anchors = set(re.findall(r'id="(nesne-[^"]+)"', html))
-    assert set(re.findall(r'href="#(nesne-[^"]+)"', html)) <= anchors
+    assert b"href=" not in rendered.html
     if count >= 120:
         assert rendered.profile != "full"
         assert "kısaltıldı" in html
@@ -120,4 +119,4 @@ def test_scale_profiles_keep_totals_and_only_live_detail_links(count: int) -> No
         assert len(minimal.html) <= 18_000
         assert b"1000 nesne kaynak fark" in minimal.html
         assert not minimal.index_object_ids and not minimal.detail_object_ids
-        assert b'href="#nesne-' not in minimal.html
+        assert b"href=" not in minimal.html

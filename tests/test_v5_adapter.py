@@ -73,11 +73,15 @@ def test_adapter_builds_real_schema_view_and_v5_mime_without_ai() -> None:
     assert view["analysis"]["ai"]["status"] == "not_used"
     assert view["objects"][0]["pattern"] == "start_with_only"
     assert view["objects"][0]["facts"][0]["taxonomy_id"] == "sequence.sequence_property.start_with"
+    assert view["objects"][0]["recommended_checks"][0]["code"] == "SEQUENCE_DEFINITION"
     rendered = render_v5_view(
         view, sender="analyzer@example.invalid", recipients=["review@example.invalid"],
         message_id="<v5@example.invalid>", date=datetime(2026, 9, 29, tzinfo=UTC),
     )
     assert b"START WITH" in rendered.html
+    assert "Olası etki ve kontrol".encode("utf-8") in rendered.html
+    assert b"cid:innova-logo" in rendered.html
+    assert b"Content-ID: <innova-logo>" in rendered.mime
     assert b"AI" in rendered.text
     manifest = build_render_manifest(view, rendered, source_report_sha256="f" * 64)
     assert manifest["html_bytes"] == len(rendered.html)

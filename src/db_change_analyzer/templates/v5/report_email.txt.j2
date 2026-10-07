@@ -1,6 +1,6 @@
-AI DB CHANGE ANALYZER
+İNNOVA · VERİTABANI DEĞİŞİKLİK ANALİZİ
 Oracle DDL incelemesi: {{ report_date }}
-{% if synthetic %}SENTETİK ÖRNEK. Gerçek model çağrısı ve gönderim yapılmadı.
+{% if synthetic %}ÖNİZLEME. Gönderim ve canlı veritabanı doğrulaması yapılmadı.
 {% endif %}
 {{ counts.primary_total }} Oracle nesnesinde kaynak değişikliği
 {{ counts.added }} Eklendi | {{ counts.modified }} Değiştirildi | {{ counts.removed }} Çıkarıldı
@@ -37,8 +37,7 @@ ANALİZ KAYDI
 {% endfor %}
 KARŞILAŞTIRMA BİLGİSİ
 {% for row in comparison_rows %}{{ row.label }}: {{ row.value }}
-{% endfor %}{% if report_url %}Yetkili tam rapor: {{ report_url }}
-{% endif %}
+{% endfor %}Bu e-posta Git snapshot karşılaştırmasını içerir; canlı veritabanı doğrulaması yapılmaz.
 KAPSAM VE SORUMLULUK BEYANI
 Rapor, belirtilen Git snapshot'ları arasındaki kaynak tanım farklılıklarıyla sınırlıdır. Canlı veritabanı durumu, deployment sonucu, çalışma zamanı değerleri ve kapsam dışındaki uygulama veya tüketici bağımlılıkları doğrulanmaz.
 AI yorumları yardımcı değerlendirmelerdir; eksik veya hatalı olabilir. Tek başına hata, operasyonel etki, güvenlik veya deployment onayı olarak kullanılmamalıdır. Uygulama kararları, yetkili kişilerin kaynak incelemesi ve uygun testleriyle doğrulanmalıdır.

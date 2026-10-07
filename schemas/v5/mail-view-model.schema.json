@@ -717,7 +717,17 @@
             "package_body.body_property.call_reference",
             "package_body.body_property.dynamic_sql",
             "package_body.body_property.initialization",
-            "package_body.source.wrapped"
+            "package_body.source.wrapped",
+            "trigger.trigger_property.target",
+            "trigger.trigger_property.enabled_state",
+            "procedure.procedure_property.has_exception",
+            "procedure.procedure_property.has_commit",
+            "procedure.procedure_property.has_rollback",
+            "function.function_property.has_exception",
+            "function.function_property.has_commit",
+            "function.function_property.has_rollback",
+            "type.type_property.raw_definition",
+            "type_body.type_property.raw_definition"
           ]
         },
         "subject_name": {
@@ -1023,6 +1033,11 @@
                 "VIEW",
                 "PACKAGE_SPEC",
                 "PACKAGE_BODY",
+                "TRIGGER",
+                "PROCEDURE",
+                "FUNCTION",
+                "TYPE",
+                "TYPE_BODY",
                 "UNKNOWN"
               ]
             },

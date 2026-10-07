@@ -39,6 +39,11 @@ _SAFE_FIELDS = {
     "package_body.parameter.name", "package_body.parameter.position",
     "package_body.parameter.mode", "package_body.parameter.data_type",
     "package_body.parameter.nocopy", "package_body.routine.return_type",
+    "trigger.trigger_property.target", "trigger.trigger_property.enabled_state",
+    "procedure.procedure_property.has_exception", "procedure.procedure_property.has_commit",
+    "procedure.procedure_property.has_rollback", "function.function_property.has_exception",
+    "function.function_property.has_commit", "function.function_property.has_rollback",
+    "type.type_property.raw_definition", "type_body.type_property.raw_definition",
 }
 _SAFE_VALUE = re.compile(r"""[A-Za-z0-9_.$#",()/: +\-]+""")
 _SAFE_PATH = re.compile(r"[A-Za-z0-9_./$#() +\-]{1,1000}")
@@ -108,6 +113,44 @@ def _fact(change: Change, extra_secret_patterns: list[str]) -> tuple[dict[str, A
         "verification": "redacted" if limited else change.verification,
         "context_only": change.context_only,
     }, limited
+
+
+def _recommended_checks(
+    object_type: str, operation: str, fact_types: set[str], evidence_ids: list[str]
+) -> list[dict[str, Any]]:
+    """Return bounded, evidence-linked impact prompts without asserting runtime dependencies."""
+    evidence = list(dict.fromkeys(evidence_ids))[:8]
+    if not evidence:
+        return []
+    checks: list[dict[str, Any]] = []
+
+    def add(code: str, text_tr: str) -> None:
+        if len(checks) < 6 and text_tr not in {item["text_tr"] for item in checks}:
+            checks.append({"code": code, "text_tr": text_tr, "evidence_ids": evidence, "origin": "deterministic_rule"})
+
+    if operation in {"added", "removed"}:
+        add(
+            "SOURCE_REFERENCES",
+            "Bu nesneyi kullanan uygulama akışları, yetkiler ve kaynak bağımlılıkları kontrol edilmelidir.",
+        )
+    if object_type == "TABLE":
+        if operation == "modified" or any(item.startswith("table.column.") for item in fact_types):
+            add("COLUMN_CONTRACT", "Kolon sözleşmesi, veri yazma/okuma akışları ve geriye dönük uyumluluk kontrol edilmelidir.")
+        if any(item.startswith("table.constraint.") for item in fact_types):
+            add("SOURCE_REFERENCES", "İlişkili kayıt yazma akışları ve veri bütünlüğü davranışı kontrol edilmelidir.")
+        if any(item.startswith("table.table_property.") for item in fact_types):
+            add("MANUAL_SOURCE_REVIEW", "Tablonun fiziksel özellikleri, performans beklentisi ve bakım akışları kontrol edilmelidir.")
+    elif object_type == "INDEX":
+        add("INDEX_DEFINITION", "İlgili sorguların planı, indeks kullanımı ve beklenen performans etkisi kontrol edilmelidir.")
+    elif object_type == "VIEW":
+        add("QUERY_DEFINITION", "View'i kullanan rapor ve sorguların kolon sözleşmesi ile sonuç kümesi kontrol edilmelidir.")
+    elif object_type in {"PACKAGE_SPEC", "PACKAGE_BODY"}:
+        add("CALL_SIGNATURE", "Paketi çağıran uygulamalar, imza uyumluluğu ve regresyon testleri kontrol edilmelidir.")
+    elif object_type == "SEQUENCE":
+        add("SEQUENCE_DEFINITION", "Sequence'in canlı NEXTVAL değeri ve kullanan akışların tekrar/çakışma davranışı kontrol edilmelidir.")
+    else:
+        add("MANUAL_SOURCE_REVIEW", "Değişen tanımın uygulama tüketicileri ve operasyonel etkisi kaynak incelemesiyle kontrol edilmelidir.")
+    return checks
 
 
 def build_mail_view(
@@ -219,6 +262,7 @@ def build_mail_view(
             frozenset({"common.source.path"}): "relocation",
             frozenset({"common.source.text"}): "text_only",
         }.get(frozenset(fact_types))
+        recommended_checks = _recommended_checks(identity["object_type"], operation, fact_types, source_ids)
         objects.append({
             "object_id": object_id,
             "identity": {
@@ -236,7 +280,7 @@ def build_mail_view(
             "evidence_ids": list(dict.fromkeys(source_ids)), "facts": converted,
             "deterministic_summary_tr": f"{len(converted)} kaynak alanı farkı kaydedildi." if converted else "Kaynak tanımında fark gözlendi; alan ayrıştırması sınırlı.",
             "limitations_tr": notes[:10], "ai_comments": comments_map.get(key, []),
-            "recommended_checks": [], "ai_status": status_map.get(key, "withheld" if item["assessments"] else "not_requested"),
+            "recommended_checks": recommended_checks, "ai_status": status_map.get(key, "withheld" if item["assessments"] else "not_requested"),
             "unit_ids": [unit_map[key]] if key in unit_map else list(dict.fromkeys(assessment["unit_id"] for assessment in item["assessments"])),
             "source_checks": {
                 "identity_match": "verified" if identity["identity_confidence"] == "known" else "uncertain",

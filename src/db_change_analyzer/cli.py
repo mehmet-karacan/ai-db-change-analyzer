@@ -193,6 +193,7 @@ def run_command(args: argparse.Namespace) -> int:
     if args.dry_run and (args.allow_ai or args.allow_mail):
         return _finish(args, mode="RUN", outcome="CONFIG_INVALID", exit_code=ExitCode.CONFIG, error_code="DRY_RUN_PERMISSION_CONFLICT")
     config = load_config(args.config)
+    from .archive import ArchiveError, find_range_archive
     store = SqliteStateStore(config)
     with store.lock():
         store.recover_inflight_notifications()
@@ -216,6 +217,23 @@ def run_command(args: argparse.Namespace) -> int:
         _json_line({"event": "range_plan", "plan": _plan_projection(plan)}, stream=sys.stderr)
         if args.dry_run:
             return _finish(args, mode="RUN", outcome="DRY_RUN", checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
+        if plan.outcome == "ANALYZE" and unfinished is None and config.reports.archive_enabled:
+            try:
+                existing_archive = find_range_archive(
+                    config.reports.archive_root,
+                    config.repository.id,
+                    config.repository.branch,
+                    plan.base_sha,
+                    plan.target_sha,
+                )
+            except ArchiveError as exc:
+                return _finish(args, mode="RUN", outcome="ARCHIVE_CHECK_FAILED", exit_code=50, error_code=exc.code, checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
+            if existing_archive is not None:
+                _json_line({"event": "range_archive_skip", "archive": str(existing_archive)}, stream=sys.stderr)
+                return _finish(
+                    args, mode="RUN", outcome="RANGE_REPORT_EXISTS", checkpoint_before=plan.base_sha,
+                    checkpoint_after=plan.base_sha, emitted_files=[str(existing_archive / "archive-manifest.json")],
+                )
         if plan.outcome == "BASELINED":
             store.compare_and_swap_checkpoint(None, plan.target_sha, store.verify()["epoch"])
             return _finish(args, mode="RUN", outcome="BASELINED", checkpoint_before=None, checkpoint_after=plan.target_sha)
@@ -236,6 +254,7 @@ def run_command(args: argparse.Namespace) -> int:
 
 
 def _resume_reported_run(args, config, store, plan: RangePlan, run) -> int:
+    from .archive import ArchiveError, write_report_archive
     from .notification import finalize_auto_delivery, send_persisted_notification
     from .smtp_transport import SmtpTransport
 
@@ -247,6 +266,35 @@ def _resume_reported_run(args, config, store, plan: RangePlan, run) -> int:
             raise StateError("pinned run is missing its persisted report or notification")
         _verify_v5_notification_binding(connection, run["report_id"], report, notification)
         emitted = _restore_v5_outputs(args, config, connection, run["report_id"], report)
+        if config.reports.archive_enabled:
+            try:
+                sidecar = connection.execute(
+                    "SELECT mail_view_json,manifest_json,html,text FROM report_render_sidecars WHERE report_id=? AND render_generation=0",
+                    (run["report_id"],),
+                ).fetchone()
+                if sidecar is None:
+                    raise StateError("pinned V5 report sidecar is missing")
+                archived = write_report_archive(
+                    config.reports.archive_root,
+                    json.loads(report["canonical_json"]),
+                    {
+                        "report.json": report["canonical_json"] + b"\n",
+                        "report.html": sidecar["html"],
+                        "report.txt": sidecar["text"],
+                        "mail-view.json": sidecar["mail_view_json"] + b"\n",
+                        "render-manifest.json": sidecar["manifest_json"] + b"\n",
+                    },
+                )
+                emitted.extend(str(path) for path in archived)
+            except (ArchiveError, OSError) as exc:
+                return _finish(
+                    args, mode="RUN", outcome="ARCHIVE_FAILED", exit_code=50,
+                    error_code=exc.code if isinstance(exc, ArchiveError) else "ARCHIVE_IO_ERROR",
+                    emitted_files=emitted, checkpoint_before=plan.base_sha,
+                    checkpoint_after=plan.base_sha, run_id=run["run_id"], report_id=run["report_id"],
+                    report_sha256=report["content_sha256"], notification_status=notification["status"],
+                    quality=report["quality"],
+                )
         if notification["status"] == "UNKNOWN":
             return _finish(args, mode="RUN", outcome="NOTIFICATION_UNKNOWN", exit_code=41, error_code="DUPLICATE_RISK_REQUIRES_RESOLUTION", emitted_files=emitted, checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha, run_id=run["run_id"], report_id=run["report_id"], report_sha256=report["content_sha256"], notification_status="UNKNOWN", quality=report["quality"])
         if notification["status"] == "ACCEPTED":

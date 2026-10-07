@@ -56,7 +56,9 @@ safety_tokens = 4096
 base_url = "https://aihub-api.turktelekom.com.tr/"
 chat_path = "chat/completions"
 allowed_host = "aihub-api.turktelekom.com.tr"
-id = "Kimi-K2.7-Code"
+# DDL karşılaştırması ve çok adımlı teknik işler için kalıcı varsayılan model.
+id = "GLM5.3-Flash-IT"
+# Günlük teknik çalışma ve içerik desteği için kalıcı alternatif: Qwen3.8 27B-IT
 route_verified = false
 capabilities_verified = false
 capability_record = ""
@@ -90,6 +92,9 @@ ca_file = ""
 
 [reports]
 emit_dir = "./out"
+# Uygulama repository checkout kökünü verince reports/db-change-analyzer/ altına immutable kayıt yazar.
+archive_enabled = false
+archive_root = ""
 mail_max_bytes = 150000
 mail_max_object_details = 12
 commit_url_template = ""

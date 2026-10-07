@@ -6,9 +6,10 @@
 | VIEW / MATERIALIZED_VIEW | Header ve query source | Statik repository referansları; sonuç satırı/plan bilinmez |
 | SEQUENCE | Header ve görülen clause'lar | `START WITH` gerçek reset nedeni veya canlı değer değildir |
 | INDEX | Header, unique/bitmap bilgisi | Fiziksel performans sonucu bilinmez |
-| TRIGGER | Header ve trailing ENABLE/DISABLE | Source durumu canlı enable state değildir |
+| TRIGGER | Header, hedef nesne ve trailing ENABLE/DISABLE projection'ı | Source durumu canlı enable state değildir |
 | PACKAGE_SPEC / PACKAGE_BODY | Ayrı logical occurrence, raw kaynak ve parser sonucu | Timeout/recovery/error varsa limited fallback |
-| PROCEDURE / FUNCTION / TYPE | Header ve kaynak bölgesi | Dynamic SQL/conditional compilation sınırlıdır |
+| PROCEDURE / FUNCTION | Header, exception/COMMIT/ROLLBACK göstergeleri ve kaynak bölgesi | Dynamic SQL/conditional compilation sınırlıdır; çağrı imzası tam eşleştirilmez |
+| TYPE / TYPE_BODY | Header ve güvenli kaynak farkı | Tüm type semantiği çıkarılmaz; typed alanlar sınırlı kalır |
 | SYNONYM | Hedef adayı, cycle ve en çok 5 hop | DB link/görünmeyen schema unresolved kalır |
 | GRANT/REVOKE ve wrappers | Limited/text fallback | Efektif yetki veya SQL*Plus çalışma sonucu yoktur |
 | Symlink/gitlink/binary/encoding bozuk | Metadata/unresolved | Semantik analiz ve checkpoint otomasyonu bloke edilir |

@@ -419,7 +419,7 @@ def test_stateful_analysis_uses_one_model_unit_and_one_smtp_transaction(tmp_path
         connection.close()
 
 
-def test_unknown_oracle_type_keeps_generic_v5_source_notice(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_trigger_projection_keeps_generic_v5_source_notice(tmp_path: Path, capsys, monkeypatch) -> None:
     config = config_for(tmp_path)
     text = config.read_text(encoding="utf-8")
     for before, after in (
@@ -460,7 +460,7 @@ def test_unknown_oracle_type_keeps_generic_v5_source_notice(tmp_path: Path, caps
             return None
 
         def complete(self, **_kwargs):
-            raise AssertionError("unsupported type must not be sent to the model")
+            raise AssertionError("source-only trigger change must not be sent to the model")
 
     class FakeMail:
         def __init__(self, _config):
@@ -474,8 +474,8 @@ def test_unknown_oracle_type_keeps_generic_v5_source_notice(tmp_path: Path, caps
     monkeypatch.setattr("db_change_analyzer.workflow.SmtpTransport", FakeMail)
     assert main(["--config", str(config), "--emit-dir", str(tmp_path / "out"), "run", "--offline", "--allow-ai", "--allow-mail"]) in {0, 10}
     view = json.loads((tmp_path / "out" / "mail-view.json").read_text(encoding="utf-8"))
-    assert view["objects"][0]["identity"]["object_type"] == "UNKNOWN"
-    assert view["objects"][0]["verification"] == "limited"
+    assert view["objects"][0]["identity"]["object_type"] == "TRIGGER"
+    assert view["objects"][0]["verification"] == "verified"
     assert view["analysis"]["ai"]["status"] == "not_used"
 
 

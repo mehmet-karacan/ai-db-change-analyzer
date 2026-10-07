@@ -15,7 +15,7 @@ html,body{margin:0!important;padding:0!important;width:100%!important}
 body,table,td,th,p,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
 table,td,th{mso-table-lspace:0pt;mso-table-rspace:0pt}
 a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
-a:focus{outline:2px solid #A84426;outline-offset:3px}
+a:focus{outline:2px solid #E92231;outline-offset:3px}
 @media only screen and (max-width:600px){
 .outer-pad{padding:0!important}.px{padding-left:18px!important;padding-right:18px!important}
 .top-left,.top-right{display:block!important;width:auto!important;text-align:left!important}.top-right{padding-top:8px!important}
@@ -36,20 +36,20 @@ a:focus{outline:2px solid #A84426;outline-offset:3px}
 @media only screen and (max-width:360px){.px{padding-left:14px!important;padding-right:14px!important}.stat{padding-left:3px!important;padding-right:3px!important}}
 </style>
 </head>
-<body bgcolor="#F4F0EA" style="margin:0;padding:0;background-color:#F4F0EA;color:#24211F;font-family:Arial,Helvetica,sans-serif;">
+<body bgcolor="#F2F5F8" style="margin:0;padding:0;background-color:#F2F5F8;color:#18283A;font-family:Arial,Helvetica,sans-serif;">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;">{{ preheader }}</div>
-<table bgcolor="#F4F0EA" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background-color:#F4F0EA;border-collapse:collapse;" width="100%">
+<table bgcolor="#F2F5F8" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background-color:#F2F5F8;border-collapse:collapse;" width="100%">
 <tr><td align="center" class="outer-pad" style="padding:28px 12px;">
 <!--[if mso]><table role="presentation" width="760" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-<table bgcolor="#FFFEFC" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:760px;background-color:#FFFEFC;border-collapse:collapse;" width="100%"><tr><td bgcolor="#A84426" height="5" style="height:5px;line-height:5px;font-size:0;background-color:#A84426;"> </td></tr>
-<tr><td class="px" style="padding:22px 34px;border-bottom:1px solid #D7CCC1;">
+<table bgcolor="#FFFFFF" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:760px;background-color:#FFFFFF;border-collapse:collapse;" width="100%"><tr><td bgcolor="#E92231" height="5" style="height:5px;line-height:5px;font-size:0;background-color:#E92231;"> </td></tr>
+<tr><td bgcolor="#0B2239" class="px" style="padding:22px 34px;border-bottom:1px solid #163B5C;background-color:#0B2239;">
 <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;border-collapse:collapse;" width="100%"><tr>
-<td align="left" class="top-left" style="font-size:14px;line-height:21px;font-weight:bold;letter-spacing:1px;color:#A84426;">AI DB CHANGE ANALYZER</td>
-<td align="right" class="top-right" style="font-size:13px;line-height:20px;color:#5F5954;">Oracle DDL incelemesi<br/>{{ report_date }}</td>
+<td align="left" class="top-left" style="font-size:14px;line-height:21px;font-weight:bold;letter-spacing:.7px;color:#FFFFFF;"><img src="cid:innova-logo" alt="İnnova" width="145" style="display:block;width:145px;height:auto;border:0;"/><span style="display:block;margin-top:13px;font-size:12px;line-height:18px;letter-spacing:1.5px;color:#78D5F5;">VERİTABANI DEĞİŞİKLİK ANALİZİ</span></td>
+<td align="right" class="top-right" style="font-size:13px;line-height:20px;color:#D9E6F1;">Oracle DDL incelemesi<br/>{{ report_date }}</td>
 </tr></table>
 </td></tr>
-{% if synthetic %}<tr><td bgcolor="#F3EEE7" class="px" style="padding:12px 34px;background-color:#F3EEE7;font-size:14px;line-height:21px;color:#5F5954;">
-<strong style="color:#24211F;">Tasarım örneği.</strong> Nesneler, değerler, AI yorumları ve süreler sentetiktir. Gerçek model çağrısı yapılmadı.
+{% if synthetic %}<tr><td bgcolor="#EAF4FA" class="px" style="padding:12px 34px;background-color:#EAF4FA;font-size:14px;line-height:21px;color:#36556E;">
+<strong style="color:#0B2239;">Önizleme.</strong> Bu içerik, mail tasarımını göstermek için hazırlanmıştır; gönderim ve canlı veritabanı doğrulaması yapılmadı.
 </td></tr>{% endif %}
 {% include 'components/summary.html.j2' %}
 {% include 'components/object_list.html.j2' %}
@@ -60,7 +60,7 @@ a:focus{outline:2px solid #A84426;outline-offset:3px}
 {% include 'components/analysis_record.html.j2' %}
 {% include 'components/comparison_info.html.j2' %}
 {% set in_object = false %}{% include 'components/scope_notes.html.j2' %}
-<tr><td class="px" style="padding:17px 34px;border-top:1px solid #D7CCC1;font-size:13px;line-height:21px;color:#5F5954;">AI DB Change Analyzer<br/>{% if synthetic %}V5 sentetik tasarım incelemesi; gönderilmedi.{% else %}Git snapshot tabanlı kaynak analizi.{% endif %}</td></tr></table>
+<tr><td bgcolor="#F2F5F8" class="px" style="padding:17px 34px;border-top:1px solid #D8E0E8;background-color:#F2F5F8;font-size:13px;line-height:21px;color:#5C6B7A;"><strong style="color:#0B2239;">İnnova · Veritabanı Değişiklik Analizi</strong><br/>{% if synthetic %}Tasarım önizlemesi.{% else %}Git snapshot tabanlı kaynak analizi.{% endif %}</td></tr></table>
 <!--[if mso]></td></tr></table><![endif]-->
 </td></tr></table>
 </body>

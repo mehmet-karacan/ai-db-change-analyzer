@@ -94,6 +94,61 @@
         "TYPE_DECLARATION",
         "VARIABLE"
       ]
+    },
+    {
+      "id": "TRIGGER",
+      "label_tr": "Tetikleyici",
+      "renderer": "objects/generic.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "TRIGGER_PROPERTY",
+        "SOURCE"
+      ]
+    },
+    {
+      "id": "PROCEDURE",
+      "label_tr": "Procedure",
+      "renderer": "objects/generic.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "PROCEDURE_PROPERTY",
+        "SOURCE"
+      ]
+    },
+    {
+      "id": "FUNCTION",
+      "label_tr": "Function",
+      "renderer": "objects/generic.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "FUNCTION_PROPERTY",
+        "SOURCE"
+      ]
+    },
+    {
+      "id": "TYPE",
+      "label_tr": "Tip tanımı",
+      "renderer": "objects/generic.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "TYPE_PROPERTY",
+        "SOURCE"
+      ]
+    },
+    {
+      "id": "TYPE_BODY",
+      "label_tr": "Tip gövdesi",
+      "renderer": "objects/generic.html.j2",
+      "count_as_top_level": true,
+      "count_unit": "schema + namespace/type + quoted identity",
+      "child_components": [
+        "TYPE_PROPERTY",
+        "SOURCE"
+      ]
     }
   ],
   "unknown_types": "Detect and report as safe UNKNOWN fallback; do not silently omit or auto-load a template.",

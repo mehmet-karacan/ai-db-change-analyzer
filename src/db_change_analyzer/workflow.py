@@ -11,7 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .archive import ArchiveError, write_report_archive
 from .config import read_secret
+from .context import select_dependency_context
+from .dependencies import SnapshotObject, build_dependency_graph
 from .git_client import GitClient, RawDelta
 from .history import RangePlan
 from .identities import stable_id
@@ -243,6 +246,191 @@ def _evidence(item: OccurrenceRef, revision: str) -> dict[str, Any]:
     }
 
 
+def _dependency_snapshot(
+    git: GitClient, revision: str, inventories: list[FileInventory], maximum: int,
+) -> tuple[dict[str, list[OccurrenceRef]], list[SnapshotObject], dict[tuple[str, str], dict[str, Any]]]:
+    """Build a bounded static dependency snapshot and its source evidence."""
+    index = _index(git, revision, inventories, maximum)
+    objects: list[SnapshotObject] = []
+    evidence_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for key, refs in index.items():
+        for ref in refs:
+            source = ref.raw[ref.occurrence.start_byte : ref.occurrence.end_byte_exclusive].decode(
+                ref.inventory.encoding or "utf-8", errors="replace"
+            )
+            evidence = _evidence(ref, revision)
+            evidence_by_key[(revision, key)] = evidence
+            objects.append(SnapshotObject(
+                object_key=key,
+                schema=ref.occurrence.raw_schema,
+                name=ref.occurrence.raw_name if ref.occurrence.name_quoted else ref.occurrence.raw_name.upper(),
+                object_type=ref.occurrence.object_type,
+                source=source,
+                evidence_ids=(evidence["evidence_id"],),
+            ))
+    return index, objects, evidence_by_key
+
+
+def _dependency_records_by_object(
+    edges: tuple[dict[str, object], ...], changed_keys: list[str],
+) -> dict[str, list[dict[str, object]]]:
+    result: dict[str, list[dict[str, object]]] = defaultdict(list)
+    changed = set(changed_keys)
+    seen: dict[str, set[str]] = defaultdict(set)
+    for edge in edges:
+        from_key = str(edge.get("from_object", ""))
+        to_key = str(edge.get("to_candidate", ""))
+        owners = changed.intersection({from_key, to_key})
+        for owner in owners:
+            marker = json.dumps(edge, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            if marker in seen[owner]:
+                continue
+            seen[owner].add(marker)
+            result[owner].append(dict(edge))
+    return dict(result)
+
+
+def _risk_assessment(
+    objects: list[dict[str, Any]], changes_by_key: dict[str, ChangeSet],
+    dependency_edges: tuple[dict[str, object], ...],
+) -> dict[str, Any]:
+    """Classify source risk conservatively without pretending to know runtime usage."""
+    critical: list[str] = []
+    high: list[str] = []
+    medium: list[str] = []
+    low: list[str] = []
+    limitations: list[str] = [
+        "Oracle metadata, veri hacmi ve canlı kullanım durumu bağlı değil.",
+        "Sınıflandırma Git kaynak farkı ve repository içi statik ilişkilere dayanır.",
+    ]
+    for item in objects:
+        key = item["identity"]["object_key"]
+        change_set = changes_by_key.get(key)
+        taxonomy_ids = {fact.taxonomy_id for fact in change_set.facts} if change_set else set()
+        operation = item["net_operation"]
+        label = item["identity"]["object_type"]
+        constraint_kind_change = any(
+            fact.taxonomy_id == "table.constraint.kind"
+            and any(token in (fact.before.value or "").upper() + " " + (fact.after.value or "").upper()
+                    for token in ("PRIMARY", "FOREIGN", "UNIQUE"))
+            for fact in (change_set.facts if change_set else ())
+        )
+        if constraint_kind_change or any(
+            tax in taxonomy_ids for tax in {
+                "package_spec.routine.signature", "sequence.sequence_property.increment_by",
+                "sequence.sequence_property.cycle", "sequence.sequence_property.cache",
+            }
+        ):
+            critical.append(label)
+        elif operation == "removed" or any(
+            tax in taxonomy_ids for tax in {
+                "table.column.data_type", "table.column.length", "table.column.nullable",
+                "table.constraint.reference",
+            }
+        ):
+            high.append(label)
+        elif any(tax.startswith("package_spec.routine.") for tax in taxonomy_ids) or any(
+            tax.startswith("view.query_property.") or tax.startswith("index.index_property.")
+            or tax.startswith("table.table_property.") for tax in taxonomy_ids
+        ):
+            medium.append(label)
+        elif taxonomy_ids and taxonomy_ids <= {
+            "common.source.format", "common.source.occurrence_order", "common.source.path", "common.source.text",
+        }:
+            low.append(label)
+        elif taxonomy_ids or operation in {"added", "modified"}:
+            medium.append(label)
+
+    dependency_count = len(dependency_edges)
+    if dependency_count >= 2 and high:
+        limitations.append("Statik bağımlılık adayları bulundu; gerçek tüketici ve kullanım sıklığı doğrulanmadı.")
+    if critical:
+        level = "critical"
+    elif high:
+        level = "high"
+    elif medium:
+        level = "medium"
+    elif low:
+        level = "low"
+    else:
+        level = "unknown"
+    if dependency_count >= 2 and level == "low":
+        level = "medium"
+    elif dependency_count >= 4 and level == "medium":
+        level = "high"
+    return {
+        "level": level,
+        "method": "deterministic_source_rules",
+        "confidence": "limited" if level != "unknown" else "unknown",
+        "basis": {
+            "critical": sorted(set(critical)),
+            "high": sorted(set(high)),
+            "medium": sorted(set(medium)),
+            "low": sorted(set(low)),
+            "static_dependency_candidates": dependency_count,
+        },
+        "limitations": limitations,
+    }
+
+
+def _oracle_identifier(value: str | None) -> str:
+    if not value:
+        return "<SCHEMA_OR_TABLE>"
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _deployment_preparation(
+    objects: list[dict[str, Any]], changes_by_key: dict[str, ChangeSet],
+) -> dict[str, Any]:
+    """Produce reviewable, non-executed deployment checks from verified facts."""
+    checks: list[dict[str, Any]] = []
+    for item in objects:
+        key = item["identity"]["object_key"]
+        change_set = changes_by_key.get(key)
+        if change_set is None:
+            continue
+        identity = item["identity"]
+        schema = _oracle_identifier(identity.get("raw_schema") or identity.get("schema_name"))
+        name = _oracle_identifier(identity.get("raw_name") or identity.get("name"))
+        for fact in change_set.facts:
+            code = None
+            sql = None
+            if fact.taxonomy_id == "table.column.nullable" and fact.after.value == "false":
+                column = _oracle_identifier(fact.component_path[0] if fact.component_path else None)
+                code = "NULL_DATA_CHECK"
+                sql = f"SELECT COUNT(*) AS NULL_COUNT FROM {schema}.{name} WHERE {column} IS NULL;"
+            elif fact.taxonomy_id in {"table.column.data_type", "table.column.length", "table.column.precision", "table.column.scale"}:
+                code = "COLUMN_COMPATIBILITY_CHECK"
+                sql = f"-- {schema}.{name} kolon değişikliği için mevcut veri ve hedef tip uyumluluğu kontrol edilmelidir."
+            elif fact.taxonomy_id.startswith("table.constraint."):
+                code = "CONSTRAINT_DATA_CHECK"
+                sql = f"-- {schema}.{name} constraint değişikliği için mevcut kayıtlar ve ilişki bütünlüğü kontrol edilmelidir."
+            elif fact.taxonomy_id.startswith("index."):
+                code = "INDEX_PLAN_CHECK"
+                sql = f"-- {schema}.{name} indeks değişikliği için ilgili sorgu planları karşılaştırılmalıdır."
+            elif fact.taxonomy_id.startswith("view.") or fact.taxonomy_id.startswith("package_"):
+                code = "CONSUMER_REGRESSION_CHECK"
+                sql = f"-- {schema}.{name} tüketicileri için derleme ve regresyon kontrolleri çalıştırılmalıdır."
+            if code is not None and len(checks) < 200:
+                checks.append({
+                    "code": code, "object_key": key, "phase": "before_deployment",
+                    "execution": "not_run", "sql_or_instruction": sql,
+                    "evidence_ids": sorted({eid for value in (fact.before, fact.after) for eid in value.evidence_ids}),
+                })
+    return {
+        "status": "prepared_not_executed",
+        "checks": checks,
+        "rollback": {
+            "status": "manual_review_required",
+            "instruction": "Geri dönüş için önceki Git snapshot'ı ve ortamın onaylı rollback prosedürü kullanılmalıdır.",
+        },
+        "post_deployment": [
+            "DDL derleme veya migration sonucu kontrol edilmeli.",
+            "Değişen nesne ve bağımlı tüketiciler için regresyon doğrulaması yapılmalı.",
+        ],
+    }
+
+
 def _canonical_projection_facts(
     old: OccurrenceRef, new: OccurrenceRef, old_evidence_ids: tuple[str, ...], new_evidence_ids: tuple[str, ...],
     *, run_id: str, base_sha: str, target_sha: str, changes: ChangeSet | None = None,
@@ -372,6 +560,18 @@ def _operation(delta: RawDelta) -> str:
 
 def _commit_rows(plan: RangePlan) -> list[dict[str, Any]]:
     by_sha = {item.sha: item for item in plan.commits}
+    files_by_sha: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for transition in plan.event_deltas:
+        for delta in transition.files:
+            files_by_sha[transition.commit.sha].append({
+                "path_display": delta.path_display,
+                "path_b64": delta.path_b64,
+                "operation": _operation(delta),
+                "old_mode": delta.old_mode if set(delta.old_mode) != {"0"} else None,
+                "new_mode": delta.new_mode if set(delta.new_mode) != {"0"} else None,
+                "old_blob": delta.old_oid if set(delta.old_oid) != {"0"} else None,
+                "new_blob": delta.new_oid if set(delta.new_oid) != {"0"} else None,
+            })
     first_parent_chain: set[str] = set()
     cursor = plan.target_sha
     while cursor in by_sha and cursor not in first_parent_chain:
@@ -383,6 +583,7 @@ def _commit_rows(plan: RangePlan) -> list[dict[str, Any]]:
         "git_author_time": item.git_author_time, "git_committer_time": item.git_committer_time,
         "position": item.position, "delta_kind": "first_parent" if item.parents else "root",
         "integration_role": "target_first_parent_chain" if item.sha in first_parent_chain else "other_reachable",
+        "files": files_by_sha.get(item.sha, []),
     } for item in plan.commits]
 
 
@@ -468,6 +669,40 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     _verify_changed_refs(new_index, changed_keys, config.parser.worker_timeout_seconds)
     if len(changed_keys) > config.analysis.max_new_units_per_invocation:
         return _finish(args, mode="RUN", outcome="RETRY_PENDING", exit_code=11, error_code="UNIT_BUDGET", checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
+
+    dependency_edges: tuple[dict[str, object], ...] = ()
+    dependency_evidence: list[dict[str, Any]] = []
+    dependency_omissions: tuple[str, ...] = ()
+    if config.analysis.dependency_depth > 0 and changed_keys:
+        old_dependency_objects: list[SnapshotObject] = []
+        old_dependency_evidence: dict[tuple[str, str], dict[str, Any]] = {}
+        if plan.base_sha:
+            old_dependency_inventories = inventory_revision(
+                git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes,
+                timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(),
+            )
+            _, old_dependency_objects, old_dependency_evidence = _dependency_snapshot(
+                git, plan.base_sha, old_dependency_inventories, config.parser.max_file_bytes,
+            )
+        new_dependency_inventories = inventory_revision(
+            git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes,
+            timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(),
+        )
+        _, new_dependency_objects, new_dependency_evidence = _dependency_snapshot(
+            git, plan.target_sha, new_dependency_inventories, config.parser.max_file_bytes,
+        )
+        old_graph = build_dependency_graph(plan.base_sha or "initial", old_dependency_objects)
+        new_graph = build_dependency_graph(plan.target_sha, new_dependency_objects)
+        selected_dependencies = select_dependency_context(
+            changed_keys, old_graph, new_graph,
+            {**old_dependency_evidence, **new_dependency_evidence},
+            depth=config.analysis.dependency_depth,
+            max_neighbors_per_side=config.analysis.max_neighbors_per_side,
+        )
+        dependency_edges = selected_dependencies.dependency_edges
+        dependency_evidence = list(selected_dependencies.evidence_registry)
+        dependency_omissions = selected_dependencies.omissions
+    dependency_by_object = _dependency_records_by_object(dependency_edges, changed_keys)
 
     system_prompt = (Path(__file__).parent / "prompts" / "mail_commentary.tr.txt").read_text(encoding="utf-8")
     response_schema = json.loads((Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json").read_text(encoding="utf-8"))
@@ -670,6 +905,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                     "old_evidence_ids": [item["evidence_id"] for item in old_evidence],
                     "new_evidence_ids": [item["evidence_id"] for item in new_evidence],
                     "facts": facts, "assessments": assessments, "diagnostics": diagnostics,
+                    "dependency_edges": dependency_by_object.get(key, []),
                 })
     except ModelTransportError as exc:
         return _finish(args, mode="RUN", outcome="AI_TRANSPORT_OR_AUTH", exit_code=30, error_code=exc.code, checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
@@ -747,12 +983,30 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     analysis_completed = _now()
     analysis_elapsed_ms = int((datetime.fromisoformat(analysis_completed) - datetime.fromisoformat(analysis_started)).total_seconds() * 1000) if resume_run_id else int((time.monotonic() - analysis_started_mono) * 1000)
     returned_models = sorted({label for labels in returned_models_by_unit.values() for label in labels})
+    impact_analysis = {
+        "status": "static_repository_evidence" if dependency_edges else "no_static_dependency_evidence",
+        "dependency_edges": [dict(edge) for edge in dependency_edges],
+        "candidate_count": len(dependency_edges) + len(dependency_omissions),
+        "provided_count": len(dependency_edges),
+        "omissions": list(dependency_omissions),
+        "external_sources": {
+            "oracle_metadata": "not_connected",
+            "application_repositories": "not_connected",
+            "jenkins_deployments": "not_connected",
+            "runtime_usage": "not_connected",
+        },
+    }
+    risk_assessment = _risk_assessment(objects, changes_by_key, dependency_edges)
+    deployment_preparation = _deployment_preparation(objects, changes_by_key)
     report = {
         "schema_version": "1.0", "synthetic": False, "report_id": report_id, "supersedes_report_id": None,
         "run": {"run_id": run_id, "mode": mode, "repository_id": config.repository.id, "branch": config.repository.branch, "scope_hash": config.scope_hash, "epoch": epoch, "base_sha": plan.base_sha, "target_sha": plan.target_sha, "planned_at": planned_at, "analysis_started_at": analysis_started, "analysis_completed_at": analysis_completed, "analysis_generation": 0, "observed_git_at": _now(), "snapshot_captured_at": None, "actual_db_change_at": None, "originating_analyzer_build": None, "sync_build": None},
         "quality": quality, "automatic_commit_eligible": quality != "blocked", "summary_tr": summary, "overall_ai_risk": "unknown",
         "counts": counts, "versions": {"analyzer": "0.1.0", "grammar_commit": config.parser.grammar_commit, "parser_adapter": "1.0", "prompt": "mail-commentary-tr-1.1", "unit_response_schema": "1.0", "report_schema": "1.0", "configured_model": config.model.id, "returned_model": returned_models[0] if len(returned_models) == 1 else None, "resolved_model_version": None, "config_digest": config.config_digest},
-        "commits": commits, "events": events, "artifacts": artifacts, "evidence_registry": evidence_registry, "objects": objects,
+        "commits": commits, "events": events, "artifacts": artifacts,
+        "evidence_registry": evidence_registry + dependency_evidence, "objects": objects,
+        "impact_analysis": impact_analysis, "risk_assessment": risk_assessment,
+        "deployment_preparation": deployment_preparation,
         "limitations": limitations,
     }
     try:
@@ -814,6 +1068,29 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     for temporary, destination in staged:
         os.replace(temporary, destination)
         emitted.append(str(destination))
+    if config.reports.archive_enabled:
+        try:
+            archived = write_report_archive(
+                config.reports.archive_root,
+                report,
+                {
+                    "report.json": rendered.canonical_json + b"\n",
+                    "report.html": v5.html,
+                    "report.txt": v5.text,
+                    "mail-view.json": view_json + b"\n",
+                    "render-manifest.json": manifest_json + b"\n",
+                },
+            )
+        except (ArchiveError, OSError) as exc:
+            return _finish(
+                args, mode="MANUAL" if mode == "MANUAL" else "RUN", outcome="ARCHIVE_FAILED",
+                exit_code=50, error_code=exc.code if isinstance(exc, ArchiveError) else "ARCHIVE_IO_ERROR", emitted_files=emitted,
+                checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha,
+                run_id=run_id, report_id=report_id, report_sha256=rendered.sha256,
+                notification_status="READY" if mode != "MANUAL" else "NOT_APPLICABLE", quality=quality,
+                ai_http_attempts=http_attempts,
+            )
+        emitted.extend(str(path) for path in archived)
     if mode == "MANUAL":
         connection = store.connection()
         try:

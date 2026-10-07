@@ -1144,7 +1144,7 @@
       "requested_units": 4,
       "models": [
         {
-          "configured_model": "Kimi-K2.7-Code",
+          "configured_model": "GLM5.3-Flash-IT",
           "returned_models": [],
           "resolved_model_version": null,
           "version_verification": "not_reported",
