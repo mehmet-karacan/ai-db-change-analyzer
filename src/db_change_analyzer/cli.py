@@ -643,7 +643,8 @@ def _extract_persisted_html(mime: bytes) -> bytes | None:
 
 def _new_outbox(connection, config, report_id: str, *, recipients: list[str] | None = None) -> str:
     import hashlib
-    from datetime import UTC, datetime
+    from datetime import datetime
+    from .compat import UTC
     from .notification import insert_notification, persist_notification
     from .reporting import RenderedReport, build_message
     from .v5_rendering import build_render_manifest, render_v5_view

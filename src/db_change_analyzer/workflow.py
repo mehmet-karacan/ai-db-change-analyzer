@@ -8,10 +8,11 @@ import time
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .compat import UTC
 from .archive import ArchiveError, write_report_archive
 from .config import read_secret
 from .context import select_dependency_context
