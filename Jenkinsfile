@@ -157,6 +157,20 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
+                                    model_probe_body="$WORKSPACE/out/model-probe-response.json"
+                                    model_http_status="$(curl --silent --show-error --output "$model_probe_body" --write-out '%{http_code}' \
+                                        --connect-timeout 10 --max-time 60 \
+                                        --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
+                                        --header "Authorization: Bearer $LITELLM_API_KEY" \
+                                        --header 'Content-Type: application/json' \
+                                        --data '{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"user","content":"Return only JSON: {\"ok\":true}"}],"stream":false,"max_tokens":16}' \
+                                        'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
+                                    echo "MODEL_VALID_ID_SIMPLE_HTTP=$model_http_status"
+                                    if [ "$model_http_status" != '200' ]; then
+                                        model_probe_message="$(tr '\\n' ' ' < "$model_probe_body" | cut -c1-1000)"
+                                        echo "MODEL_VALID_ID_SIMPLE_BODY=$model_probe_message"
+                                    fi
+                                    rm -f "$model_probe_body"
                                     if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \

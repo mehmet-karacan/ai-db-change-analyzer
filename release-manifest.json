@@ -3,7 +3,7 @@
   "release": "0.1.0",
   "files": {
     ".gitattributes": "c6f58b140366ec7aab896bd4aa0be06aa6273ed2af8bdd73d9357bd7af10fdae",
-    "Jenkinsfile": "2cc534a1d5fd01c9cc323948d5d880708e71645dfed587443fa358426c308931",
+    "Jenkinsfile": "43e4c958b33e41b61620a42b26e39d21f9a5dd2e8d081d58b0f283ce647701cd",
     "config/gpu.artifact.example.toml": "8172289fc3e4654f812158ea433337ad842d5ee569e61b5fa42239eb2ace1ed2",
     "config/gpu.artifact.toml": "52c7cf4afd2b5ac1e2de427d5db56821db937d75df52c4e93d6e189f53dcce26",
     "docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md": "8b4ece6d6a62a6a5b9673c5975588a4f9dbea5d4ed4d388928fdb98049635122",
