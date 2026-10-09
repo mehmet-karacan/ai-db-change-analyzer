@@ -54,7 +54,7 @@ output_tokens = 16384
 safety_tokens = 4096
 
 [model]
-base_url = "https://aihub-api.turktelekom.com.tr/v1/"
+base_url = "https://aihub-api.turktelekom.com.tr/"
 chat_path = "chat/completions"
 allowed_host = "aihub-api.turktelekom.com.tr"
 id = "Qwen/Qwen3.8-27B-FP8"
