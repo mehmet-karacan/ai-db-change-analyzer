@@ -21,7 +21,7 @@
     "schemas/v5/mail-view-model.schema.json": "7fac9955b063b1a0d7c2e33d7f4c14a6f6acf72f07bc740d8a783dd5810213be",
     "schemas/v5/render-manifest.schema.json": "8ad7d94cf3a2912cad963cbf8a8c7934aca309b93212dd12b369d82ee6c2268a",
     "src/db_change_analyzer/archive.py": "16d48263ba00892873ced94cb97555627540928cb967353b8af4f929c92618d8",
-    "src/db_change_analyzer/cli.py": "06e029933c1d8f4be06f7dd59755e2eddfacb7cd111d57958c3f97ecdb3651fe",
+    "src/db_change_analyzer/cli.py": "ddcab30d837f19a085702828d1f96d18ff323922c93bc03a1d6eff4655a55366",
     "src/db_change_analyzer/compat.py": "fb40b91c58eba5627949fede0b491c73a115ae75b93ab52bd4772125a0d388e6",
     "src/db_change_analyzer/config.py": "1a8cd2d8591b8f8f29502368dac496f68c5a85d71e450916d20353cf18715eec",
     "src/db_change_analyzer/dependencies.py": "7d88400a0c639b3ed3dcca3221d943c95cfe32eea26da0d2dd356ec77de2af6b",

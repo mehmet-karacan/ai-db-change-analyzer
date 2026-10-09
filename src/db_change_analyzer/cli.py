@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -850,7 +851,7 @@ def smoke_model_command(args: argparse.Namespace) -> int:
         "verified_context_window_tokens": config.model.verified_context_window_tokens,
         "features": {"json_schema": config.model.output_mode == "json_schema", "tools": tool_probe.tool_call_count >= 1},
         "probe": {"response_schema_validated": True, "tool_turns": tool_probe.turns, "tool_call_count": tool_probe.tool_call_count},
-        "recorded_at": __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat(),
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
     record["record_sha256"] = capability_record_digest(record)
     path = Path(args.record).resolve()
