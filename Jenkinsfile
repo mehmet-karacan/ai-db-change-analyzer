@@ -157,6 +157,10 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
+                                    MODEL_ROUTE=$(PYTHONPATH="$PWD/.site:$PWD/src" python3 -c 'from db_change_analyzer.config import load_config; import os; c=load_config(os.environ["ANALYZER_CONFIG"]); print(c.model.base_url.rstrip("/") + "/" + c.model.chat_path.lstrip("/"))')
+                                    curl --silent --show-error --connect-timeout 5 --max-time 10 \
+                                        --output /dev/null --write-out 'MODEL_ROUTE_HTTP=%{http_code} MODEL_ROUTE_REMOTE=%{remote_ip}\n' \
+                                        "$MODEL_ROUTE"
                                     if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
