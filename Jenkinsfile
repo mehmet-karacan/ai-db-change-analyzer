@@ -189,6 +189,24 @@ JSON
                                         echo "MODEL_JSON_SCHEMA_BODY=$model_schema_message"
                                     fi
                                     rm -f "$model_schema_payload" "$model_schema_body"
+                                    model_tools_payload="$WORKSPACE/out/model-tools-payload.json"
+                                    cat > "$model_tools_payload" <<'JSON'
+{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"system","content":"Use synthetic_lookup exactly once, then return JSON."},{"role":"user","content":"Call synthetic_lookup with nonce probe-nonce-1."}],"tools":[{"type":"function","function":{"name":"synthetic_lookup","description":"fixed synthetic probe","parameters":{"type":"object","properties":{"nonce":{"type":"string"}},"required":["nonce"],"additionalProperties":false}}}],"tool_choice":"auto","stream":false,"max_tokens":128,"response_format":{"type":"json_schema","json_schema":{"name":"smoke","strict":true,"schema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}}},"chat_template_kwargs":{"enable_thinking":false}}
+JSON
+                                    model_tools_body="$WORKSPACE/out/model-tools-response.json"
+                                    model_tools_http_status="$(curl --silent --show-error --output "$model_tools_body" --write-out '%{http_code}' \
+                                        --connect-timeout 10 --max-time 60 \
+                                        --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
+                                        --header "Authorization: Bearer $LITELLM_API_KEY" \
+                                        --header 'Content-Type: application/json' \
+                                        --data-binary "@$model_tools_payload" \
+                                        'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
+                                    echo "MODEL_TOOLS_HTTP=$model_tools_http_status"
+                                    if [ "$model_tools_http_status" != '200' ]; then
+                                        model_tools_message="$(tr '\\n' ' ' < "$model_tools_body" | cut -c1-1000)"
+                                        echo "MODEL_TOOLS_BODY=$model_tools_message"
+                                    fi
+                                    rm -f "$model_tools_payload" "$model_tools_body"
                                     if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
