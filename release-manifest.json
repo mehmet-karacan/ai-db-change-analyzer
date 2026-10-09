@@ -127,6 +127,6 @@
     "vendor/wheels/typing_extensions-4.16.0-py3-none-any.whl": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
     "vendor/wheels/typing_inspection-0.4.4-py3-none-any.whl": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
     "vendor/wheels/tzdata-2026.4-py2.py3-none-any.whl": "c2169a8b0a7a5e9674da5a135ccdfb2b3e671b333ed9fed17b41f73c34476e81",
-    "config/certs/turktelekom-sub-g3-01.pem": "88eb9aa33f7320ffe6478145ca66eedc15e430b6486bf18ea41b7418ee2b8cb0"
+    "config/certs/turktelekom-sub-g3-01.pem": "7715e9a3a88430c2d49590ec0b77951d531d6d38e0f06e4c447bb84ab1e049f2"
   }
 }
