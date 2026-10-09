@@ -7,6 +7,12 @@
 
 def analyzerUpstream = 'sky/GPU/GPU-FUSION/10-ORACLE_DB_DDL_SYNC'
 def analyzerMailRecipients = 'mkaracan@innova.com.tr'
+// Declarative parameters are materialized after the first Jenkins run. Keep
+// the first run usable as well so it can install the job parameters/trigger.
+def analyzerConfig = params.ANALYZER_CONFIG ?: '/etc/ai-db-change-analyzer/gpu.artifact.toml'
+def analyzerWheelhouse = params.ANALYZER_WHEELHOUSE ?: '/opt/ai-db-change-analyzer/wheelhouse'
+def analyzerGitCredentialId = params.ANALYZER_GIT_CREDENTIAL_ID ?: 'gpu-db-http-oracle-ddl-sync'
+def analyzerModelKeyCredentialId = params.ANALYZER_MODEL_KEY_CREDENTIAL_ID ?: 'aihub-api-key'
 
 pipeline {
     agent any
@@ -65,7 +71,11 @@ pipeline {
         stage('Prepare locked runtime') {
             steps {
                 dir('analyzer-src') {
-                    sh '''
+                    withEnv([
+                        "ANALYZER_CONFIG=${analyzerConfig}",
+                        "ANALYZER_WHEELHOUSE=${analyzerWheelhouse}"
+                    ]) {
+                        sh '''
                         set +x
                         set -eu
                         umask 077
@@ -87,7 +97,8 @@ pipeline {
                         PYTHONPATH="$PWD/src" .venv/bin/python -m db_change_analyzer \
                             --config "$ANALYZER_CONFIG" \
                             doctor --offline
-                    '''
+                        '''
+                    }
                 }
             }
         }
@@ -96,21 +107,24 @@ pipeline {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: "${params.ANALYZER_GIT_CREDENTIAL_ID}",
+                        credentialsId: analyzerGitCredentialId,
                         usernameVariable: 'DB_ANALYZER_GIT_USERNAME',
                         passwordVariable: 'DB_ANALYZER_GIT_PASSWORD'
                     ),
                     string(
-                        credentialsId: "${params.ANALYZER_MODEL_KEY_CREDENTIAL_ID}",
+                        credentialsId: analyzerModelKeyCredentialId,
                         variable: 'LITELLM_API_KEY'
                     )
                 ]) {
                     script {
                         int rc
                         dir('analyzer-src') {
-                            rc = sh(
-                                returnStatus: true,
-                                script: '''
+                            withEnv([
+                                "ANALYZER_CONFIG=${analyzerConfig}"
+                            ]) {
+                                rc = sh(
+                                    returnStatus: true,
+                                    script: '''
                                     set +x
                                     set -eu
                                     umask 077
@@ -120,8 +134,9 @@ pipeline {
                                         --config "$ANALYZER_CONFIG" \
                                         --emit-dir "$WORKSPACE/out" \
                                         run --allow-ai
-                                '''
-                            )
+                                    '''
+                                )
+                            }
                         }
                         if (rc == 10 || rc == 11) {
                             unstable("Analyzer sınırlı veya bekleyen sonuç üretti; exit=${rc}. result.json incelenmeli.")

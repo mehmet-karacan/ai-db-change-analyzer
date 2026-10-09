@@ -33,6 +33,10 @@ def test_analyzer_pipeline_uses_locked_offline_runtime() -> None:
 
 def test_analyzer_pipeline_is_manually_startable_with_parameters() -> None:
     assert "parameters {" in JENKINSFILE
+    assert "params.ANALYZER_CONFIG ?:" in JENKINSFILE
+    assert "params.ANALYZER_WHEELHOUSE ?:" in JENKINSFILE
+    assert "params.ANALYZER_GIT_CREDENTIAL_ID ?:" in JENKINSFILE
+    assert "params.ANALYZER_MODEL_KEY_CREDENTIAL_ID ?:" in JENKINSFILE
     assert "name: 'ANALYZER_CONFIG'" in JENKINSFILE
     assert "name: 'ANALYZER_WHEELHOUSE'" in JENKINSFILE
     assert "name: 'ANALYZER_GIT_CREDENTIAL_ID'" in JENKINSFILE

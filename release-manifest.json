@@ -3,7 +3,7 @@
   "release": "0.1.0",
   "files": {
     ".gitattributes": "3cdceda86dcc2aab5491ee36582122936f6ab90d64971687f1989ab3681e8dd7",
-    "Jenkinsfile": "8779d51004f18d805d5043747c3211384f483b2115114558f13900fdd10427e4",
+    "Jenkinsfile": "ab1274c84f5b59c3009393d20eaad15cf1230b67efe01d7ab05ac8e4ec5f3c85",
     "config/gpu.artifact.example.toml": "8172289fc3e4654f812158ea433337ad842d5ee569e61b5fa42239eb2ace1ed2",
     "pyproject.toml": "8b91f978050d0bb15733b67fddbb69c6375e9bd777ba41be4f47781ed0f57fc9",
     "requirements-dev.lock": "b4e9a6ce6c4b0c896c7c22e495af0a151bb1cdb354f89bb5953d6ecd162eef2e",
