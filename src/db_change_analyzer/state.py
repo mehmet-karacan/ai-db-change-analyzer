@@ -462,7 +462,7 @@ class SqliteStateStore:
         finally:
             connection.close()
 
-    def rebaseline(self, expected_base: str, target: str, reason: str) -> None:
+    def rebaseline(self, expected_base: str | None, target: str, reason: str) -> None:
         if not reason.strip():
             raise StateError("rebaseline reason is required")
         connection = self._connect()

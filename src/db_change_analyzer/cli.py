@@ -120,7 +120,8 @@ def state_command(args: argparse.Namespace) -> int:
             store.restore(Path(args.backup), args.reason)
             details, outcome = store.status(), "STATE_RESTORE_COMPLETE"
         elif args.state_command == "rebaseline":
-            store.rebaseline(args.expected_base, args.target, args.reason)
+            expected_base = None if args.expected_base == "ROOT" else args.expected_base
+            store.rebaseline(expected_base, args.target, args.reason)
             details, outcome = store.status(), "STATE_REBASELINED"
         elif args.state_command == "retry-blocked":
             generation = store.retry_blocked(args.run_id, args.expected_base, args.report_sha256, args.reason)

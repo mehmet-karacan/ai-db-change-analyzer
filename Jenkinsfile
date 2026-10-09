@@ -107,6 +107,16 @@ pipeline {
                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                             --config "$ANALYZER_CONFIG" \
                             doctor --offline
+                        python3 tools/prepare_runtime_config.py \
+                            "$ANALYZER_CONFIG" "$WORKSPACE/.analyzer-runtime.toml"
+                        if [ ! -f .analyzer-state/INSTALLATION.json ]; then
+                            printf '1\n' > "$WORKSPACE/.analyzer-first-run"
+                            PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
+                                --config "$WORKSPACE/.analyzer-runtime.toml" \
+                                state init --confirm-new-install
+                        else
+                            printf '0\n' > "$WORKSPACE/.analyzer-first-run"
+                        fi
                         '''
                     }
                 }
@@ -130,7 +140,7 @@ pipeline {
                         int rc
                         dir('analyzer-src') {
                             withEnv([
-                                "ANALYZER_CONFIG=${analyzerConfig}"
+                                "ANALYZER_CONFIG=${env.WORKSPACE}/.analyzer-runtime.toml"
                             ]) {
                                 rc = sh(
                                     returnStatus: true,
@@ -140,6 +150,26 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
+                                    if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
+                                        PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
+                                            --config "$ANALYZER_CONFIG" \
+                                            --emit-dir "$WORKSPACE/out" \
+                                            smoke-model --allow-ai --record "$WORKSPACE/out/capability-record.json"
+                                        cp "$WORKSPACE/out/capability-record.json" "$WORKSPACE/.analyzer-state/capability-record.json"
+                                    fi
+                                    if [ "$(cat "$WORKSPACE/.analyzer-first-run")" = '1' ]; then
+                                        set -- $(PYTHONPATH="$PWD/.site:$PWD/src" python3 \
+                                            tools/resolve_initial_range.py "$ANALYZER_CONFIG")
+                                        if [ "$1" = 'ROOT' ]; then
+                                            echo 'İlk analiz için karşılaştırılabilir bir önceki commit bulunamadı.' >&2
+                                            exit 12
+                                        fi
+                                        PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
+                                            --config "$ANALYZER_CONFIG" \
+                                            state rebaseline --expected-base ROOT --target "$1" \
+                                            --reason 'İlk Jenkins analizinde son committen önceki commit checkpoint olarak alındı.' \
+                                            --ack-unanalysed-history
+                                    fi
                                     PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                         --config "$ANALYZER_CONFIG" \
                                         --emit-dir "$WORKSPACE/out" \
