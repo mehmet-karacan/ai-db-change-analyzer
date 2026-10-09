@@ -157,6 +157,13 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
+                                    model_http_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+                                        --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
+                                        --header "Authorization: Bearer $LITELLM_API_KEY" \
+                                        --header 'Content-Type: application/json' \
+                                        --data '{"model":"Qwen3.8 27B-IT","messages":[{"role":"user","content":"Return only JSON: {\\"ok\\":true}"}],"stream":false,"max_tokens":16}' \
+                                        'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
+                                    echo "MODEL_SIMPLE_POST_HTTP=$model_http_status"
                                     if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
