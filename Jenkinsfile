@@ -163,7 +163,7 @@ pipeline {
                                         --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
                                         --header "Authorization: Bearer $LITELLM_API_KEY" \
                                         --header 'Content-Type: application/json' \
-                                        --data '{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"user","content":"Return only JSON: {\"ok\":true}"}],"stream":false,"max_tokens":16}' \
+                                        --data '{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"user","content":"Return only the word OK"}],"stream":false,"max_tokens":16}' \
                                         'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
                                     echo "MODEL_VALID_ID_SIMPLE_HTTP=$model_http_status"
                                     if [ "$model_http_status" != '200' ]; then
