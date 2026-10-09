@@ -253,7 +253,7 @@ def test_synthetic_tool_probe_requires_tool_and_uses_probe_schema(tmp_path: Path
         body = json.loads(request.content)
         requests.append(body)
         if len(requests) == 1:
-            assert body["tool_choice"] == "required"
+            assert body["tool_choice"] == "auto"
             return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [
                 {"id": "probe-call", "type": "function", "function": {"name": "synthetic_lookup", "arguments": '{"nonce":"probe-nonce-1"}'}},
             ]}, "finish_reason": "tool_calls"}]})

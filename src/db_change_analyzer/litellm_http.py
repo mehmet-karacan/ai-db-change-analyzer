@@ -262,7 +262,7 @@ class LiteLLMClient:
             user_payload={"synthetic": True, "nonce": "probe-nonce-1", "sentinel": sentinel},
             response_schema=probe_schema, output_tokens=output_tokens, tools=[tool],
             handlers={"synthetic_lookup": lambda args: {"sentinel": sentinel, "nonce": args.get("nonce")}},
-            max_turns=4, tool_choice="required",
+            max_turns=4,
         )
         sentinel_present = sentinel in result.final_content
         _safe_log(
