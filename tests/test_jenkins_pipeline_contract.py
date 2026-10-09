@@ -29,6 +29,9 @@ def test_analyzer_pipeline_uses_locked_offline_runtime() -> None:
     assert "ANALYZER_WHEELHOUSE" in JENKINSFILE
     assert "PYTHONPATH=\"$PWD/.site:$PWD/src\" python3 -m db_change_analyzer" in JENKINSFILE
     assert "doctor --offline" in JENKINSFILE
+    assert "MODEL_HTTPX_" not in JENKINSFILE
+    assert "MODEL_VALID_ID_SIMPLE_HTTP" not in JENKINSFILE
+    assert "ANALYZER_PHASE=RUN_START" in JENKINSFILE
 
 
 def test_analyzer_pipeline_is_manually_startable_with_parameters() -> None:

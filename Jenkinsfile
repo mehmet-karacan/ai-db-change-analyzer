@@ -157,91 +157,7 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
-                                    for proxy_name in HTTPS_PROXY HTTP_PROXY ALL_PROXY https_proxy http_proxy all_proxy; do
-                                        if printenv "$proxy_name" >/dev/null 2>&1; then
-                                            echo "MODEL_${proxy_name}_SET=true"
-                                        fi
-                                    done
-                                    PYTHONPATH="$PWD/.site:$PWD/src" python3 - <<'PY'
-import os
-import httpx
-
-payload = {
-    "model": "Qwen/Qwen3.8-27B-FP8",
-    "messages": [{"role": "user", "content": "Return only the word OK"}],
-    "stream": False,
-    "max_tokens": 16,
-}
-headers = {
-    "Authorization": f"Bearer {os.environ['LITELLM_API_KEY']}",
-    "Content-Type": "application/json",
-}
-checks = (
-    ("CUSTOM_CA", "config/certs/turktelekom-aihub-ca-bundle.pem"),
-    ("SYSTEM_CA", True),
-    ("NO_VERIFY", False),
-)
-for label, verify in checks:
-    try:
-        with httpx.Client(verify=verify, timeout=20, trust_env=False, follow_redirects=False) as client:
-            response = client.post("https://aihub-api.turktelekom.com.tr/chat/completions", headers=headers, json=payload)
-        print(f"MODEL_HTTPX_{label}_HTTP={response.status_code}")
-    except Exception as exc:
-        cause = type(exc.__cause__).__name__.upper() if exc.__cause__ is not None else "NOCAUSE"
-        detail = " ".join(str(exc).split())[:240]
-        print(f"MODEL_HTTPX_{label}_ERROR={type(exc).__name__.upper()}_{cause}")
-        print(f"MODEL_HTTPX_{label}_DETAIL={detail}")
-PY
-                                    model_probe_body="$WORKSPACE/out/model-probe-response.json"
-                                    model_http_status="$(curl --silent --show-error --output "$model_probe_body" --write-out '%{http_code}' \
-                                        --connect-timeout 10 --max-time 60 \
-                                        --cacert "$PWD/config/certs/turktelekom-aihub-ca-bundle.pem" \
-                                        --header "Authorization: Bearer $LITELLM_API_KEY" \
-                                        --header 'Content-Type: application/json' \
-                                        --data '{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"user","content":"Return only the word OK"}],"stream":false,"max_tokens":16}' \
-                                        'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
-                                    echo "MODEL_VALID_ID_SIMPLE_HTTP=$model_http_status"
-                                    if [ "$model_http_status" != '200' ]; then
-                                        model_probe_message="$(tr '\\n' ' ' < "$model_probe_body" | cut -c1-1000)"
-                                        echo "MODEL_VALID_ID_SIMPLE_BODY=$model_probe_message"
-                                    fi
-                                    rm -f "$model_probe_body"
-                                    model_schema_payload="$WORKSPACE/out/model-schema-payload.json"
-                                    cat > "$model_schema_payload" <<'JSON'
-{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"system","content":"Return a JSON object."},{"role":"user","content":"Return an object with ok=true."}],"stream":false,"max_tokens":64,"response_format":{"type":"json_schema","json_schema":{"name":"smoke","strict":true,"schema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}}},"chat_template_kwargs":{"enable_thinking":false}}
-JSON
-                                    model_schema_body="$WORKSPACE/out/model-schema-response.json"
-                                    model_schema_http_status="$(curl --silent --show-error --output "$model_schema_body" --write-out '%{http_code}' \
-                                        --connect-timeout 10 --max-time 60 \
-                                        --cacert "$PWD/config/certs/turktelekom-aihub-ca-bundle.pem" \
-                                        --header "Authorization: Bearer $LITELLM_API_KEY" \
-                                        --header 'Content-Type: application/json' \
-                                        --data-binary "@$model_schema_payload" \
-                                        'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
-                                    echo "MODEL_JSON_SCHEMA_HTTP=$model_schema_http_status"
-                                    if [ "$model_schema_http_status" != '200' ]; then
-                                        model_schema_message="$(tr '\\n' ' ' < "$model_schema_body" | cut -c1-1000)"
-                                        echo "MODEL_JSON_SCHEMA_BODY=$model_schema_message"
-                                    fi
-                                    rm -f "$model_schema_payload" "$model_schema_body"
-                                    model_tools_payload="$WORKSPACE/out/model-tools-payload.json"
-                                    cat > "$model_tools_payload" <<'JSON'
-{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"system","content":"Use synthetic_lookup exactly once, then return JSON."},{"role":"user","content":"Call synthetic_lookup with nonce probe-nonce-1."}],"tools":[{"type":"function","function":{"name":"synthetic_lookup","description":"fixed synthetic probe","parameters":{"type":"object","properties":{"nonce":{"type":"string"}},"required":["nonce"],"additionalProperties":false}}}],"tool_choice":"auto","stream":false,"max_tokens":128,"response_format":{"type":"json_schema","json_schema":{"name":"smoke","strict":true,"schema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}}},"chat_template_kwargs":{"enable_thinking":false}}
-JSON
-                                    model_tools_body="$WORKSPACE/out/model-tools-response.json"
-                                    model_tools_http_status="$(curl --silent --show-error --output "$model_tools_body" --write-out '%{http_code}' \
-                                        --connect-timeout 10 --max-time 60 \
-                                        --cacert "$PWD/config/certs/turktelekom-aihub-ca-bundle.pem" \
-                                        --header "Authorization: Bearer $LITELLM_API_KEY" \
-                                        --header 'Content-Type: application/json' \
-                                        --data-binary "@$model_tools_payload" \
-                                        'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
-                                    echo "MODEL_TOOLS_HTTP=$model_tools_http_status"
-                                    if [ "$model_tools_http_status" != '200' ]; then
-                                        model_tools_message="$(tr '\\n' ' ' < "$model_tools_body" | cut -c1-1000)"
-                                        echo "MODEL_TOOLS_BODY=$model_tools_message"
-                                    fi
-                                    rm -f "$model_tools_payload" "$model_tools_body"
+                                    echo 'ANALYZER_PHASE=SMOKE_MODEL_START'
                                     if [ ! -f "$PWD/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
@@ -249,6 +165,7 @@ JSON
                                             smoke-model --allow-ai --record "$WORKSPACE/out/capability-record.json"
                                         cp "$WORKSPACE/out/capability-record.json" "$PWD/.analyzer-state/capability-record.json"
                                     fi
+                                    echo 'ANALYZER_PHASE=SMOKE_MODEL_COMPLETE'
                                     if [ "$(cat "$WORKSPACE/.analyzer-first-run")" = '1' ]; then
                                         set -- $(PYTHONPATH="$PWD/.site:$PWD/src" python3 \
                                             tools/resolve_initial_range.py "$ANALYZER_CONFIG")
@@ -262,10 +179,12 @@ JSON
                                             --reason 'İlk Jenkins analizinde son committen önceki commit checkpoint olarak alındı.' \
                                             --ack-unanalysed-history
                                     fi
+                                    echo 'ANALYZER_PHASE=RUN_START'
                                     PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                         --config "$ANALYZER_CONFIG" \
                                         --emit-dir "$WORKSPACE/out" \
                                         run --allow-ai
+                                    echo 'ANALYZER_PHASE=RUN_COMPLETE'
                                     '''
                                 )
                             }
