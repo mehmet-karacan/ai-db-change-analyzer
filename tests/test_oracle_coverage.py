@@ -30,6 +30,17 @@ def test_parser_generation_runs_real_antlr_for_table_and_sequence() -> None:
     assert projections[1].properties["increment_by"] == "2"
 
 
+def test_large_combined_export_verifies_object_fragments() -> None:
+    raw = "\n".join(
+        f"CREATE SEQUENCE GPU_USER.SEQ_{index} START WITH {index + 1} INCREMENT BY 1 NOCACHE;"
+        for index in range(40)
+    ).encode("utf-8")
+    scanned, projections, status, diagnostics = inventory_bytes(raw, default_schema="GPU_USER", parse_timeout_seconds=20)
+    assert status == "parsed", diagnostics
+    assert len(scanned.occurrences) == 40
+    assert all(projection.diagnostics == () for projection in projections)
+
+
 def test_p08_readable_unknown_ddl_is_visible_fallback() -> None:
     raw = b"CREATE FOOBAR GPU_USER.X WITH UNSUPPORTED CLAUSE;\n"
     scanned, projections, status, diagnostics = inventory_bytes(raw, default_schema="GPU_USER", parse_timeout_seconds=20)

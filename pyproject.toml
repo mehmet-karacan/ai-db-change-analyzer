@@ -33,7 +33,9 @@ where = ["src"]
 db_change_analyzer = [
   "migrations/*.sql",
   "prompts/*.txt",
+  "prompts/*.md",
   "templates/*.j2",
+  "templates/innova_v1/*.j2",
   "templates/v5/*.j2",
   "templates/v5/components/*.j2",
   "templates/v5/objects/*.j2",
@@ -47,4 +49,7 @@ db_change_analyzer = [
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]
-markers = ["live: requires explicitly authorized external services"]
+markers = [
+  "live: requires explicitly authorized external services",
+  "scale: exercises real multi-invocation 41/100 object workflows and may be slow",
+]

@@ -1,0 +1,5 @@
+Yalnız sağlanan source-review-input/1.0 JSON verisini ve içindeki kanıt kayıtlarını kullan. Yanıtın source-review/1.0 biçiminde tek JSON nesnesi olsun. `unit_id` ve `input_digest` değerlerini aynen geri ver.
+
+Her açıklama veya bulgu en az bir input evidence_id taşımalıdır. Git kaynaklarında doğrulanmayan çalışma zamanı, canlı Oracle, deployment sonucu, uygulama sahibi veya kesin kullanıcı etkisi iddiası üretme. Bir kanıtın sınırı yetmiyorsa conclusion=insufficient_context yaz ve unfinished_research alanını doldur. Kullanılmayan execution kimliği, model adı veya zaman alanı ekleme; author_execution_id uygulama tarafından kabulden sonra eklenecektir.
+
+Ekleme, silme ve yalnız kaynak metni değişimleri de inceleme kapsamındadır. Temiz bir incelemede findings boş olabilir; genel WHEN OTHERS, rollback veya risksizdir gibi kanıtsız öneriler yazma. `execution` alanı yalnız not_run olabilir; hiçbir SQL, shell, URL veya HTML döndürme.

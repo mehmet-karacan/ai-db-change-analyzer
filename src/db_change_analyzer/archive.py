@@ -14,7 +14,8 @@ from zoneinfo import ZoneInfo
 
 
 ARCHIVE_PREFIX = Path("db-change-analyzer") / "reports"
-ARCHIVE_SCHEMA_VERSION = "db-change-archive/1.0"
+ARCHIVE_SCHEMA_VERSION = "db-change-archive/2.0"
+LEGACY_ARCHIVE_SCHEMA_VERSIONS = {"db-change-archive/1.0", ARCHIVE_SCHEMA_VERSION}
 _SAFE_PART = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -87,6 +88,7 @@ def find_range_archive(
     target_sha: str,
     *,
     when: str | None = None,
+    analysis_fingerprint: str | None = None,
 ) -> Path | None:
     """Find a valid immutable record for one exact Git comparison range.
 
@@ -108,13 +110,15 @@ def find_range_archive(
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise ArchiveError("ARCHIVE_MANIFEST_INVALID") from exc
         if (
-            manifest.get("schema_version") != ARCHIVE_SCHEMA_VERSION
+            manifest.get("schema_version") not in LEGACY_ARCHIVE_SCHEMA_VERSIONS
             or manifest.get("repository_id") != repository_id
             or manifest.get("branch") != branch
             or manifest.get("base_sha") != base_sha
             or manifest.get("target_sha") != target_sha
         ):
             raise ArchiveError("ARCHIVE_MANIFEST_INVALID")
+        if analysis_fingerprint is not None and manifest.get("analysis_fingerprint") != analysis_fingerprint:
+            continue
         return candidate
     return None
 
@@ -133,6 +137,7 @@ def _manifest(report: dict[str, Any], files: dict[str, bytes]) -> bytes:
         "branch": run["branch"],
         "base_sha": run.get("base_sha"),
         "target_sha": run["target_sha"],
+        "analysis_fingerprint": report.get("analysis_fingerprint") or (report.get("versions") or {}).get("analysis_fingerprint"),
         "commit_shas": [item.get("sha") for item in report.get("commits", []) if item.get("sha")],
         "analysis_completed_at": run["analysis_completed_at"],
         "trigger_exclusion_prefix": "db-change-analyzer/reports/",
@@ -146,7 +151,8 @@ def _manifest(report: dict[str, Any], files: dict[str, bytes]) -> bytes:
 
 def _expected_files(report: dict[str, Any], files: dict[str, bytes]) -> dict[str, bytes]:
     required = {"report.json", "report.html", "report.txt", "mail-view.json", "render-manifest.json"}
-    if set(files) != required:
+    allowed = (required, required | {"report-email.html"})
+    if set(files) not in allowed:
         raise ArchiveError("ARCHIVE_FILE_SET_INVALID")
     try:
         report_id = report["report_id"]

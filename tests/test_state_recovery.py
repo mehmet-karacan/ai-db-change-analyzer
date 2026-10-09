@@ -30,6 +30,15 @@ def test_g07_init_creates_empty_checkpoint_and_verified_identity(tmp_path: Path)
     assert store.paths.lock.exists()
 
 
+def test_parser_cache_entry_is_content_hashed_and_reusable(tmp_path: Path) -> None:
+    store = SqliteStateStore(config_for(tmp_path))
+    with store.lock():
+        store.initialize()
+        store.put_cache_entry("blob:test", b'{"ok":true}', kind="oracle_parser", version_fingerprint="parser-v1")
+        assert store.get_cache_entry("blob:test", kind="oracle_parser", version_fingerprint="parser-v1") == b'{"ok":true}'
+        assert store.get_cache_entry("blob:test", kind="oracle_parser", version_fingerprint="parser-v2") is None
+
+
 def test_explicit_v1_to_v5_migration_preserves_state_and_creates_backup(tmp_path: Path) -> None:
     store = SqliteStateStore(config_for(tmp_path))
     with store.lock():
@@ -110,3 +119,60 @@ def test_checkpoint_compare_and_swap_rejects_stale_expected_base(tmp_path: Path)
         store.compare_and_swap_checkpoint(None, "a" * 40, 1)
         with pytest.raises(StateError, match="compare-and-swap"):
             store.compare_and_swap_checkpoint(None, "b" * 40, 1)
+
+
+def test_migrate_run_increments_generation_without_reusing_previous_units(tmp_path: Path) -> None:
+    store = SqliteStateStore(config_for(tmp_path))
+    with store.lock():
+        store.initialize()
+        connection = store.connection()
+        try:
+            with connection:
+                connection.execute(
+                    """INSERT INTO runs(
+                        run_id,scope_hash,mode,base_sha,target_sha,epoch,analysis_generation,status,
+                        config_digest,fingerprint_json,originating_build_json,planned_at,last_attempt_at,
+                        analysis_started_at
+                    ) VALUES (?,?,?,?,?,?,0,'ANALYZING',?,?,?,?,?,?)""",
+                    (
+                        "generation-test-run", store.config.scope_hash, "AUTO", "a" * 40, "b" * 40,
+                        1, store.config.config_digest, "{}", None,
+                        "2026-10-08T10:00:00+00:00", "2026-10-08T10:00:00+00:00",
+                        "2026-10-08T10:00:00+00:00",
+                    ),
+                )
+                connection.execute(
+                    """INSERT INTO units(
+                        run_id,analysis_generation,unit_id,canonical_sources_json,alias_events_json,
+                        context_digest,request_digest,status,result_json,diagnostics_json,http_attempts,
+                        returned_models_json
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        "generation-test-run", 0, "unit-generation-zero", "[]", "[]", "context-0",
+                        "request-0", "VALIDATED", "{}", "[]", 1, "[]",
+                    ),
+                )
+        finally:
+            connection.close()
+
+    assert store.migrate_run("generation-test-run", "generation isolation test") == 1
+
+    connection = store.connection()
+    try:
+        run = connection.execute(
+            "SELECT analysis_generation,status,report_id FROM runs WHERE run_id=?",
+            ("generation-test-run",),
+        ).fetchone()
+        assert run["analysis_generation"] == 1
+        assert run["status"] == "PLANNED"
+        assert run["report_id"] is None
+        assert connection.execute(
+            "SELECT COUNT(*) FROM units WHERE run_id=? AND analysis_generation=0",
+            ("generation-test-run",),
+        ).fetchone()[0] == 1
+        assert connection.execute(
+            "SELECT COUNT(*) FROM units WHERE run_id=? AND analysis_generation=1",
+            ("generation-test-run",),
+        ).fetchone()[0] == 0
+    finally:
+        connection.close()

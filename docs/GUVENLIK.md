@@ -5,6 +5,7 @@
 - Parser child'a model/SMTP/Git secret aktarılmaz. Model key yalnız `LITELLM_API_KEY`, SMTP/Git credential yalnız adlandırılmış environment alanlarından okunur.
 - HTTPX `trust_env=false`, redirect kapalı, TLS verification zorunludur. Route/model/capability doğrulanmadan production DDL gönderilmez; 400 yanıtından capability downgrade çıkarılmaz.
 - Model kaynakları güvenilmeyen veri kabul eder. Tool/function çağrısı yoktur. JSON, şema, unit echo, evidence üyeliği ve secret taraması yerelde uygulanır. Bu kontroller yorumun semantik doğruluğunu kanıtlamaz.
+- Runtime policy Markdown dosyaları güvenilir Analyzer paketinden okunur; sürüm ve SHA-256 fingerprint'i analiz generation'ına ve kabul edilmiş execution kaydına bağlanır. Başarısız veya doğrulanmamış model denemeleri bir yorumun yazarı olarak gösterilmez.
 - Jinja `StrictUndefined` ve autoescape kullanır; AI metni template olarak derlenmez veya `safe` yapılmaz. Rapor linkleri yalnız açık HTTPS host allowlist'inden gelir.
 - SMTP plaintext fallback yapmaz. DATA sonrası bağlantı belirsizliği `UNKNOWN` olur ve açık duplicate-risk kararı olmadan retry edilmez. SMTP 250 inbox/okunma kanıtı değildir.
 - Raw prompt/response, secret, credential-bearing URL ve private corpus Git'e/loga/result projection'ına yazılmaz. Secret scanner bütün hassas veriyi bulma garantisi değildir; repository/model/artifact ACL'i zorunludur.

@@ -39,10 +39,14 @@ _SAFE_FIELDS = {
     "package_body.parameter.name", "package_body.parameter.position",
     "package_body.parameter.mode", "package_body.parameter.data_type",
     "package_body.parameter.nocopy", "package_body.routine.return_type",
+    "package_body.body_property.dynamic_sql_profile",
     "trigger.trigger_property.target", "trigger.trigger_property.enabled_state",
     "procedure.procedure_property.has_exception", "procedure.procedure_property.has_commit",
-    "procedure.procedure_property.has_rollback", "function.function_property.has_exception",
-    "function.function_property.has_commit", "function.function_property.has_rollback",
+    "procedure.procedure_property.has_rollback", "procedure.procedure_property.signature",
+    "procedure.procedure_property.transaction_statement", "procedure.procedure_property.exception_handler",
+    "function.function_property.has_exception", "function.function_property.has_commit",
+    "function.function_property.has_rollback", "function.function_property.signature",
+    "function.function_property.transaction_statement", "function.function_property.exception_handler",
     "type.type_property.raw_definition", "type_body.type_property.raw_definition",
 }
 _SAFE_VALUE = re.compile(r"""[A-Za-z0-9_.$#",()/: +\-]+""")
@@ -52,6 +56,11 @@ _SOURCE_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 _SAFE_ROUTINE_SIGNATURE = re.compile(r"[A-Za-z0-9_.$#(), +\-]{1,256}")
 _SAFE_VIEW_JOIN = re.compile(r"[A-Za-z0-9_.$#(),*/ +=!|\-]{1,1200}")
 _STANDALONE_NUMBER = re.compile(r"(?<![A-Za-z0-9_$#])[0-9]+(?![A-Za-z0-9_$#])")
+_SAFE_DYNAMIC_SQL_PROFILE = re.compile(
+    r"mode=(?:literal|expression|unknown),target=(?:static|runtime|unknown),"
+    r"bind=(?:yes|no),concat=(?:yes|no),validation=(?:visible|not_applicable|not_observed|unknown),"
+    r"loop=(?:yes|no)"
+)
 
 
 def _safe_signature_group(text: str) -> bool:
@@ -76,7 +85,8 @@ def _display_value(taxonomy_id: str, value: Value, extra_secret_patterns: list[s
     if value.state != "present":
         return result, False
     text = value.value or ""
-    signature_group = taxonomy_id in {"package_spec.routine.signature", "package_body.routine.signature"} and _safe_signature_group(text)
+    signature_group = taxonomy_id in {"package_spec.routine.signature", "package_body.routine.signature", "procedure.procedure_property.signature", "function.function_property.signature"} and _safe_signature_group(text)
+    dynamic_sql_profile = taxonomy_id == "package_body.body_property.dynamic_sql_profile" and bool(_SAFE_DYNAMIC_SQL_PROFILE.fullmatch(text))
     safe_join = (taxonomy_id == "view.query_property.join" and bool(_SAFE_VIEW_JOIN.fullmatch(text))
                  and not _STANDALONE_NUMBER.search(text)
                  and not any(marker in text for marker in ("--", "/*", "*/")))
@@ -86,11 +96,11 @@ def _display_value(taxonomy_id: str, value: Value, extra_secret_patterns: list[s
     allowed = (taxonomy_id.startswith("sequence.sequence_property.") or taxonomy_id in _SAFE_FIELDS
                or (taxonomy_id == "common.source.occurrence_order" and bool(re.fullmatch(r"[1-9][0-9]{0,8}", text)))
                or (taxonomy_id in {"common.source.format", "common.source.text"} and bool(_SOURCE_DIGEST.fullmatch(text)))
-               or signature_group or safe_join or safe_analytic)
+               or signature_group or dynamic_sql_profile or safe_join or safe_analytic)
     if len(text) > 1200:
         result.update(state="unparsed", value=None)
         return result, True
-    safe_label = (taxonomy_id == "common.object.presence" and text == "Tanım kaynakta mevcut") or signature_group or safe_join or safe_analytic
+    safe_label = (taxonomy_id == "common.object.presence" and text == "Tanım kaynakta mevcut") or signature_group or dynamic_sql_profile or safe_join or safe_analytic
     possible_pii = not taxonomy_id.startswith("sequence.sequence_property.") and bool(_PII.search(text))
     if not allowed or (not safe_label and not _SAFE_VALUE.fullmatch(text)) or possible_pii or scan_secret(text, extra_secret_patterns).blocked:
         result.update(state="redacted", value=None)
@@ -146,11 +156,65 @@ def _recommended_checks(
         add("QUERY_DEFINITION", "View'i kullanan rapor ve sorguların kolon sözleşmesi ile sonuç kümesi kontrol edilmelidir.")
     elif object_type in {"PACKAGE_SPEC", "PACKAGE_BODY"}:
         add("CALL_SIGNATURE", "Paketi çağıran uygulamalar, imza uyumluluğu ve regresyon testleri kontrol edilmelidir.")
+        if "package_body.body_property.dynamic_sql_profile" in fact_types:
+            add("DYNAMIC_SQL_REVIEW", "Dinamik SQL'in sabit/runtime hedefi, bind kullanımı, görülebilen doğrulama, loop bağlamı ve kaynak destekli kontrol adımları değerlendirilmelidir.")
     elif object_type == "SEQUENCE":
         add("SEQUENCE_DEFINITION", "Sequence'in canlı NEXTVAL değeri ve kullanan akışların tekrar/çakışma davranışı kontrol edilmelidir.")
     else:
         add("MANUAL_SOURCE_REVIEW", "Değişen tanımın uygulama tüketicileri ve operasyonel etkisi kaynak incelemesiyle kontrol edilmelidir.")
     return checks
+
+
+_RISK_LEVELS = {"critical", "high", "medium", "low", "unknown"}
+_RISK_CONFIDENCE = {"limited", "unknown"}
+_IMPACT_STATUS = {"static_repository_evidence", "no_static_dependency_evidence", "not_reviewed"}
+_EXTERNAL_SOURCE_STATUS = {"connected", "not_connected", "not_run"}
+
+
+def _nonnegative_int(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _analysis_summaries(report: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Expose bounded impact/risk facts in the mail view without inventing runtime claims."""
+    raw_impact = report.get("impact_analysis") or {}
+    raw_sources = raw_impact.get("external_sources") or {}
+    impact = {
+        "status": raw_impact.get("status") if raw_impact.get("status") in _IMPACT_STATUS else "not_reviewed",
+        "candidate_count": _nonnegative_int(raw_impact.get("candidate_count")),
+        "provided_count": _nonnegative_int(raw_impact.get("provided_count")),
+        "external_sources": {
+            name: raw_sources.get(name) if raw_sources.get(name) in _EXTERNAL_SOURCE_STATUS else "not_run"
+            for name in ("oracle_metadata", "application_repositories", "jenkins_deployments", "runtime_usage")
+        },
+    }
+    raw_risk = report.get("risk_assessment") or {}
+    raw_basis = raw_risk.get("basis") or {}
+    risk = {
+        "level": raw_risk.get("level") if raw_risk.get("level") in _RISK_LEVELS else "unknown",
+        "method": "deterministic_source_rules",
+        "confidence": raw_risk.get("confidence") if raw_risk.get("confidence") in _RISK_CONFIDENCE else "unknown",
+        "basis": {
+            level: [str(item)[:160] for item in raw_basis.get(level, []) if isinstance(item, str)][:1000]
+            for level in ("critical", "high", "medium", "low", "unknown")
+        },
+        "limitations": [str(item)[:600] for item in raw_risk.get("limitations", []) if isinstance(item, str)][:12]
+        or ["Canlı veritabanı ve çalışma zamanı kullanımı doğrulanmadı."],
+    }
+    risk["basis"]["static_dependency_candidates"] = _nonnegative_int(raw_basis.get("static_dependency_candidates"))
+    object_levels: dict[str, dict[str, str]] = {}
+    for key, value in (raw_risk.get("object_levels") or {}).items():
+        if not isinstance(key, str) or not isinstance(value, dict):
+            continue
+        level = value.get("level") if value.get("level") in _RISK_LEVELS else "unknown"
+        confidence = value.get("confidence") if value.get("confidence") in _RISK_CONFIDENCE else "unknown"
+        reason = value.get("reason") if isinstance(value.get("reason"), str) else "insufficient_context"
+        object_levels[key[:300]] = {"level": level, "confidence": confidence, "reason": reason[:80]}
+    risk["object_levels"] = object_levels
+    return impact, risk
 
 
 def build_mail_view(
@@ -162,6 +226,7 @@ def build_mail_view(
     ai_comments_by_key: dict[str, list[dict[str, Any]]] | None = None,
     ai_unit_ids_by_key: dict[str, str] | None = None,
     ai_status_by_key: dict[str, str] | None = None,
+    ai_execution_records_by_unit: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     run = report["run"]
     base_sha, target_sha = run["base_sha"], run["target_sha"]
@@ -169,6 +234,9 @@ def build_mail_view(
     comments_map = ai_comments_by_key or {}
     unit_map = ai_unit_ids_by_key or {}
     status_map = ai_status_by_key or {}
+    execution_map = ai_execution_records_by_unit or {}
+    impact_analysis, risk_assessment = _analysis_summaries(report)
+    risk_levels = risk_assessment.get("object_levels", {})
     object_ids = {item["identity"]["object_key"]: _object_id(item["identity"]["object_key"]) for item in report["objects"]}
     evidence_owner: dict[str, str] = {}
     for item in report["objects"]:
@@ -263,6 +331,9 @@ def build_mail_view(
             frozenset({"common.source.text"}): "text_only",
         }.get(frozenset(fact_types))
         recommended_checks = _recommended_checks(identity["object_type"], operation, fact_types, source_ids)
+        object_risk = risk_levels.get(key, {
+            "level": "unknown", "confidence": "unknown", "reason": "insufficient_context",
+        })
         objects.append({
             "object_id": object_id,
             "identity": {
@@ -276,6 +347,7 @@ def build_mail_view(
             },
             "operation": operation,
             "pattern": "start_with_only" if sequence_only else technical_pattern or "structured" if converted else "text_only" if source_ids else "unknown",
+            "risk": object_risk,
             "verification": verification, "source_paths": source_paths,
             "evidence_ids": list(dict.fromkeys(source_ids)), "facts": converted,
             "deterministic_summary_tr": f"{len(converted)} kaynak alanı farkı kaydedildi." if converted else "Kaynak tanımında fark gözlendi; alan ayrıştırması sınırlı.",
@@ -294,7 +366,7 @@ def build_mail_view(
         ai = {
             "status": "not_used", "phase_started_at": None, "phase_completed_at": None,
             "phase_elapsed_ms": None, "request_duration_sum_ms": None,
-            "http_attempts": 0, "requested_units": 0, "models": [],
+            "http_attempts": 0, "requested_units": 0, "models": [], "executions": [],
         }
     else:
         model_units: dict[tuple[str, ...], list[str]] = {}
@@ -313,6 +385,7 @@ def build_mail_view(
             "phase_completed_at": ai_phase_completed_at, "phase_elapsed_ms": ai_phase_elapsed_ms,
             "request_duration_sum_ms": None, "http_attempts": report["counts"]["ai_http_attempts"],
             "requested_units": report["counts"]["ai_units"],
+            "executions": [execution_map[unit_id] for unit_id in sorted(execution_map)],
             "models": [{
                 "configured_model": report["versions"]["configured_model"],
                 "returned_models": list(labels), "resolved_model_version": None,
@@ -369,6 +442,7 @@ def build_mail_view(
             "field_coverage_complete": field_complete,
         },
         "evidence_registry": registry, "objects": objects, "artifact_notices": artifact_notices,
+        "impact_analysis": impact_analysis, "risk_assessment": risk_assessment,
         "analysis": {
             "record_origin": "runtime", "started_at": run["analysis_started_at"],
             "completed_at": run["analysis_completed_at"], "elapsed_ms": analysis_elapsed_ms,
@@ -376,5 +450,31 @@ def build_mail_view(
             "display_timezone": "Europe/Istanbul", "ai": ai,
         },
     }
+    validate_mail_view(view)
+    return view
+
+
+def build_innova_mail_view(
+    report: dict[str, Any], changes_by_key: dict[str, ChangeSet], *,
+    analysis_elapsed_ms: int | None, ai_phase_started_at: str | None,
+    ai_phase_completed_at: str | None, ai_phase_elapsed_ms: int | None,
+    returned_models_by_unit: dict[str, set[str]], analysis_duration_basis: str | None = None,
+    extra_secret_patterns: list[str] | None = None,
+    ai_comments_by_key: dict[str, list[dict[str, Any]]] | None = None,
+    ai_unit_ids_by_key: dict[str, str] | None = None,
+    ai_status_by_key: dict[str, str] | None = None,
+    ai_execution_records_by_unit: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Build the approved Innova report view while preserving the V5 builder."""
+    view = build_mail_view(
+        report, changes_by_key, analysis_elapsed_ms=analysis_elapsed_ms,
+        ai_phase_started_at=ai_phase_started_at, ai_phase_completed_at=ai_phase_completed_at,
+        ai_phase_elapsed_ms=ai_phase_elapsed_ms, returned_models_by_unit=returned_models_by_unit,
+        analysis_duration_basis=analysis_duration_basis, extra_secret_patterns=extra_secret_patterns,
+        ai_comments_by_key=ai_comments_by_key, ai_unit_ids_by_key=ai_unit_ids_by_key,
+        ai_status_by_key=ai_status_by_key, ai_execution_records_by_unit=ai_execution_records_by_unit,
+    )
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
     validate_mail_view(view)
     return view

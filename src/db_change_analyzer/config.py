@@ -92,6 +92,7 @@ class ParserConfig(ConfigModel):
 
 
 class AnalysisConfig(ConfigModel):
+    review_mode: Literal["legacy_commentary", "source_review"] = "legacy_commentary"
     max_job_seconds: Annotated[int, Field(ge=1)]
     shutdown_reserve_seconds: Annotated[int, Field(ge=0)]
     max_new_units_per_invocation: Annotated[int, Field(ge=1)]
@@ -203,6 +204,13 @@ class ReportsConfig(ConfigModel):
     error_emails: bool
 
 
+class DeliveryConfig(ConfigModel):
+    """Controls artifact preparation without changing legacy SMTP behavior."""
+
+    mode: Literal["smtp_legacy", "jenkins_artifact"] = "smtp_legacy"
+    result_path: str = ""
+
+
 class SecurityConfig(ConfigModel):
     extra_secret_patterns: list[str]
 
@@ -231,7 +239,7 @@ class RetentionConfig(ConfigModel):
 
 
 class AppConfig(ConfigModel):
-    schema_version: Literal[1]
+    schema_version: Literal[1, 2]
     repository: RepositoryConfig
     scope: ScopeConfig
     state: StateConfig
@@ -239,10 +247,17 @@ class AppConfig(ConfigModel):
     parser: ParserConfig
     analysis: AnalysisConfig
     model: ModelConfig
-    smtp: SmtpConfig
+    smtp: SmtpConfig | None = None
+    delivery: DeliveryConfig = Field(default_factory=DeliveryConfig)
     reports: ReportsConfig
     security: SecurityConfig
     retention: RetentionConfig
+
+    @model_validator(mode="after")
+    def validate_delivery_profile(self) -> "AppConfig":
+        if self.delivery.mode == "smtp_legacy" and self.smtp is None:
+            raise ValueError("smtp configuration is required for smtp_legacy delivery")
+        return self
 
     def canonical_public_dict(self) -> dict:
         return self.model_dump(mode="json")

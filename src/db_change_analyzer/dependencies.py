@@ -70,6 +70,172 @@ _RULES: tuple[tuple[Relation, re.Pattern[str], str], ...] = (
     (Relation.READ, re.compile(rf"(?is)\b(?:FROM|JOIN)\s+{_QUALIFIED}"), "query source"),
     (Relation.READ, re.compile(rf"(?is)\b{_QUALIFIED}\s*\.\s*(?:NEXTVAL|CURRVAL)\b"), "sequence value reference"),
 )
+_CALL_RULE = re.compile(
+    rf"(?is)\b(?P<package>{_IDENT}(?:\s*\.\s*{_IDENT})?)\s*\.\s*(?P<routine>{_IDENT})\s*\("
+)
+_CALL_NO_ARGS_RULE = re.compile(
+    rf"(?is)\b(?P<package>{_IDENT}(?:\s*\.\s*{_IDENT})?)\s*\.\s*(?P<routine>{_IDENT})\s*(?=;)"
+)
+_CALL_LOCAL_RULE = re.compile(
+    rf"(?is)(?P<routine>{_IDENT})(?:\s*\(|\s*(?=;))"
+)
+_LOCAL_CALL_BLOCKERS = {
+    "BEGIN", "CASE", "COMMIT", "CREATE", "DECLARE", "DELETE", "END", "EXCEPTION", "EXECUTE",
+    "FOR", "FUNCTION", "IF", "INSERT", "LOOP", "MERGE", "NULL", "PROCEDURE", "RAISE", "RETURN",
+    "ROLLBACK", "SELECT", "THEN", "UPDATE", "WHEN", "WHILE",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class _RoutineShape:
+    name: str
+    parameter_names: tuple[str, ...]
+    parameter_types: tuple[str | None, ...]
+    required_count: int
+
+
+def _routine_shapes(objects: tuple[SnapshotObject, ...]) -> dict[tuple[str | None, str], tuple[_RoutineShape, ...]]:
+    """Extract bounded package and standalone routine signatures."""
+    from .oracle.package import extract_package, extract_standalone_routine
+
+    result: dict[tuple[str | None, str], list[_RoutineShape]] = defaultdict(list)
+    for item in objects:
+        if item.object_type in {"PACKAGE_SPEC", "PACKAGE_BODY"}:
+            extraction = extract_package(item.source, item.object_type)
+        elif item.object_type in {"PROCEDURE", "FUNCTION"}:
+            extraction = extract_standalone_routine(item.source, item.object_type)
+        else:
+            continue
+        if not extraction.routines or any(code in {
+            "PACKAGE_EXTRACTION_SIZE_LIMIT", "WRAPPED_SOURCE_OPAQUE",
+            "PACKAGE_PARSE_UNRESOLVED", "PACKAGE_IDENTITY_UNRESOLVED",
+        } for code in extraction.diagnostics):
+            continue
+        key = (item.schema, item.name)
+        for routine in extraction.routines:
+            shape = _RoutineShape(
+                name=item.name.upper() if item.object_type in {"PROCEDURE", "FUNCTION"} else routine.name.upper(),
+                parameter_names=tuple((parameter.name or "").strip('"').upper() for parameter in routine.parameters),
+                parameter_types=tuple((parameter.data_type or "").strip().upper() or None for parameter in routine.parameters),
+                required_count=sum(parameter.default is None for parameter in routine.parameters),
+            )
+            if shape not in result[key]:
+                result[key].append(shape)
+    return {key: tuple(value) for key, value in result.items()}
+
+
+def _split_call_arguments(text: str) -> tuple[tuple[str | None, str], ...] | None:
+    """Split one call argument list without interpreting expressions or types."""
+    if not text.strip():
+        return ()
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    quote = False
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "'":
+            if quote and index + 1 < len(text) and text[index + 1] == "'":
+                index += 2
+                continue
+            quote = not quote
+        elif not quote:
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth < 0:
+                    return None
+            elif char == "," and depth == 0:
+                parts.append(text[start:index].strip())
+                start = index + 1
+        index += 1
+    if quote or depth != 0:
+        return None
+    parts.append(text[start:].strip())
+    result: list[tuple[str | None, str]] = []
+    for part in parts:
+        if not part:
+            return None
+        named = re.match(r"(?is)^\s*([A-Za-z][A-Za-z0-9_$#]*)\s*=>\s*(.+)$", part, re.S)
+        result.append((named.group(1).upper(), named.group(2).strip()) if named else (None, part))
+    return tuple(result)
+
+
+def _call_arguments(masked: str, opening_parenthesis: int) -> str | None:
+    depth = 1
+    quote = False
+    index = opening_parenthesis + 1
+    while index < len(masked):
+        char = masked[index]
+        if char == "'":
+            if quote and index + 1 < len(masked) and masked[index + 1] == "'":
+                index += 2
+                continue
+            quote = not quote
+        elif not quote:
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    return masked[opening_parenthesis + 1:index]
+        index += 1
+    return None
+
+
+def _call_binding_reason(
+    shapes: dict[tuple[str | None, str], tuple[_RoutineShape, ...]],
+    schema: str | None, package: str, routine: str, arguments: tuple[tuple[str | None, str], ...] | None,
+    *, kind: str = "qualified package/routine",
+) -> str:
+    candidates = [shape for shape in shapes.get((schema, package), ()) if shape.name == routine.upper()]
+    if arguments is None:
+        return f"{kind} call candidate; binding=arguments_unparsed"
+    compatible: list[_RoutineShape] = []
+    for shape in candidates:
+        positional_count = 0
+        named: list[str] = []
+        seen_named = False
+        order_valid = True
+        for name, _value in arguments:
+            if name is None:
+                if seen_named:
+                    order_valid = False
+                positional_count += 1
+            else:
+                seen_named = True
+                named.append(name)
+        if not order_valid or positional_count > len(shape.parameter_names) or len(set(named)) != len(named):
+            continue
+        if named and any(name not in shape.parameter_names for name in named):
+            continue
+        supplied = set(named) | set(shape.parameter_names[:positional_count])
+        if len(supplied) < shape.required_count:
+            continue
+        compatible.append(shape)
+    if not candidates:
+        suffix = "definition_unresolved"
+    elif not compatible:
+        suffix = "incompatible_arity_or_names"
+    elif len(compatible) > 1:
+        suffix = "overload_candidate"
+    else:
+        suffix = "arity_name_compatible_type_unresolved"
+    return f"{kind} call candidate; binding={suffix}"
+
+
+def _local_call_allowed(masked: str, match: re.Match[str]) -> bool:
+    """Reject declaration/control keywords and qualified calls already handled elsewhere."""
+    routine = _unquote(match.group("routine"))[0]
+    if routine in _LOCAL_CALL_BLOCKERS:
+        return False
+    prefix = masked[max(0, match.start() - 32):match.start()]
+    if re.search(r"\.\s*$", prefix):
+        return False
+    previous = re.findall(r"[A-Za-z][A-Za-z0-9_$#]*", prefix.upper())
+    return not previous or previous[-1] not in {"PROCEDURE", "FUNCTION", "END"}
 
 
 def _unquote(value: str) -> tuple[str, bool]:
@@ -100,6 +266,13 @@ class DependencyGraph:
             outgoing[edge.from_object].append(edge)
             if edge.resolution == Resolution.RESOLVED_STATIC:
                 incoming[edge.to_candidate].append(edge)
+            elif edge.resolution == Resolution.CANDIDATE:
+                # Candidate targets are still useful for reverse impact
+                # context.  Keep the edge's candidate resolution so callers
+                # cannot be presented as uniquely bound.
+                for candidate in edge.to_candidate.split(","):
+                    if candidate in self.objects:
+                        incoming[candidate].append(edge)
         self.outgoing = {key: tuple(value) for key, value in outgoing.items()}
         self.incoming = {key: tuple(value) for key, value in incoming.items()}
 
@@ -137,8 +310,43 @@ def _resolve(schema: str | None, name: str, objects: Iterable[SnapshotObject]) -
     return (",".join(by_name), Resolution.CANDIDATE) if by_name else ((f"{schema}." if schema else "") + name, Resolution.UNRESOLVED)
 
 
+def _resolve_call(
+    package_ref: str, routine: str, default_schema: str | None,
+    objects: Iterable[SnapshotObject],
+) -> tuple[str, Resolution, str, str | None, str]:
+    """Resolve package calls, with a conservative standalone fallback.
+
+    A package specification and body intentionally remain a candidate pair;
+    this graph does not claim overload or runtime binding from a call spelling.
+    """
+    snapshot = tuple(objects)
+    schema, package = _parts(package_ref, default_schema)
+    packages = tuple(item for item in snapshot if item.object_type in {"PACKAGE_SPEC", "PACKAGE_BODY"})
+    package_target, package_resolution = _resolve(schema, package, packages)
+    if package_resolution != Resolution.UNRESOLVED:
+        return package_target, package_resolution, "qualified package/routine", schema, package
+
+    raw_parts = re.split(r"\s*\.\s*", package_ref.strip())
+    if len(raw_parts) in {1, 2}:
+        # APP.RUN_JOB is captured as package_ref=APP, routine=RUN_JOB;
+        # APP.P.RUN is captured as package_ref=APP.P.  In both cases only
+        # an existing standalone object can activate this fallback.
+        standalone_schema, _ = _unquote(raw_parts[0] if len(raw_parts) == 2 else package_ref)
+        standalone = tuple(
+            item for item in snapshot
+            if item.schema == standalone_schema
+            and item.name == routine
+            and item.object_type in {"PROCEDURE", "FUNCTION"}
+        )
+        if standalone:
+            target, resolution = _resolve(standalone_schema, routine, standalone)
+            return target, resolution, "standalone routine", standalone_schema, routine
+    return package_target, package_resolution, "qualified package/routine", schema, package
+
+
 def build_dependency_graph(revision: str, objects: Iterable[SnapshotObject]) -> DependencyGraph:
     snapshot = tuple(objects)
+    routine_shapes = _routine_shapes(snapshot)
     edges: list[DependencyEdge] = []
     for item in snapshot:
         if not item.structural:
@@ -155,6 +363,42 @@ def build_dependency_graph(revision: str, objects: Iterable[SnapshotObject]) -> 
                     continue
                 target, resolution = _resolve(schema, name, snapshot)
                 edges.append(DependencyEdge(item.object_key, target, relation, resolution, revision, item.evidence_ids, reason))
+        call_matches: list[tuple[re.Match[str], tuple[tuple[str | None, str], ...] | None, bool]] = []
+        for match in _CALL_RULE.finditer(masked):
+            arguments_text = _call_arguments(masked, match.end() - 1)
+            call_matches.append((match, _split_call_arguments(arguments_text) if arguments_text is not None else None, False))
+        call_matches.extend((match, (), False) for match in _CALL_NO_ARGS_RULE.finditer(masked))
+        if item.object_type in {"PACKAGE_BODY", "PROCEDURE", "FUNCTION"}:
+            for match in _CALL_LOCAL_RULE.finditer(masked):
+                if not _local_call_allowed(masked, match):
+                    continue
+                arguments = _call_arguments(masked, match.end() - 1) if masked[match.end() - 1] == "(" else ""
+                call_matches.append((match, _split_call_arguments(arguments), True))
+        seen_calls: set[tuple[int, int]] = set()
+        for match, arguments, local in call_matches:
+            marker = (match.start(), match.end())
+            if marker in seen_calls:
+                continue
+            seen_calls.add(marker)
+            routine = _unquote(match.group("routine"))[0]
+            if local:
+                package_ref = item.name if item.object_type == "PACKAGE_BODY" else item.schema or item.name
+            else:
+                package_ref = match.group("package")
+            target, resolution, kind, shape_schema, shape_name = _resolve_call(
+                package_ref, routine, item.schema, snapshot,
+            )
+            if local and resolution == Resolution.UNRESOLVED:
+                continue
+            if local:
+                kind = "local routine"
+            reason = _call_binding_reason(
+                routine_shapes, shape_schema, shape_name or "", routine, arguments, kind=kind,
+            )
+            edges.append(DependencyEdge(
+                item.object_key, target, Relation.CALL, resolution, revision,
+                item.evidence_ids, reason,
+            ))
 
     grouped: dict[tuple[str | None, str], dict[str, SnapshotObject]] = defaultdict(dict)
     for item in snapshot:

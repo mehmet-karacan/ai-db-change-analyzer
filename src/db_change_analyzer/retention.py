@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -46,6 +47,7 @@ class RetentionManager:
                 if kind == "completed_export" and self._is_protected_export(resolved):
                     continue
                 candidates.append(CleanupCandidate(str(resolved), kind, resolved.stat().st_size))
+        candidates.extend(self._research_candidates(root))
         usage = shutil_disk_percent(root)
         return {
             "schema_version": 1,
@@ -56,6 +58,55 @@ class RetentionManager:
             "candidates": [asdict(candidate) for candidate in sorted(candidates, key=lambda item: item.path)],
             "applied": False,
         }
+
+    def _research_candidates(self, root: Path) -> list[CleanupCandidate]:
+        """Return complete, inactive journal generations as whole-tree candidates."""
+        research = self.store.paths.research
+        if not research.is_dir() or research.is_symlink():
+            return []
+        cutoff = self._cutoff(self.policy.receipt_days)
+        candidates: list[CleanupCandidate] = []
+        for run_directory in research.iterdir():
+            if run_directory.is_symlink() or not run_directory.is_dir():
+                continue
+            if self._is_protected_research(run_directory.name):
+                continue
+            for generation in run_directory.iterdir():
+                if generation.is_symlink() or not generation.is_dir() or generation.stat().st_mtime >= cutoff:
+                    continue
+                index = generation / "journal-index.json"
+                if index.is_symlink() or not index.is_file() or not self._safe_research_tree(generation, root):
+                    continue
+                candidates.append(CleanupCandidate(str(generation.resolve()), "old_research_journal", self._tree_bytes(generation)))
+        return candidates
+
+    @staticmethod
+    def _safe_research_tree(directory: Path, root: Path) -> bool:
+        try:
+            directory_resolved = directory.resolve(strict=True)
+        except OSError:
+            return False
+        if directory_resolved.parent.parent != (root / "research").resolve(strict=True):
+            return False
+        for path in directory.rglob("*"):
+            if path.is_symlink() or not path.is_file() or path.resolve(strict=True).parent != directory_resolved:
+                return False
+        return True
+
+    @staticmethod
+    def _tree_bytes(directory: Path) -> int:
+        return sum(path.stat().st_size for path in directory.rglob("*") if path.is_file())
+
+    def _is_protected_research(self, run_id: str) -> bool:
+        connection = self.store.connection()
+        try:
+            row = connection.execute(
+                "SELECT COUNT(*) FROM runs WHERE run_id=? AND status NOT IN ('BASELINED','NO_CHANGE','OUT_OF_SCOPE_ONLY','COMMITTED','CLOSED')",
+                (run_id,),
+            ).fetchone()
+            return bool(row[0])
+        finally:
+            connection.close()
 
     def _is_protected_export(self, path: Path) -> bool:
         connection = self.store.connection()
@@ -87,16 +138,27 @@ class RetentionManager:
                 raise StateError("cleanup candidate changed since planning")
             path = contained_path(root, original)
             area = {"completed_export": (self.store.paths.exports, self.policy.completed_report_days),
-                    "old_backup": (self.store.paths.backups, self.policy.backup_days)}.get(item.get("kind"))
+                    "old_backup": (self.store.paths.backups, self.policy.backup_days),
+                    "old_research_journal": (self.store.paths.research, self.policy.receipt_days)}.get(item.get("kind"))
             if area is None or area[0].is_symlink() or path.parent != area[0].resolve(strict=True):
-                raise StateError("cleanup candidate is outside its permitted area")
-            if not path.is_file() or path.stat().st_mtime >= self._cutoff(area[1]):
-                raise StateError("cleanup candidate changed since planning")
-            if path.stat().st_size != item["bytes"]:
-                raise StateError("cleanup candidate size changed since planning")
-            if item["kind"] == "completed_export" and self._is_protected_export(path):
-                raise StateError("cleanup export became protected")
-            path.unlink()
+                if item.get("kind") != "old_research_journal" or path.parent.parent != area[0].resolve(strict=True):
+                    raise StateError("cleanup candidate is outside its permitted area")
+            if item.get("kind") == "old_research_journal":
+                if not path.is_dir() or path.is_symlink() or not self._safe_research_tree(path, root):
+                    raise StateError("cleanup research journal changed since planning")
+                if path.stat().st_mtime >= self._cutoff(area[1]) or self._tree_bytes(path) != item["bytes"]:
+                    raise StateError("cleanup candidate changed since planning")
+                if self._is_protected_research(path.parent.name):
+                    raise StateError("cleanup research journal became protected")
+                shutil.rmtree(path)
+            else:
+                if not path.is_file() or path.stat().st_mtime >= self._cutoff(area[1]):
+                    raise StateError("cleanup candidate changed since planning")
+                if path.stat().st_size != item["bytes"]:
+                    raise StateError("cleanup candidate size changed since planning")
+                if item["kind"] == "completed_export" and self._is_protected_export(path):
+                    raise StateError("cleanup export became protected")
+                path.unlink()
             removed.append(str(path))
         return {**manifest, "applied": True, "removed": removed}
 

@@ -7,7 +7,7 @@ from db_change_analyzer.oracle.changes import compare_projections
 from db_change_analyzer.oracle.changes import Change, Value
 from db_change_analyzer.oracle.projections import project
 from db_change_analyzer.oracle.scanner import scan
-from db_change_analyzer.v5_adapter import _display_value, _fact, build_mail_view
+from db_change_analyzer.v5_adapter import _display_value, _fact, _recommended_checks, build_mail_view
 from db_change_analyzer.v5_rendering import build_render_manifest, render_v5_view
 
 
@@ -178,6 +178,20 @@ def test_editionable_value_is_visible_without_exposing_source_sql() -> None:
     displayed, limited = _display_value("common.object.editionable", Value("present", "NONEDITIONABLE", ("ev",)), [])
     assert displayed == {"state": "present", "value": "NONEDITIONABLE", "evidence_ids": ["ev"]}
     assert not limited
+
+
+def test_dynamic_sql_profile_is_display_safe_and_adds_a_bounded_check() -> None:
+    value, limited = _display_value(
+        "package_body.body_property.dynamic_sql_profile",
+        Value("present", "mode=expression,target=runtime,bind=yes,concat=yes,validation=not_observed,loop=yes", ("ev",)),
+        [],
+    )
+    assert value["value"] == "mode=expression,target=runtime,bind=yes,concat=yes,validation=not_observed,loop=yes"
+    assert not limited
+    checks = _recommended_checks(
+        "PACKAGE_BODY", "modified", {"package_body.body_property.dynamic_sql_profile"}, ["ev"],
+    )
+    assert any(item["code"] == "DYNAMIC_SQL_REVIEW" for item in checks)
 
 
 def test_source_digest_can_be_displayed_but_raw_source_text_is_redacted() -> None:

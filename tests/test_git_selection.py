@@ -146,3 +146,19 @@ def test_g20_tab_and_newline_path_roundtrips_as_raw_bytes(tmp_path: Path) -> Non
     raw = b":100644 100644 " + (b"a" * 40) + b" " + (b"b" * 40) + b" M\x00" + weird + b"\x00"
     delta = GitClient._parse_raw_delta(raw)
     assert delta[0].path == weird
+
+
+def test_batch_blob_read_returns_requested_content_and_reuses_cache(tmp_path: Path) -> None:
+    fixture = GitFixture(tmp_path / "source")
+    fixture.write("gpu_user/a.sql", "CREATE TABLE GPU_USER.A (ID NUMBER);\n")
+    fixture.write("gpu_user/b.sql", "CREATE TABLE GPU_USER.B (ID NUMBER);\n")
+    target = fixture.commit("base")
+    client, _ = fetched(tmp_path, fixture)
+    entries = {entry.path: entry for entry in client.list_tree(target)}
+    oids = [entries[b"gpu_user/a.sql"].oid, entries[b"gpu_user/b.sql"].oid]
+
+    blobs = client.read_blobs(oids, 1024)
+
+    assert blobs[oids[0]].startswith(b"CREATE TABLE")
+    assert blobs[oids[1]].endswith(b"\n")
+    assert client.read_blobs(list(reversed(oids)), 1024) == blobs

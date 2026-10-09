@@ -293,8 +293,15 @@
             "package_body.body_property.raise",
             "package_body.body_property.call_reference",
             "package_body.body_property.dynamic_sql",
+            "package_body.body_property.dynamic_sql_profile",
             "package_body.body_property.initialization",
-            "package_body.source.wrapped"
+            "package_body.source.wrapped",
+            "procedure.procedure_property.signature",
+            "procedure.procedure_property.transaction_statement",
+            "procedure.procedure_property.exception_handler",
+            "function.function_property.signature",
+            "function.function_property.transaction_statement",
+            "function.function_property.exception_handler"
           ]
         },
         "subject_name": {

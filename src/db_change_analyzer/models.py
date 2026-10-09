@@ -143,7 +143,7 @@ class DeterministicFact(StrictModel):
 
 
 class ResultRecord(StrictModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "2.0"] = "2.0"
     operation_id: str
     run_id: str | None
     report_id: str | None
@@ -162,6 +162,12 @@ class ResultRecord(StrictModel):
     current_build: dict[str, Any] | None
     emitted_files: list[str]
     error_code: str | None
+    delivery_mode: Literal["smtp_legacy", "jenkins_artifact"] = "smtp_legacy"
+    analysis_fingerprint: Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$")] = None
+    artifact_ready: bool = False
+    artifact_manifest_sha256: Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$")] = None
+    email_html_path: str | None = None
+    email_html_sha256: Annotated[str | None, Field(pattern=r"^[0-9a-f]{64}$")] = None
 
 
 class DeliveryRecipient(StrictModel):

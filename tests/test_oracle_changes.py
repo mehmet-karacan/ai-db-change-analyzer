@@ -192,6 +192,18 @@ def test_package_body_sql_statement_change_has_parser_backed_fact() -> None:
     assert statement.after.evidence_ids == ("ev-new",)
 
 
+def test_package_body_dynamic_sql_profile_is_bounded_and_safe_to_display() -> None:
+    old = _projection("CREATE PACKAGE BODY S.P AS PROCEDURE X IS BEGIN EXECUTE IMMEDIATE 'UPDATE S.T SET X = 1'; END X; END P; /")
+    new = _projection("CREATE PACKAGE BODY S.P AS PROCEDURE X IS BEGIN EXECUTE IMMEDIATE 'UPDATE ' || V_TABLE || ' SET X = :1' USING V_ID; END X; END P; /")
+    result = compare_projections(old, new, old_evidence_ids=("ev-old",), new_evidence_ids=("ev-new",))
+    profile = next(fact for fact in result.facts if fact.taxonomy_id == "package_body.body_property.dynamic_sql_profile")
+
+    assert profile.before.value == '["mode=literal,target=static,bind=no,concat=no,validation=not_applicable,loop=no"]'
+    assert profile.after.value == '["mode=expression,target=runtime,bind=yes,concat=yes,validation=not_observed,loop=no"]'
+    assert "EXECUTE" not in (profile.before.value or "")
+    assert "EXECUTE" not in (profile.after.value or "")
+
+
 def test_package_declaration_families_use_catalog_names() -> None:
     old = _projection("CREATE PACKAGE S.P AS C_LIMIT CONSTANT NUMBER := 10; V_COUNT NUMBER; END P; /")
     new = _projection("CREATE PACKAGE S.P AS C_LIMIT CONSTANT NUMBER := 20; V_COUNT VARCHAR2(30); END P; /")
@@ -209,6 +221,39 @@ def test_package_parameter_definition_retains_source_span() -> None:
     assert definitions
     assert {fact.before.value for fact in definitions if fact.before.value} == {"P_ID NUMBER"}
     assert {fact.after.value for fact in definitions if fact.after.value} == {"P_ID VARCHAR2"}
+
+
+def test_standalone_procedure_signature_change_has_contract_fact() -> None:
+    old = _projection("CREATE PROCEDURE S.RUN_JOB(P_ID NUMBER) IS BEGIN NULL; END RUN_JOB; /")
+    new = _projection("CREATE PROCEDURE S.RUN_JOB(P_ID NUMBER, P_LABEL VARCHAR2 DEFAULT 'x') IS BEGIN NULL; END RUN_JOB; /")
+    result = compare_projections(old, new, old_evidence_ids=("ev-old",), new_evidence_ids=("ev-new",))
+    signature = next(fact for fact in result.facts if fact.taxonomy_id == "procedure.procedure_property.signature")
+    assert signature.action == "modified"
+    assert "P_ID NUMBER" in (signature.before.value or "")
+    assert "P_LABEL VARCHAR2" in (signature.after.value or "")
+    assert signature.before.evidence_ids == ("ev-old",)
+    assert signature.after.evidence_ids == ("ev-new",)
+
+
+def test_standalone_procedure_exception_and_transaction_facts_stay_source_bound() -> None:
+    old = _projection("CREATE PROCEDURE S.RUN_JOB IS BEGIN NULL; END RUN_JOB; /")
+    new = _projection("CREATE PROCEDURE S.RUN_JOB IS BEGIN COMMIT; EXCEPTION WHEN OTHERS THEN ROLLBACK; END RUN_JOB; /")
+    result = compare_projections(old, new, old_evidence_ids=("ev-old",), new_evidence_ids=("ev-new",))
+    by_taxonomy = {fact.taxonomy_id: fact for fact in result.facts}
+    assert by_taxonomy["procedure.procedure_property.transaction_statement"].after.value == '["COMMIT","ROLLBACK"]'
+    assert by_taxonomy["procedure.procedure_property.exception_handler"].after.value is not None
+    assert by_taxonomy["procedure.procedure_property.transaction_statement"].after.evidence_ids == ("ev-new",)
+    assert by_taxonomy["procedure.procedure_property.exception_handler"].after.evidence_ids == ("ev-new",)
+
+
+def test_standalone_function_return_signature_change_has_contract_fact() -> None:
+    old = _projection("CREATE FUNCTION S.GET_VALUE(P_ID NUMBER) RETURN NUMBER IS BEGIN RETURN P_ID; END GET_VALUE; /")
+    new = _projection("CREATE FUNCTION S.GET_VALUE(P_ID NUMBER) RETURN VARCHAR2 IS BEGIN RETURN TO_CHAR(P_ID); END GET_VALUE; /")
+    result = compare_projections(old, new, old_evidence_ids=("ev-old",), new_evidence_ids=("ev-new",))
+    signature = next(fact for fact in result.facts if fact.taxonomy_id == "function.function_property.signature")
+    assert signature.action == "modified"
+    assert "RETURN NUMBER" in (signature.before.value or "")
+    assert "RETURN VARCHAR2" in (signature.after.value or "")
 
 
 def test_overload_signature_set_changes_without_inventing_member_pairings() -> None:

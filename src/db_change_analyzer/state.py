@@ -57,6 +57,7 @@ class ScopePaths:
     source: Path
     exports: Path
     backups: Path
+    research: Path
 
     @classmethod
     def from_config(cls, config: AppConfig) -> "ScopePaths":
@@ -72,6 +73,7 @@ class ScopePaths:
             source=scope / "source.git",
             exports=scope / "exports",
             backups=scope / "backups",
+            research=scope / "research",
         )
 
 
@@ -115,6 +117,7 @@ class SqliteStateStore:
         paths.source.mkdir(mode=0o700)
         paths.exports.mkdir(mode=0o700)
         paths.backups.mkdir(mode=0o700)
+        paths.research.mkdir(mode=0o700)
         connection = self._connect(create=True)
         try:
             migration = (Path(__file__).parent / "migrations" / "001_initial.sql").read_text(encoding="utf-8")
@@ -388,6 +391,47 @@ class SqliteStateStore:
     def connection(self) -> sqlite3.Connection:
         self.verify_markers()
         return self._connect()
+
+    def get_cache_entry(self, cache_key: str, *, kind: str, version_fingerprint: str) -> bytes | None:
+        """Read a verified optimization cache entry without using it as state."""
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                "SELECT validated_content, content_hash FROM cache_entries WHERE cache_key=? AND kind=? AND version_fingerprint=?",
+                (cache_key, kind, version_fingerprint),
+            ).fetchone()
+            if row is None:
+                return None
+            content = bytes(row["validated_content"])
+            if hashlib.sha256(content).hexdigest() != row["content_hash"]:
+                with connection:
+                    connection.execute("DELETE FROM cache_entries WHERE cache_key=?", (cache_key,))
+                return None
+            with connection:
+                connection.execute("UPDATE cache_entries SET accessed_at=? WHERE cache_key=?", (_now(), cache_key))
+            return content
+        finally:
+            connection.close()
+
+    def put_cache_entry(self, cache_key: str, content: bytes, *, kind: str, version_fingerprint: str) -> None:
+        """Persist a bounded, content-hashed optimization result."""
+        if len(content) > 1024 * 1024:
+            raise StateError("cache entry exceeds configured limit")
+        digest = hashlib.sha256(content).hexdigest()
+        now = _now()
+        connection = self._connect()
+        try:
+            with connection:
+                connection.execute(
+                    """INSERT INTO cache_entries(cache_key,kind,version_fingerprint,validated_content,content_hash,created_at,accessed_at)
+                       VALUES (?,?,?,?,?,?,?)
+                       ON CONFLICT(cache_key) DO UPDATE SET kind=excluded.kind,
+                       version_fingerprint=excluded.version_fingerprint,validated_content=excluded.validated_content,
+                       content_hash=excluded.content_hash,accessed_at=excluded.accessed_at""",
+                    (cache_key, kind, version_fingerprint, content, digest, now, now),
+                )
+        finally:
+            connection.close()
 
     def status(self) -> dict[str, Any]:
         base = self.verify()

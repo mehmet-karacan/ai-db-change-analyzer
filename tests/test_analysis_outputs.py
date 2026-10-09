@@ -34,7 +34,7 @@ def test_risk_and_deployment_outputs_are_conservative_and_bound_to_evidence() ->
     key = "SCHEMA|GPU_USER|TABLE|T"
     objects = [{
         "identity": {"object_key": key, "object_type": "TABLE", "raw_schema": "GPU_USER", "raw_name": "T", "schema_name": "GPU_USER", "name": "T"},
-        "net_operation": "modified", "status": "analyzed",
+        "net_operation": "modified", "status": "limited",
     }]
     changes = {key: ChangeSet(key, "TABLE", "modified", (_change("table.column.nullable", after="false", path=("ID",)),), (), ())}
 
@@ -47,3 +47,20 @@ def test_risk_and_deployment_outputs_are_conservative_and_bound_to_evidence() ->
     assert deployment["checks"][0]["code"] == "NULL_DATA_CHECK"
     assert deployment["checks"][0]["execution"] == "not_run"
     assert deployment["checks"][0]["evidence_ids"] == ["ev-new", "ev-old"]
+
+
+def test_removed_objects_keep_unknown_risk_when_no_live_context_exists() -> None:
+    key = "SCHEMA|GPU_USER|TABLE|REMOVED_T"
+    objects = [{
+        "identity": {"object_key": key, "object_type": "TABLE"},
+        "net_operation": "removed", "status": "analyzed",
+    }]
+    changes = {key: ChangeSet(key, "TABLE", "removed", (), (), ())}
+
+    risk = _risk_assessment(objects, changes, ())
+
+    assert risk["level"] == "unknown"
+    assert risk["basis"]["unknown"] == ["TABLE"]
+    assert risk["object_levels"][key] == {
+        "level": "unknown", "confidence": "unknown", "reason": "removed_or_unresolved_object",
+    }

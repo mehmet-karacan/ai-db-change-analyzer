@@ -7,6 +7,12 @@ Oracle DDL incelemesi: {{ report_date }}
 {{ summary_tr }}
 {{ coverage_display }}
 
+{% if show_risk_summary %}ETKİ VE RİSK
+Kaynak tabanlı risk: {{ risk_summary.label }} ({{ risk_summary.confidence_label }})
+Etki kapsamı: {{ impact_summary.status_label }}. {{ impact_summary.provided_count }} doğrulanmış aday / {{ impact_summary.candidate_count }} aday.
+{% for row in impact_summary.external_rows %}{{ row.label }}: {{ row.value }}
+{% endfor %}{% endif %}
+
 DEĞİŞEN NESNELER
 {% for obj in index_objects %}{{ obj.number }} {{ obj.type }} {{ obj.display_name }}: {{ obj.action.label }}{% if obj.limited %} (Ayrıntı sınırlı){% endif %}
 {% endfor %}{% if omitted_index %}{{ omitted_index }} nesne listede gösterilmedi.
@@ -15,6 +21,7 @@ DEĞİŞEN NESNELER
 {% for obj in detail_objects %}
 {{ obj.number }} {{ obj.type }}: {{ obj.display_name }}
 Durum: {{ obj.action.label }}
+Risk düzeyi: {{ obj.risk.label }}
 {{ obj.summary }}
 {% for fact in obj.rows %}
 Değişen alan: {{ fact.field }} ({{ fact.subject }})

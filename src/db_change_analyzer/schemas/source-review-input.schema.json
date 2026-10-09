@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "source-review-input/1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "synthetic", "report_id", "unit_id", "object_id", "source_pair", "object", "facts", "evidence_registry", "research_receipts", "allowed_claim_kinds", "allowed_finding_kinds", "allowed_categories", "execution", "input_digest"],
+  "properties": {
+    "schema_version": {"const": "source-review-input/1.0"},
+    "synthetic": {"const": false},
+    "report_id": {"type": "string", "minLength": 1, "maxLength": 120},
+    "unit_id": {"type": "string", "minLength": 1, "maxLength": 100},
+    "object_id": {"type": "string", "minLength": 1, "maxLength": 100},
+    "source_pair": {
+      "type": "object", "additionalProperties": false, "required": ["base_sha", "target_sha"],
+      "properties": {"base_sha": {"type": ["string", "null"], "maxLength": 40}, "target_sha": {"type": "string", "minLength": 40, "maxLength": 40}}
+    },
+    "object": {
+      "type": "object", "additionalProperties": false, "required": ["object_key", "object_type", "operation"],
+      "properties": {"object_key": {"type": "string", "minLength": 1, "maxLength": 300}, "object_type": {"type": "string", "minLength": 1, "maxLength": 80}, "operation": {"type": "string", "minLength": 1, "maxLength": 20}}
+    },
+    "facts": {"type": "array", "maxItems": 200, "items": {"type": "object"}},
+    "evidence_registry": {"type": "array", "maxItems": 128, "items": {"type": "object"}},
+    "research_receipts": {"type": "array", "maxItems": 32, "items": {"type": "object"}},
+    "allowed_claim_kinds": {"type": "array", "items": {"type": "string"}},
+    "allowed_finding_kinds": {"type": "array", "items": {"type": "string"}},
+    "allowed_categories": {"type": "array", "items": {"type": "string"}},
+    "execution": {"type": "object", "additionalProperties": false, "required": ["author_execution_id"], "properties": {"author_execution_id": {"const": "application-assigned-after-acceptance"}}},
+    "input_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

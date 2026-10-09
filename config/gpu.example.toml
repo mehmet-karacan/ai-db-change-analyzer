@@ -31,7 +31,7 @@ grammar_commit = "b434a051c56dcc2a5de0a0f2d86575ed192b59da"
 runtime_version = "4.13.2"
 max_file_bytes = 67108864
 max_parse_unit_bytes = 2097152
-worker_timeout_seconds = 20
+worker_timeout_seconds = 60
 worker_memory_mib = 1024
 
 [analysis]

@@ -3,10 +3,16 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "mail-view/2.0"
+      "enum": [
+        "mail-view/2.0",
+        "mail-view/3.0"
+      ]
     },
     "template_version": {
-      "const": "v5.0"
+      "enum": [
+        "v5.0",
+        "innova-db-report/1.0"
+      ]
     },
     "report_id": {
       "type": "string",
@@ -279,6 +285,64 @@
       "minItems": 0,
       "maxItems": 100000
     },
+    "impact_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["static_repository_evidence", "no_static_dependency_evidence", "not_reviewed"] },
+        "candidate_count": { "type": "integer", "minimum": 0 },
+        "provided_count": { "type": "integer", "minimum": 0 },
+        "external_sources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "oracle_metadata": { "type": "string", "enum": ["connected", "not_connected", "not_run"] },
+            "application_repositories": { "type": "string", "enum": ["connected", "not_connected", "not_run"] },
+            "jenkins_deployments": { "type": "string", "enum": ["connected", "not_connected", "not_run"] },
+            "runtime_usage": { "type": "string", "enum": ["connected", "not_connected", "not_run"] }
+          },
+          "required": ["oracle_metadata", "application_repositories", "jenkins_deployments", "runtime_usage"]
+        }
+      },
+      "required": ["status", "candidate_count", "provided_count", "external_sources"]
+    },
+    "risk_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": { "type": "string", "enum": ["critical", "high", "medium", "low", "unknown"] },
+        "method": { "const": "deterministic_source_rules" },
+        "confidence": { "type": "string", "enum": ["limited", "unknown"] },
+        "basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "critical": { "type": "array", "items": { "type": "string", "maxLength": 160 }, "maxItems": 1000 },
+            "high": { "type": "array", "items": { "type": "string", "maxLength": 160 }, "maxItems": 1000 },
+            "medium": { "type": "array", "items": { "type": "string", "maxLength": 160 }, "maxItems": 1000 },
+            "low": { "type": "array", "items": { "type": "string", "maxLength": 160 }, "maxItems": 1000 },
+            "unknown": { "type": "array", "items": { "type": "string", "maxLength": 160 }, "maxItems": 1000 },
+            "static_dependency_candidates": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["critical", "high", "medium", "low", "unknown", "static_dependency_candidates"]
+        },
+        "object_levels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "level": { "type": "string", "enum": ["critical", "high", "medium", "low", "unknown"] },
+              "confidence": { "type": "string", "enum": ["limited", "unknown"] },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 80 }
+            },
+            "required": ["level", "confidence", "reason"]
+          }
+        },
+        "limitations": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 600 }, "minItems": 1, "maxItems": 12 }
+      },
+      "required": ["level", "method", "confidence", "basis", "object_levels", "limitations"]
+    },
     "analysis": {
       "type": "object",
       "additionalProperties": false,
@@ -409,7 +473,7 @@
                       "maxLength": 300
                     },
                     "minItems": 0,
-                    "maxItems": 32
+                    "maxItems": 100000
                   },
                   "resolved_model_version": {
                     "anyOf": [
@@ -449,7 +513,7 @@
                       "pattern": "^[A-Za-z0-9._:-]{1,100}$"
                     },
                     "minItems": 0,
-                    "maxItems": 64,
+                    "maxItems": 100000,
                     "uniqueItems": true
                   }
                 },
@@ -463,7 +527,128 @@
                 ]
               },
               "minItems": 0,
-              "maxItems": 32
+              "maxItems": 100000
+            },
+            "executions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "execution_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{1,120}$"
+                  },
+                  "unit_id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+                  },
+                  "attempt": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "turn": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "generation": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "requested_route": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "requested_model": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "returned_model": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "completed_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "enum": [
+                      "accepted",
+                      "failed",
+                      "refused",
+                      "truncated",
+                      "not_run"
+                    ]
+                  },
+                  "policy_versions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "policy_fingerprint": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "response_schema": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "error_code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "execution_id",
+                  "unit_id",
+                  "attempt",
+                  "turn",
+                  "generation",
+                  "requested_route",
+                  "requested_model",
+                  "returned_model",
+                  "started_at",
+                  "completed_at",
+                  "status",
+                  "policy_versions",
+                  "policy_fingerprint",
+                  "response_schema",
+                  "error_code"
+                ]
+              },
+              "maxItems": 100000
             }
           },
           "required": [
@@ -505,7 +690,7 @@
     "analysis"
   ],
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AI DB Analyzer: sanitized deterministic Mail View 2.0 / approved V5",
+  "title": "Validated database change report view",
   "$defs": {
     "value": {
       "type": "object",
@@ -716,6 +901,7 @@
             "package_body.body_property.raise",
             "package_body.body_property.call_reference",
             "package_body.body_property.dynamic_sql",
+            "package_body.body_property.dynamic_sql_profile",
             "package_body.body_property.initialization",
             "package_body.source.wrapped",
             "trigger.trigger_property.target",
@@ -723,9 +909,15 @@
             "procedure.procedure_property.has_exception",
             "procedure.procedure_property.has_commit",
             "procedure.procedure_property.has_rollback",
+            "procedure.procedure_property.signature",
+            "procedure.procedure_property.transaction_statement",
+            "procedure.procedure_property.exception_handler",
             "function.function_property.has_exception",
             "function.function_property.has_commit",
             "function.function_property.has_rollback",
+            "function.function_property.signature",
+            "function.function_property.transaction_statement",
+            "function.function_property.exception_handler",
             "type.type_property.raw_definition",
             "type_body.type_property.raw_definition"
           ]
@@ -945,7 +1137,10 @@
           "uniqueItems": true
         },
         "origin": {
-          "const": "validated_ai"
+          "enum": [
+            "validated_ai",
+            "source_review"
+          ]
         },
         "gate": {
           "const": "accepted"
@@ -972,9 +1167,14 @@
           "type": "string",
           "enum": [
             "deterministic_rule",
+            "source_review_contract",
             "human_review",
             "synthetic_fixture"
           ]
+        },
+        "author_execution_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,120}$"
         }
       },
       "required": [
@@ -1095,6 +1295,16 @@
             "unknown",
             "unchanged"
           ]
+        },
+        "risk": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "level": { "type": "string", "enum": ["critical", "high", "medium", "low", "unknown"] },
+            "confidence": { "type": "string", "enum": ["limited", "unknown"] },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 80 }
+          },
+          "required": ["level", "confidence", "reason"]
         },
         "pattern": {
           "type": "string",

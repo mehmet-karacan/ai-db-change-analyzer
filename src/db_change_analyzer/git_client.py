@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -64,6 +65,21 @@ class GitClient:
         self.cache = cache.resolve()
         self.timeout_seconds = timeout_seconds
         self.allow_file_protocol = allow_file_protocol
+        self._blob_cache: OrderedDict[str, bytes] = OrderedDict()
+        self._blob_cache_bytes = 0
+        self._blob_cache_limit = 128 * 1024 * 1024
+
+    def _cache_blob(self, oid: str, data: bytes) -> None:
+        previous = self._blob_cache.pop(oid, None)
+        if previous is not None:
+            self._blob_cache_bytes -= len(previous)
+        if len(data) > self._blob_cache_limit:
+            return
+        self._blob_cache[oid] = data
+        self._blob_cache_bytes += len(data)
+        while self._blob_cache and self._blob_cache_bytes > self._blob_cache_limit:
+            _, evicted = self._blob_cache.popitem(last=False)
+            self._blob_cache_bytes -= len(evicted)
 
     def _environment(self, extra: dict[str, str] | None = None) -> dict[str, str]:
         allowed = ("SYSTEMROOT", "WINDIR", "TEMP", "TMP", "LANG", "LC_ALL")
@@ -236,6 +252,40 @@ class GitClient:
         author, committer = value.rstrip(b"\n").split(b"\x00", 1)
         return author.decode("ascii"), committer.decode("ascii")
 
+    def commit_metadata(self, oid: str) -> dict[str, str | list[str]]:
+        """Return bounded, immutable metadata for one already-resolved commit."""
+        value = self._run(["-C", str(self.cache), "show", "-s", "--format=%H%x00%P%x00%aI%x00%cI%x00%s", self.validate_oid(oid)]).stdout
+        fields = value.rstrip(b"\n").split(b"\x00", 4)
+        if len(fields) != 5:
+            raise GitError("HISTORY_PARSE", "commit metadata could not be parsed")
+        commit, parents, author_at, committer_at, subject = fields
+        return {
+            "commit": commit.decode("ascii"),
+            "parents": parents.decode("ascii").split() if parents else [],
+            "author_at": author_at.decode("ascii"),
+            "committer_at": committer_at.decode("ascii"),
+            "subject": subject.decode("utf-8", errors="replace")[:500],
+        }
+
+    def history(self, oid: str, maximum: int, path: str | None = None) -> list[dict[str, str | list[str]]]:
+        """Return commit metadata in reverse chronological order for a safe path."""
+        oid = self.validate_oid(oid)
+        args = ["-C", str(self.cache), "log", "--format=%H%x00%P%x00%aI%x00%cI%x00%s%x00", f"--max-count={maximum}", oid]
+        if path is not None:
+            args.extend(["--", path])
+        raw = self._run(args).stdout
+        fields = raw.split(b"\x00")
+        rows: list[dict[str, str | list[str]]] = []
+        for index in range(0, len(fields) - 1, 5):
+            commit, parents, author_at, committer_at, subject = fields[index:index + 5]
+            commit = commit.strip()
+            if not commit:
+                continue
+            rows.append({"commit": commit.decode("ascii"), "parents": parents.decode("ascii").split(),
+                         "author_at": author_at.decode("ascii"), "committer_at": committer_at.decode("ascii"),
+                         "subject": subject.decode("utf-8", errors="replace")[:500]})
+        return rows
+
     @staticmethod
     def _parse_raw_delta(data: bytes) -> list[RawDelta]:
         fields = data.split(b"\x00")
@@ -299,10 +349,75 @@ class GitClient:
     def read_blob(self, oid: str, maximum: int) -> bytes:
         if not OID.fullmatch(oid):
             raise GitError("INVALID_OID", "blob ID must be full")
+        cached = self._blob_cache.get(oid)
+        if cached is not None:
+            if len(cached) > maximum:
+                raise GitError("BLOB_TOO_LARGE", "blob exceeds configured limit")
+            self._blob_cache.move_to_end(oid)
+            return cached
         size = int(self._run(["-C", str(self.cache), "cat-file", "-s", oid], limit=1024).stdout)
         if size > maximum:
             raise GitError("BLOB_TOO_LARGE", "blob exceeds configured limit")
         data = self._run(["-C", str(self.cache), "cat-file", "blob", oid], limit=maximum + 1).stdout
         if len(data) != size:
             raise GitError("BLOB_SIZE_MISMATCH", "blob read was incomplete")
+        self._cache_blob(oid, data)
         return data
+
+    def read_blobs(self, oids: list[str], maximum: int) -> dict[str, bytes]:
+        """Read immutable blobs through one bounded ``cat-file --batch`` call."""
+        unique = list(dict.fromkeys(oids))
+        for oid in unique:
+            if not OID.fullmatch(oid):
+                raise GitError("INVALID_OID", "blob ID must be full")
+        result: dict[str, bytes] = {}
+        missing: list[str] = []
+        for oid in unique:
+            cached = self._blob_cache.get(oid)
+            if cached is None:
+                missing.append(oid)
+            elif len(cached) > maximum:
+                raise GitError("BLOB_TOO_LARGE", "blob exceeds configured limit")
+            else:
+                self._blob_cache.move_to_end(oid)
+                result[oid] = cached
+        if not missing:
+            return result
+        input_bytes = b"".join(oid.encode("ascii") + b"\n" for oid in missing)
+        # Keep one batch bounded even when max_file_bytes is large. Callers can
+        # fall back to individual reads for an oversized batch.
+        output_limit = min(
+            128 * 1024 * 1024,
+            sum(maximum + len(oid) + 64 for oid in missing),
+        )
+        output = self._run(
+            ["-C", str(self.cache), "cat-file", "--batch"],
+            input_bytes=input_bytes,
+            limit=output_limit,
+        ).stdout
+        position = 0
+        for expected in missing:
+            line_end = output.find(b"\n", position)
+            if line_end < 0:
+                raise GitError("BLOB_BATCH_PARSE", "missing cat-file batch header")
+            header = output[position:line_end].split(b" ")
+            position = line_end + 1
+            if len(header) != 3 or header[0].decode("ascii", errors="ignore") != expected:
+                raise GitError("BLOB_BATCH_PARSE", "unexpected cat-file batch header")
+            kind = header[1].decode("ascii", errors="ignore")
+            if kind != "blob":
+                raise GitError("BLOB_BATCH_TYPE", "cat-file batch returned a non-blob object")
+            try:
+                size = int(header[2])
+            except ValueError as exc:
+                raise GitError("BLOB_BATCH_PARSE", "invalid cat-file batch size") from exc
+            if size > maximum or position + size >= len(output):
+                raise GitError("BLOB_TOO_LARGE", "blob exceeds configured limit")
+            data = output[position:position + size]
+            position += size
+            if position >= len(output) or output[position:position + 1] != b"\n":
+                raise GitError("BLOB_BATCH_PARSE", "cat-file batch data terminator missing")
+            position += 1
+            self._cache_blob(expected, data)
+            result[expected] = data
+        return result

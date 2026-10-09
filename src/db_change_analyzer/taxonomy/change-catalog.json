@@ -2955,6 +2955,28 @@
       ]
     },
     {
+      "id": "package_body.body_property.dynamic_sql_profile",
+      "object_types": [
+        "PACKAGE_BODY"
+      ],
+      "component": "BODY_PROPERTY",
+      "property_key": "dynamic_sql_profile",
+      "label_tr": "Dinamik SQL kullanım profili",
+      "change_kind": "BODY_SOURCE_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "security",
+      "evidence_basis": "structured_or_bounded_clause",
+      "implementation_status": "implemented_source_only",
+      "fallback": "Retain source difference and show only bounded mode/target/bind/concat profile.",
+      "notes_tr": "Profil kaynak metninden sınırlı çıkarılır; runtime hedef çözümlemesi veya injection sonucu değildir.",
+      "source_refs": [
+        "O6",
+        "O7"
+      ]
+    },
+    {
       "id": "package_body.body_property.initialization",
       "object_types": [
         "PACKAGE_BODY"
@@ -3103,6 +3125,138 @@
       "implementation_status": "implemented",
       "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
       "notes_tr": "Git kaynak projection'ı ile sınırlıdır; canlı çalışma davranışı değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "procedure.procedure_property.signature",
+      "object_types": [
+        "PROCEDURE"
+      ],
+      "component": "PROCEDURE_PROPERTY",
+      "property_key": "signature",
+      "label_tr": "Procedure imzası",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Parametre ve dönüş sözleşmesi kaynak imzasıyla sınırlı karşılaştırılır; overload/runtime binding değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "function.function_property.signature",
+      "object_types": [
+        "FUNCTION"
+      ],
+      "component": "FUNCTION_PROPERTY",
+      "property_key": "signature",
+      "label_tr": "Function imzası",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "contract",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference and mark limited fields when extraction is incomplete.",
+      "notes_tr": "Parametre ve dönüş sözleşmesi kaynak imzasıyla sınırlı karşılaştırılır; overload/runtime binding değildir.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "procedure.procedure_property.transaction_statement",
+      "object_types": [
+        "PROCEDURE"
+      ],
+      "component": "PROCEDURE_PROPERTY",
+      "property_key": "transaction_statement",
+      "label_tr": "Procedure transaction ifadeleri",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "transaction",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference; do not infer commit visibility or rollback safety from source alone.",
+      "notes_tr": "Kaynakta görülen transaction ifadeleridir; çalışma zamanı transaction sonucunu kanıtlamaz.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "procedure.procedure_property.exception_handler",
+      "object_types": [
+        "PROCEDURE"
+      ],
+      "component": "PROCEDURE_PROPERTY",
+      "property_key": "exception_handler",
+      "label_tr": "Procedure exception handler",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "exception",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference; absence of a handler is not itself a defect.",
+      "notes_tr": "Caller propagationı ve WHEN OTHERS davranışı ayrıca kaynak bağlamı ister.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "function.function_property.transaction_statement",
+      "object_types": [
+        "FUNCTION"
+      ],
+      "component": "FUNCTION_PROPERTY",
+      "property_key": "transaction_statement",
+      "label_tr": "Function transaction ifadeleri",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "transaction",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference; do not infer commit visibility or rollback safety from source alone.",
+      "notes_tr": "Kaynakta görülen transaction ifadeleridir; çalışma zamanı transaction sonucunu kanıtlamaz.",
+      "source_refs": [
+        "O1",
+        "O7"
+      ]
+    },
+    {
+      "id": "function.function_property.exception_handler",
+      "object_types": [
+        "FUNCTION"
+      ],
+      "component": "FUNCTION_PROPERTY",
+      "property_key": "exception_handler",
+      "label_tr": "Function exception handler",
+      "change_kind": "OBJECT_PROPERTY_CHANGED",
+      "allowed_change_actions": [
+        "modified"
+      ],
+      "category": "exception",
+      "evidence_basis": "bounded_source_projection",
+      "implementation_status": "implemented",
+      "fallback": "Retain verified source difference; absence of a handler is not itself a defect.",
+      "notes_tr": "Caller propagationı ve WHEN OTHERS davranışı ayrıca kaynak bağlamı ister.",
       "source_refs": [
         "O1",
         "O7"

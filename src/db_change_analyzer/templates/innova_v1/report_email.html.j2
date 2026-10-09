@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="tr" dir="ltr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>İnnova · Veritabanı değişiklik özeti</title>
+<style>
+body{margin:0;padding:0}table{mso-table-lspace:0pt;mso-table-rspace:0pt}td{word-wrap:break-word}
+@media only screen and (max-width:600px){
+.pad{padding-left:20px!important;padding-right:20px!important}
+.outer{padding:0!important}.container{width:100%!important}
+.hero-title{font-size:30px!important;line-height:35px!important}.hide-mobile{display:none!important}
+}
+</style>
+</head>
+<body style="margin:0;background:#EDF2F6;font-family:Arial,Helvetica,sans-serif;color:#303B46;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;">{{ preheader }}</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
+<tr><td class="outer" style="padding:32px 12px;">
+<!--[if mso]><table role="presentation" width="720" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="container" align="center" style="width:100%;border-collapse:collapse;max-width:720px;background:#FFFFFF;text-align:left;">
+
+<tr><td class="pad" style="padding:10px 32px;background:#171C22;color:#FFFFFF;font-size:10px;line-height:16px;letter-spacing:1px;font-weight:bold;">
+{% if synthetic %}TASARIM ÖNİZLEMESİ &nbsp;•&nbsp; GERÇEK SNAPSHOT VERİSİ{% else %}GERÇEK SNAPSHOT VERİSİ &nbsp;•&nbsp; GİT KARŞILAŞTIRMASI{% endif %}
+</td></tr>
+
+<tr><td style="padding:33px 32px 32px;">
+<img src="{{ logo_src }}" width="160" alt="İnnova" style="display:block;border:0;width:160px;height:auto;"/>
+</td></tr>
+
+<tr><td class="pad" style="padding:0 32px 26px;border-bottom:4px solid #ED3340;">
+<p style="margin:0 0 10px;font-size:11px;line-height:19px;color:#B32430;font-weight:bold;">GPU &nbsp;/&nbsp; VERİTABANI</p>
+<h1 class="hero-title" style="margin:0 0 15px;font-size:36px;line-height:41px;letter-spacing:-.8px;color:#171C22;">Veritabanı<br/>değişiklik özeti</h1>
+<p style="margin:0 0 23px;font-size:15px;line-height:23px;color:#67717D;font-weight:normal;">{{ summary_tr }}</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr>
+<td><p style="margin:0;font-size:10px;line-height:18px;color:#67717D;font-weight:normal;">KARŞILAŞTIRMA</p><p style="margin:0;font-size:12px;line-height:20px;color:#303B46;font-weight:bold;">{{ comparison_rows[2].value }} → {{ comparison_rows[3].value }}</p></td>
+<td align="right"><p style="margin:0;font-size:10px;line-height:18px;color:#67717D;font-weight:normal;">KAPSAM</p><p style="margin:0;font-size:12px;line-height:20px;color:#303B46;font-weight:bold;">{{ coverage_display }}</p></td>
+</tr></table>
+</td></tr>
+
+<tr><td class="pad" style="padding:26px 32px;border-top:1px solid #E0E4E9;">
+<p style="margin:0 0 6px;font-size:10px;line-height:18px;color:#B32430;font-weight:bold;">01 / YÖNETİCİ ÖZETİ</p>
+<h2 style="margin:0 0 16px;font-size:23px;line-height:29px;color:#171C22;">Kısa özet</h2>
+<p style="margin:0 0 18px;font-size:15px;line-height:23px;color:#303B46;font-weight:normal;">{{ summary_tr }}</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr><td style="padding:16px 18px;background:#F3F6F8;border-left:3px solid #8095A6;">
+<p style="margin:0 0 6px;font-size:10px;line-height:18px;color:#536674;font-weight:bold;">İŞ ETKİSİ</p>
+<p style="margin:0;font-size:14px;line-height:22px;color:#303B46;font-weight:normal;">
+{% if show_risk_summary %}{{ impact_summary.status_label }}. {{ impact_summary.provided_count }} doğrulanmış aday / {{ impact_summary.candidate_count }} aday. Canlı veritabanı ve çalışma zamanı kullanımı doğrulanmadı.
+{% else %}Bu rapor Git snapshot kaynaklarıyla sınırlıdır. Canlı veritabanına uygulanmış sonuç, veri hacmi ve çalışma zamanı kullanımı bu dosyalardan doğrulanamaz.
+{% endif %}
+</p></td></tr></table>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr>
+<td width="33%" align="center" style="padding:19px 8px 0;"><p style="margin:0;font-size:32px;line-height:40px;color:#087C64;font-weight:bold;">{{ counts.added }}</p><p style="margin:2px 0 0;font-size:10px;line-height:18px;color:#67717D;font-weight:bold;">EKLENEN</p></td>
+<td width="33%" align="center" style="padding:19px 8px 0;"><p style="margin:0;font-size:32px;line-height:40px;color:#1A63A8;font-weight:bold;">{{ counts.modified }}</p><p style="margin:2px 0 0;font-size:10px;line-height:18px;color:#67717D;font-weight:bold;">GÜNCELLENEN</p></td>
+<td width="33%" align="center" style="padding:19px 8px 0;"><p style="margin:0;font-size:32px;line-height:40px;color:#596574;font-weight:bold;">{{ counts.removed }}</p><p style="margin:2px 0 0;font-size:10px;line-height:18px;color:#67717D;font-weight:bold;">SİLİNEN</p></td>
+</tr></table>
+</td></tr>
+
+<tr><td class="pad" style="padding:26px 32px;border-top:1px solid #E0E4E9;">
+<p style="margin:0 0 6px;font-size:10px;line-height:18px;color:#B32430;font-weight:bold;">02 / DEĞİŞİKLİKLER</p>
+<h2 style="margin:0 0 16px;font-size:23px;line-height:29px;color:#171C22;">Nesne bazında özet</h2>
+{% if index_objects %}
+{% for obj in index_objects %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
+<tr><td style="vertical-align:top;"><div style="border-left:4px solid {{ obj.action.fg }};padding-left:12px;">
+<p style="margin:0;font-size:12px;line-height:20px;color:{{ obj.action.fg }};font-weight:bold;">{{ obj.action.symbol }} &nbsp;{{ obj.action.label|upper }}</p>
+<p style="margin:0;font-size:10px;line-height:18px;color:#67717D;font-weight:normal;">{{ obj.type_label|upper }}{% if obj.limited %} · AYRINTI SINIRLI{% endif %}</p>
+</div></td>
+<td width="100" align="right" style="vertical-align:top;"><p style="margin:0 0 4px;font-size:9px;line-height:17px;color:#67717D;font-weight:normal;">RİSK DÜZEYİ</p><span style="display:inline-block;font-size:10px;line-height:16px;font-weight:bold;padding:5px 8px;color:{{ obj.risk.fg }};background:{{ obj.risk.bg }};">{{ obj.risk.label }}</span></td>
+</tr></table>
+<p class="wrap" style="margin:16px 0 7px;font-size:16px;line-height:24px;color:#171C22;font-weight:bold;">{{ obj.display_name }}</p>
+<p style="margin:0 0 9px;font-size:13px;line-height:21px;color:#303B46;font-weight:normal;">{{ obj.summary }}</p>
+{% for row in obj.rows %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr><td style="padding:12px 0;border-top:1px solid #E0E4E9;">
+<p class="wrap" style="margin:0 0 4px;font-size:13px;line-height:21px;color:#171C22;font-weight:bold;">{{ row.field }}</p>
+<p class="wrap" style="margin:0;font-size:12px;line-height:20px;color:#67717D;font-weight:normal;">{{ row.change }} &nbsp;<span style="color:#67717D;">{{ row.before }}</span> &nbsp;→&nbsp; <strong style="color:#1A63A8;">{{ row.after }}</strong></p>
+</td></tr></table>
+{% endfor %}
+{% for comment in obj.comments %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr><td style="padding:12px 0;border-top:1px solid #E0E4E9;">
+<p style="margin:0 0 4px;font-size:10px;line-height:18px;color:#67717D;font-weight:bold;">{{ comment.label|upper }}</p>
+<p style="margin:0;font-size:13px;line-height:21px;color:#303B46;font-weight:normal;">{{ comment.text }}</p>
+{% if comment.author_execution_id %}<p style="margin:5px 0 0;font-size:10px;line-height:18px;color:#67717D;">Model yürütme kaydı: {{ comment.author_execution_id }}</p>{% endif %}
+</td></tr></table>
+{% endfor %}
+{% for check in obj.checks %}<p style="margin:9px 0 0;font-size:12px;line-height:20px;color:#67717D;font-weight:normal;"><strong>Kontrol:</strong> {{ check }}</p>{% endfor %}
+{% endfor %}
+{% else %}<p style="margin:0;font-size:13px;line-height:21px;color:#67717D;">Bu karşılaştırmada raporlanabilir nesne değişikliği bulunmadı.</p>{% endif %}
+{% if omitted_index %}<p style="margin:12px 0 0;font-size:11px;line-height:19px;color:#67717D;">{{ omitted_index }} nesne özet görünümünde yer almadı; tam kayıt arşivlenen rapordadır.</p>{% endif %}
+</td></tr>
+
+<span style="display:none;max-height:0;overflow:hidden;">03 / ETKİ VE KONTROL</span>
+{% if show_risk_summary %}
+<tr><td class="pad" style="padding:26px 32px;border-top:1px solid #E0E4E9;">
+<p style="margin:0 0 6px;font-size:10px;line-height:18px;color:#B32430;font-weight:bold;">03 / ETKİ VE KONTROL</p>
+<h2 style="margin:0 0 16px;font-size:23px;line-height:29px;color:#171C22;">Bağlamı doğrulamak yeterli</h2>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr><td style="padding:12px 14px;background:{{ risk_summary.bg }};border-left:3px solid {{ risk_summary.fg }};"><p style="margin:0 0 4px;font-size:10px;line-height:18px;color:{{ risk_summary.fg }};font-weight:bold;">KAYNAK TABANLI RİSK SINIFI</p><span style="display:inline-block;font-size:10px;line-height:16px;font-weight:bold;padding:5px 8px;color:{{ risk_summary.fg }};background:{{ risk_summary.bg }};">{{ risk_summary.label }}</span></td></tr></table>
+<p style="margin:0 0 12px;font-size:13px;line-height:21px;color:#303B46;font-weight:normal;"><strong>Değerlendirme:</strong> {{ risk_summary.label }} risk sınıfı, kaynak farkı kurallarına göre belirlenmiştir. {{ risk_summary.confidence_label }}.</p>
+<p style="margin:0 0 12px;font-size:13px;line-height:21px;color:#303B46;font-weight:normal;"><strong>Önerilen kontrol:</strong> {% for row in impact_summary.external_rows %}{{ row.label }}: {{ row.value }}. {% endfor %}</p>
+{% for note in risk_summary.limitations %}<p style="margin:7px 0 0;font-size:12px;line-height:20px;color:#67717D;">{{ note }}</p>{% endfor %}
+</td></tr>
+{% endif %}
+
+<span style="display:none;max-height:0;overflow:hidden;">04 / KAPSAM</span>
+{% if artifact_notices or coverage_notes %}
+<tr><td class="pad" style="padding:20px 32px;background:#F4F7F9;border-top:1px solid #E0E4E9;">
+{% for notice in artifact_notices %}<p class="wrap" style="margin:5px 0;font-size:11px;line-height:19px;color:#67717D;"><strong>{{ notice.path_display }}:</strong> {{ notice.detail_tr }}</p>{% endfor %}
+{% for note in coverage_notes %}<p style="margin:5px 0;font-size:11px;line-height:19px;color:#67717D;">{{ note }}</p>{% endfor %}
+</td></tr>
+{% endif %}
+
+<tr><td class="pad" style="padding:20px 32px;background:#F4F7F9;border-top:1px solid #E0E4E9;">
+{% for row in ledger_rows %}<p class="wrap" style="margin:5px 0;font-size:11px;line-height:19px;color:#67717D;font-weight:normal;"><strong style="color:#303B46;">{{ row.label }}:</strong> {{ row.value }}</p>{% endfor %}
+{% for row in comparison_rows %}{% if loop.index <= 2 %}<p class="wrap" style="margin:5px 0;font-size:11px;line-height:19px;color:#67717D;font-weight:normal;"><strong style="color:#303B46;">{{ row.label }}:</strong> {{ row.value }}</p>{% endif %}{% endfor %}
+<p style="margin:5px 0 0;font-size:11px;line-height:19px;color:#67717D;font-weight:normal;"><strong>Analiz:</strong> {% if synthetic %}Tasarım önizlemesi ve sentetik test verisi.{% else %}Git snapshot kaynak farklarıyla sınırlı analiz; canlı veritabanı doğrulaması değildir.{% endif %}</p>
+</td></tr>
+
+{% if synthetic %}
+<tr><td class="pad" style="padding:26px 32px;border-top:1px solid #E0E4E9;">
+<p style="margin:0 0 6px;font-size:10px;line-height:18px;color:#B32430;font-weight:bold;">AYRI GÖSTERİM / TEST VERİSİ</p>
+<h2 style="margin:0 0 16px;font-size:23px;line-height:29px;color:#171C22;">Bileşen örnekleri</h2>
+<p style="margin:0;font-size:12px;line-height:20px;color:#67717D;font-weight:normal;">Bu bölüm yalnızca tasarım ve test verisi içindir; gerçek snapshot bulgularına dahil değildir.</p>
+</td></tr>
+{% endif %}
+
+<tr><td class="pad" style="padding:22px 32px;background:#F4F7F9;border-top:1px solid #E0E4E9;">
+<p style="margin:0 0 8px;font-size:12px;line-height:20px;color:#171C22;font-weight:bold;">İnnova · Veritabanı değişiklik raporu</p>
+<p style="margin:0;font-size:10px;line-height:18px;color:#67717D;font-weight:normal;">Kurumsal kimlik uygulaması. Tablo tabanlı e-posta tasarımı; logo gönderimde gömülü CID görseli olarak hazırlanmıştır.</p>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr></table>
+</body>
+</html>
+

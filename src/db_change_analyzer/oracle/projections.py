@@ -6,7 +6,7 @@ from typing import Any
 
 from .ddl_tokens import code_tokens
 from .index import extract_index
-from .package import extract_package
+from .package import extract_package, extract_standalone_routine
 from .scanner import ScanOccurrence
 from .sequence import extract_sequence_options
 from .table import extract_table
@@ -70,9 +70,21 @@ def project(occurrence: ScanOccurrence, fragment: str, *, parse_ok: bool) -> Pro
         target = re.search(r"(?is)\bON\s+(\"[^\"]+\"|[A-Z][A-Z0-9_$#.]*)", fragment)
         properties["target"] = target.group(1) if target else None
     elif occurrence.object_type in {"PROCEDURE", "FUNCTION"}:
-        properties["has_exception"] = bool(re.search(r"(?i)\bEXCEPTION\b", fragment))
-        properties["has_commit"] = bool(re.search(r"(?i)\bCOMMIT\b", fragment))
-        properties["has_rollback"] = bool(re.search(r"(?i)\bROLLBACK\b", fragment))
+        extracted = extract_standalone_routine(fragment, occurrence.object_type)
+        if extracted.routines:
+            routine = extracted.routines[0]
+            properties["routine_signature"] = (routine.signature,)
+            properties["transaction_statements"] = routine.transactions
+            properties["exception_handlers"] = routine.exception_handlers
+            properties["has_exception"] = bool(routine.exception_handlers)
+            properties["has_commit"] = any(value.upper().startswith("COMMIT") for value in routine.transactions)
+            properties["has_rollback"] = any(value.upper().startswith("ROLLBACK") for value in routine.transactions)
+        else:
+            properties["has_exception"] = bool(re.search(r"(?i)\bEXCEPTION\b", fragment))
+            properties["has_commit"] = bool(re.search(r"(?i)\bCOMMIT\b", fragment))
+            properties["has_rollback"] = bool(re.search(r"(?i)\bROLLBACK\b", fragment))
+            properties["transaction_statements"] = ()
+            properties["exception_handlers"] = ()
     else:
         properties["raw_clause"] = fragment.strip()
     return Projection(occurrence.object_key, occurrence.object_type, properties, support)

@@ -120,6 +120,33 @@ def finalize_auto_delivery(connection: sqlite3.Connection, notification_id: str,
     )
 
 
+def finalize_artifact_checkpoint(connection: sqlite3.Connection, report_id: str, scope_hash: str) -> None:
+    """Advance an AUTO checkpoint after the immutable artifact is durable."""
+    row = connection.execute(
+        """SELECT r.run_id,r.mode,r.status,r.scope_hash,r.epoch,r.base_sha,r.target_sha,p.quality
+           FROM reports p JOIN runs r ON r.run_id=p.run_id WHERE p.report_id=?""",
+        (report_id,),
+    ).fetchone()
+    if row is None:
+        raise StateError("artifact report is not linked to a run")
+    if row["scope_hash"] != scope_hash or row["mode"] != "AUTO" or row["status"] != "REPORTED":
+        return
+    if row["quality"] == "blocked":
+        connection.execute("UPDATE runs SET status='REVIEW_REQUIRED' WHERE run_id=?", (row["run_id"],))
+        return
+    cursor = connection.execute(
+        "UPDATE scopes SET checkpoint_sha=? WHERE scope_hash=? AND epoch=? AND checkpoint_sha IS ?",
+        (row["target_sha"], scope_hash, row["epoch"], row["base_sha"]),
+    )
+    if cursor.rowcount != 1:
+        raise StateError("checkpoint compare-and-swap failed during artifact commit")
+    connection.execute("UPDATE runs SET status='COMMITTED' WHERE run_id=?", (row["run_id"],))
+    connection.execute(
+        "INSERT INTO audit_events(scope_hash,run_id,action,actor,expected_base,target,created_at) VALUES (?,?,'ARTIFACT_CHECKPOINT_ADVANCED','system',?,?,?)",
+        (scope_hash, row["run_id"], row["base_sha"], row["target_sha"], _now()),
+    )
+
+
 def send_persisted_notification(
     connection: sqlite3.Connection,
     notification_id: str,

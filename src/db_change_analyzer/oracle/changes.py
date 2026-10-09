@@ -138,6 +138,8 @@ def _flatten(projection: Projection) -> dict[tuple[str, tuple[str, ...]], str | 
                 _field(fields, "package_body.body_property.transaction_statement", path, routine.transactions)
                 _field(fields, "package_body.body_property.exception_handler", path, routine.exception_handlers)
                 _field(fields, "package_body.body_property.dynamic_sql", path, routine.dynamic_sql)
+                _field(fields, "package_body.body_property.dynamic_sql_profile", path,
+                       tuple(profile.as_text() for profile in routine.dynamic_sql_profiles))
                 for taxonomy_key, values in (
                     ("sql_statement", routine.sql_statements),
                     ("condition", routine.conditions),
@@ -165,6 +167,9 @@ def _flatten(projection: Projection) -> dict[tuple[str, tuple[str, ...]], str | 
         _field(fields, "trigger.trigger_property.enabled_state", (), properties.get("enabled_state"))
     elif kind in {"PROCEDURE", "FUNCTION"}:
         prefix = kind.lower()
+        _field(fields, f"{prefix}.{prefix}_property.signature", (), properties.get("routine_signature"))
+        _field(fields, f"{prefix}.{prefix}_property.transaction_statement", (), properties.get("transaction_statements"))
+        _field(fields, f"{prefix}.{prefix}_property.exception_handler", (), properties.get("exception_handlers"))
         for property_key in ("has_exception", "has_commit", "has_rollback"):
             _field(fields, f"{prefix}.{prefix}_property.{property_key}", (), properties.get(property_key))
     elif kind in {"TYPE", "TYPE_BODY"}:

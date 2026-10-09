@@ -85,7 +85,60 @@ def test_fact_evidence_side_cannot_be_swapped() -> None:
         _render(view)
 
 
-@pytest.mark.parametrize("count", [0, 1, 7, 120, 1000])
+def test_combined_unknown_and_history_only_objects_render_with_explicit_limits() -> None:
+    view = deepcopy(_view("03-sequence-only.view.json"))
+    original_object = view["objects"][0]
+    original_evidence = view["evidence_registry"]
+
+    def unique(value: object, old: str, new: str) -> object:
+        return json.loads(json.dumps(value, ensure_ascii=False).replace(old, new))
+
+    unknown = unique(original_object, "obj-004", "obj-unknown")
+    unknown = unique(unknown, "ev-004", "ev-unknown")
+    unknown = unique(unknown, "fact-004", "fact-unknown")
+    unknown["identity"]["name"] = "UNKNOWN_OBJECT"
+    unknown["operation"] = "unknown"
+    unknown["pattern"] = "unknown"
+    unknown["verification"] = "unresolved"
+    unknown["facts"][0]["taxonomy_id"] = "common.source.text"
+    unknown["facts"][0]["subject_name"] = "Kaynak metni"
+    unknown["facts"][0]["subject_kind"] = "SOURCE"
+    unknown["facts"][0]["change_action"] = "modified"
+    for side in ("before", "after"):
+        unknown["facts"][0][side] = {"state": "unknown", "value": None, "evidence_ids": ["ev-unknown-scope"]}
+    unknown["evidence_ids"] = ["ev-unknown-scope"]
+    unknown["deterministic_summary_tr"] = "Nesne durumu doğrulanamadı."
+    unknown["source_checks"] = {"identity_match": "uncertain", "presence_comparison": "uncertain", "start_with_only_proved": False, "remainder_equal": False, "conflict_detected": False}
+
+    history = unique(original_object, "obj-004", "obj-history")
+    history = unique(history, "ev-004", "ev-history")
+    history = unique(history, "fact-004", "fact-history")
+    history["identity"]["name"] = "HISTORY_ONLY"
+    history["operation"] = "added"
+    history["verification"] = "limited"
+    history["facts"][0]["change_action"] = "added"
+    history["facts"][0]["context_only"] = True
+    history["deterministic_summary_tr"] = "Yalnız tarihsel bağlam kaydıdır."
+
+    scope_evidence = unique(original_evidence[2], "ev-004-scope", "ev-unknown-scope")
+    scope_evidence["object_id"] = "obj-unknown"
+    view["objects"] = [unknown, history]
+    view["evidence_registry"] = [scope_evidence, *unique(original_evidence[:2], "ev-004", "ev-history")]
+    view["evidence_registry"].extend(unique(item, "ev-004", "ev-history") for item in original_evidence)
+    view["evidence_registry"] = [item for index, item in enumerate(view["evidence_registry"]) if item["evidence_id"] not in {previous["evidence_id"] for previous in view["evidence_registry"][:index]}]
+    for item in view["evidence_registry"]:
+        if item["evidence_id"].startswith("ev-history"):
+            item["object_id"] = "obj-history"
+    view["changed_files"] = 2
+
+    rendered = _render(view)
+    html = rendered.html.decode("utf-8")
+    assert "UNKNOWN_OBJECT" in html and "HISTORY_ONLY" in html
+    assert "Doğrulanamadı" in html
+    assert "tarihsel" in html.lower()
+
+
+@pytest.mark.parametrize("count", [0, 1, 40, 41, 100, 120, 1000])
 def test_scale_profiles_keep_totals_and_only_live_detail_links(count: int) -> None:
     original = _view("03-sequence-only.view.json")
     view = deepcopy(original)

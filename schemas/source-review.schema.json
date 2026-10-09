@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "source-review/1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "unit_id", "input_digest", "explanations", "findings", "conclusion", "limitations", "unfinished_research"],
+  "properties": {
+    "schema_version": {"const": "source-review/1.0"},
+    "unit_id": {"type": "string", "minLength": 1, "maxLength": 100},
+    "input_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "explanations": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/explanation"}},
+    "findings": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/finding"}},
+    "conclusion": {"enum": ["no_finding", "findings", "insufficient_context", "not_applicable"]},
+    "limitations": {"type": "array", "maxItems": 20, "items": {"type": "string"}},
+    "unfinished_research": {"type": "array", "maxItems": 20, "items": {"type": "string"}}
+  },
+  "$defs": {
+    "explanation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["explanation_id", "kind", "text_tr", "evidence_ids", "author_execution_id"],
+      "properties": {
+        "explanation_id": {"type": "string", "minLength": 1, "maxLength": 100},
+        "kind": {"enum": ["change", "impact", "limitation"]},
+        "text_tr": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "evidence_ids": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "string"}}
+      }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["finding_id", "kind", "category", "title_tr", "detail_tr", "severity", "basis", "evidence_ids", "verification_steps", "execution", "author_execution_id"],
+      "properties": {
+        "finding_id": {"type": "string", "minLength": 1, "maxLength": 120},
+        "kind": {"enum": ["impact", "issue", "improvement"]},
+        "category": {"enum": ["correctness", "error_handling", "transaction", "performance", "security", "maintainability"]},
+        "title_tr": {"type": "string", "minLength": 1, "maxLength": 300},
+        "detail_tr": {"type": "string", "minLength": 1, "maxLength": 2400},
+        "severity": {"enum": ["info", "low", "medium", "high", "critical", "unknown"]},
+        "basis": {"enum": ["source_observation", "source_backed_inference", "hypothesis"]},
+        "evidence_ids": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "string"}},
+        "verification_steps": {"type": "array", "maxItems": 12, "items": {"type": "string"}},
+        "execution": {"const": "not_run"}
+      }
+    }
+  }
+}

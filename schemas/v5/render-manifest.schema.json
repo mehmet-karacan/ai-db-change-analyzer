@@ -1,11 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Immutable V5 render binding",
+  "title": "Immutable database change render binding",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "render-manifest/1.0"
+      "enum": [
+        "render-manifest/1.0",
+        "render-manifest/2.0"
+      ]
     },
     "report_id": {
       "type": "string",
@@ -38,7 +41,10 @@
       "pattern": "^[0-9a-f]{64}$"
     },
     "template_version": {
-      "const": "v5.0"
+      "enum": [
+        "v5.0",
+        "innova-db-report/1.0"
+      ]
     },
     "taxonomy_version": {
       "const": "oracle-taxonomy/1.0"
@@ -96,6 +102,14 @@
       "minimum": 0
     },
     "ai_objects_displayed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "email_html_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "email_html_bytes": {
       "type": "integer",
       "minimum": 0
     }

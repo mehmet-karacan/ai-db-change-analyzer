@@ -39,6 +39,176 @@ def test_old_reverse_consumers_and_new_neighbors_are_both_selected() -> None:
     assert {edge["context_side"] for edge in selected.dependency_edges} >= {"old_reverse", "new_reverse"}
 
 
+def test_repaired_caller_remains_history_only_when_target_has_no_reference() -> None:
+    target = obj("SCHEMA|APP|TABLE|T", "TABLE", "CREATE TABLE t(id NUMBER)")
+    replacement = obj("SCHEMA|APP|TABLE|U", "TABLE", "CREATE TABLE u(id NUMBER)")
+    old_caller = obj("SCHEMA|APP|VIEW|OLD_V", "VIEW", "CREATE VIEW old_v AS SELECT * FROM t")
+    repaired_caller = obj("SCHEMA|APP|VIEW|NEW_V", "VIEW", "CREATE VIEW new_v AS SELECT * FROM u")
+    old = build_dependency_graph("c" * 40, [target, old_caller])
+    new = build_dependency_graph("d" * 40, [target, replacement, repaired_caller])
+    selected = select_dependency_context(
+        [target.object_key], old, new,
+        {
+            (old.revision, old_caller.object_key): {"evidence_id": "old"},
+            (new.revision, repaired_caller.object_key): {"evidence_id": "new"},
+        },
+    )
+    old_edges = [edge for edge in selected.dependency_edges if edge["from_object"] == old_caller.object_key]
+    assert old_edges and {edge["context_side"] for edge in old_edges} == {"old_reverse"}
+    assert not any(edge["context_side"] == "new_reverse" for edge in selected.dependency_edges)
+
+
+def test_multiple_callers_keep_old_and_current_reverse_context_separate() -> None:
+    target = obj("SCHEMA|APP|TABLE|T", "TABLE", "CREATE TABLE t(id NUMBER)")
+    replacement = obj("SCHEMA|APP|TABLE|U", "TABLE", "CREATE TABLE u(id NUMBER)")
+    repaired = obj("SCHEMA|APP|VIEW|REPAIRED", "VIEW", "CREATE VIEW repaired AS SELECT * FROM u")
+    still_using = obj("SCHEMA|APP|VIEW|STILL_USING", "VIEW", "CREATE VIEW still_using AS SELECT * FROM t")
+    old = build_dependency_graph("e" * 40, [target, obj("SCHEMA|APP|VIEW|REPAIRED", "VIEW", "CREATE VIEW repaired AS SELECT * FROM t"), still_using])
+    new = build_dependency_graph("f" * 40, [target, replacement, repaired, still_using])
+    selected = select_dependency_context(
+        [target.object_key], old, new,
+        {
+            (old.revision, "SCHEMA|APP|VIEW|REPAIRED"): {"evidence_id": "repaired-old"},
+            (old.revision, still_using.object_key): {"evidence_id": "still-old"},
+            (new.revision, repaired.object_key): {"evidence_id": "repaired-new"},
+            (new.revision, still_using.object_key): {"evidence_id": "still-new"},
+        },
+    )
+    repaired_edges = [edge for edge in selected.dependency_edges if edge["from_object"].endswith("|REPAIRED")]
+    still_edges = [edge for edge in selected.dependency_edges if edge["from_object"] == still_using.object_key]
+    assert {edge["context_side"] for edge in repaired_edges} == {"old_reverse"}
+    assert {edge["context_side"] for edge in still_edges} == {"old_reverse", "new_reverse"}
+
+
+def test_qualified_package_calls_are_candidate_edges_without_overload_claim() -> None:
+    package_spec = obj("SCHEMA|APP|PACKAGE_SPEC|P", "PACKAGE_SPEC", "CREATE PACKAGE P AS PROCEDURE RUN(P_ID NUMBER); END P;")
+    package_body = obj("SCHEMA|APP|PACKAGE_BODY|P", "PACKAGE_BODY", "CREATE PACKAGE BODY P AS BEGIN NULL; END P;")
+    caller = obj(
+        "SCHEMA|APP|PROCEDURE|CALLER", "PROCEDURE",
+        "CREATE PROCEDURE CALLER IS BEGIN APP.P.RUN(1); DBMS_OUTPUT.PUT_LINE('ignored'); END;",
+    )
+    graph = build_dependency_graph("4" * 40, [package_spec, package_body, caller])
+    calls = [edge for edge in graph.edges if edge.relation == Relation.CALL]
+    assert len(calls) == 2
+    package_calls = [edge for edge in calls if edge.resolution == Resolution.CANDIDATE]
+    assert len(package_calls) == 1
+    assert package_spec.object_key in package_calls[0].to_candidate
+    assert package_body.object_key in package_calls[0].to_candidate
+    assert package_calls[0].reason.endswith("binding=arity_name_compatible_type_unresolved")
+    assert any(edge.resolution == Resolution.UNRESOLVED and edge.to_candidate == "APP.DBMS_OUTPUT" for edge in calls)
+
+
+def test_package_call_binding_keeps_named_defaults_and_incompatible_arity_distinct() -> None:
+    package_spec = obj(
+        "SCHEMA|APP|PACKAGE_SPEC|P", "PACKAGE_SPEC",
+        "CREATE PACKAGE P AS PROCEDURE RUN(P_ID NUMBER, P_LABEL VARCHAR2 DEFAULT 'x'); END P;",
+    )
+    caller = obj(
+        "SCHEMA|APP|PROCEDURE|CALLER", "PROCEDURE",
+        "CREATE PROCEDURE CALLER IS BEGIN APP.P.RUN(P_ID => 1); APP.P.RUN(1, 2, 3); END;",
+    )
+    graph = build_dependency_graph("6" * 40, [package_spec, caller])
+    reasons = [edge.reason for edge in graph.edges if edge.relation == Relation.CALL]
+    assert any(reason.endswith("binding=arity_name_compatible_type_unresolved") for reason in reasons)
+    assert any(reason.endswith("binding=incompatible_arity_or_names") for reason in reasons)
+
+
+def test_overloaded_package_call_remains_an_overload_candidate() -> None:
+    package_spec = obj(
+        "SCHEMA|APP|PACKAGE_SPEC|P", "PACKAGE_SPEC",
+        "CREATE PACKAGE P AS PROCEDURE RUN(P_ID NUMBER); PROCEDURE RUN(P_ID VARCHAR2); END P;",
+    )
+    caller = obj("SCHEMA|APP|PROCEDURE|CALLER", "PROCEDURE", "CREATE PROCEDURE CALLER IS BEGIN APP.P.RUN(1); END;")
+    graph = build_dependency_graph("7" * 40, [package_spec, caller])
+    calls = [edge for edge in graph.edges if edge.relation == Relation.CALL]
+    assert len(calls) == 1
+    assert calls[0].reason.endswith("binding=overload_candidate")
+
+
+def test_candidate_package_call_is_available_in_reverse_impact_context() -> None:
+    package_spec = obj("SCHEMA|APP|PACKAGE_SPEC|P", "PACKAGE_SPEC", "CREATE PACKAGE P AS PROCEDURE RUN; END P;")
+    package_body = obj("SCHEMA|APP|PACKAGE_BODY|P", "PACKAGE_BODY", "CREATE PACKAGE BODY P AS BEGIN NULL; END P;")
+    caller = obj("SCHEMA|APP|PROCEDURE|CALLER", "PROCEDURE", "CREATE PROCEDURE CALLER IS BEGIN APP.P.RUN(); END;")
+    graph = build_dependency_graph("5" * 40, [package_spec, package_body, caller])
+    selected = select_dependency_context(
+        [package_spec.object_key], graph, graph,
+        {(graph.revision, caller.object_key): {"evidence_id": "caller-evidence"}},
+    )
+    assert any(
+        edge["relation"] == Relation.CALL.value
+        and edge["resolution"] == Resolution.CANDIDATE.value
+        and edge["from_object"] == caller.object_key
+        and edge["context_side"] == "new_reverse"
+        for edge in selected.dependency_edges
+    )
+
+
+def test_schema_qualified_standalone_routine_is_a_static_call_target() -> None:
+    routine = obj(
+        "SCHEMA|APP|PROCEDURE|RUN_JOB", "PROCEDURE",
+        "CREATE PROCEDURE run_job(p_id NUMBER) IS BEGIN NULL; END;",
+    )
+    caller = obj(
+        "SCHEMA|APP|PROCEDURE|CALLER", "PROCEDURE",
+        "CREATE PROCEDURE caller IS BEGIN APP.RUN_JOB(1); END;",
+    )
+    graph = build_dependency_graph("8" * 40, [routine, caller])
+    calls = [edge for edge in graph.edges if edge.relation == Relation.CALL]
+    assert len(calls) == 1
+    assert calls[0].to_candidate == routine.object_key
+    assert calls[0].resolution == Resolution.RESOLVED_STATIC
+    assert calls[0].reason == "standalone routine call candidate; binding=arity_name_compatible_type_unresolved"
+
+
+def test_standalone_routine_binding_distinguishes_optional_and_incompatible_arguments() -> None:
+    routine = obj(
+        "SCHEMA|APP|PROCEDURE|RUN_JOB", "PROCEDURE",
+        "CREATE PROCEDURE run_job(p_id NUMBER, p_label VARCHAR2 DEFAULT 'x') IS BEGIN NULL; END;",
+    )
+    caller = obj(
+        "SCHEMA|APP|PROCEDURE|CALLER", "PROCEDURE",
+        "CREATE PROCEDURE caller IS BEGIN APP.RUN_JOB(1); APP.RUN_JOB(1, 2, 3); END;",
+    )
+    graph = build_dependency_graph("9" * 40, [routine, caller])
+    reasons = [edge.reason for edge in graph.edges if edge.relation == Relation.CALL]
+    assert any(reason.endswith("binding=arity_name_compatible_type_unresolved") for reason in reasons)
+    assert any(reason.endswith("binding=incompatible_arity_or_names") for reason in reasons)
+
+
+def test_local_package_call_is_kept_as_a_package_candidate_without_builtin_noise() -> None:
+    package_spec = obj(
+        "SCHEMA|APP|PACKAGE_SPEC|P", "PACKAGE_SPEC",
+        "CREATE PACKAGE P AS PROCEDURE HELPER; END P;",
+    )
+    package_body = obj(
+        "SCHEMA|APP|PACKAGE_BODY|P", "PACKAGE_BODY",
+        "CREATE PACKAGE BODY P AS PROCEDURE CALLER IS BEGIN HELPER; DBMS_OUTPUT.PUT_LINE('x'); END CALLER; END P;",
+    )
+    graph = build_dependency_graph("a" * 40, [package_spec, package_body])
+    calls = [edge for edge in graph.edges if edge.relation == Relation.CALL and "local routine" in edge.reason]
+    assert len(calls) == 1
+    assert calls[0].resolution == Resolution.CANDIDATE
+    assert package_spec.object_key in calls[0].to_candidate
+    assert package_body.object_key in calls[0].to_candidate
+    assert calls[0].reason.endswith("binding=arity_name_compatible_type_unresolved")
+
+
+def test_unqualified_standalone_call_resolves_only_known_repository_routine() -> None:
+    target = obj(
+        "SCHEMA|APP|PROCEDURE|RUN_JOB", "PROCEDURE",
+        "CREATE PROCEDURE RUN_JOB(P_ID NUMBER) IS BEGIN NULL; END RUN_JOB;",
+    )
+    caller = obj(
+        "SCHEMA|APP|PROCEDURE|CALLER", "PROCEDURE",
+        "CREATE PROCEDURE CALLER IS BEGIN RUN_JOB(1); DBMS_OUTPUT.PUT_LINE('x'); END CALLER;",
+    )
+    graph = build_dependency_graph("b" * 40, [target, caller])
+    calls = [edge for edge in graph.edges if edge.relation == Relation.CALL and edge.to_candidate == target.object_key]
+    assert len(calls) == 1
+    assert calls[0].to_candidate == target.object_key
+    assert calls[0].resolution == Resolution.RESOLVED_STATIC
+
+
 def test_synonym_resolution_has_cycle_and_hop_boundaries() -> None:
     a = obj("SCHEMA|APP|SYNONYM|A", "SYNONYM", "CREATE SYNONYM a FOR app.b")
     b = obj("SCHEMA|APP|SYNONYM|B", "SYNONYM", "CREATE SYNONYM b FOR app.a")

@@ -178,15 +178,28 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
     for number, obj in enumerate(ordered, 1):
         identity = obj["identity"]
         action = _TOKENS["actions"].get(obj["operation"], {"label": "Doğrulanamadı", "symbol": "?", "fg": "#5F5954", "bg": "#F3EEE7"})
+        object_risk = obj.get("risk") or {"level": "unknown", "confidence": "unknown", "reason": "insufficient_context"}
+        object_risk_tokens = {
+            "critical": ("KRİTİK", "#FFFFFF", "#8F1D2C"),
+            "high": ("YÜKSEK", "#FFFFFF", "#A62C24"),
+            "medium": ("ORTA", "#805A0D", "#FFF0CD"),
+            "low": ("DÜŞÜK", "#2F6B4F", "#EAF5EE"),
+            "unknown": ("BİLGİ", "#536674", "#EEF2F5"),
+        }
+        risk_label, risk_fg, risk_bg = object_risk_tokens.get(object_risk.get("level"), object_risk_tokens["unknown"])
+        risk_badge = {
+            "title": "RİSK DÜZEYİ", "label": risk_label, "fg": risk_fg, "bg": risk_bg,
+            "level": object_risk.get("level", "unknown"),
+        }
         facts = [fact for fact in obj["facts"] if fact["change_action"] != "unchanged" or fact["context_only"]]
-        comments = [{"label": {"summary": "AI Yorumu", "interpretation": "AI Yorumu", "uncertainty": "AI Belirsizlik Notu", "recommended_check": "AI Kontrol Önerisi"}[comment["kind"]], "text": comment["text_tr"]} for comment in obj["ai_comments"]]
+        comments = [{"label": {"summary": "AI Yorumu", "interpretation": "AI Yorumu", "uncertainty": "AI Belirsizlik Notu", "recommended_check": "AI Kontrol Önerisi"}[comment["kind"]], "text": comment["text_tr"], "author_execution_id": comment.get("author_execution_id")} for comment in obj["ai_comments"]]
         limited = obj["verification"] != "verified"
         method = "Deterministik kaynak karşılaştırması + AI destekli yorum." if comments else "Kaynak farkı doğrulandı; ayrıntılı ayrıştırma sınırlı, AI yorumu gösterilmedi." if limited else "Deterministik kaynak karşılaştırması; AI yorumu kullanılmadı."
         transformed.append({
             "number": f"{number:02d}", "anchor": "nesne-" + obj["object_id"],
             "type": identity["object_type"], "type_label": _TYPES.get(identity["object_type"], {}).get("label_tr", "Desteklenmeyen / çözümlenemeyen tür"),
             "display_name": ((identity["schema_name"] + ".") if identity["schema_name"] else "") + identity["name"],
-            "action": action, "summary": obj["deterministic_summary_tr"], "limited": limited, "renderer": _route(obj),
+            "action": action, "risk": risk_badge, "summary": obj["deterministic_summary_tr"], "limited": limited, "renderer": _route(obj),
             "rows": [{"field": fact["subject_name"], "subject": fact["subject_kind"], "change": _change_label(fact), "before": _value(fact, "before"), "after": _value(fact, "after")} for fact in facts[:max_facts]],
             "omitted_facts": max(0, len(facts) - max_facts), "comments": comments,
             "checks": [check["text_tr"] for check in obj["recommended_checks"]], "notes": obj["limitations_tr"], "method": method,
@@ -247,6 +260,48 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
         ("Repository", source["repository"]), ("Dal", source["branch"]), ("Önceki snapshot", source["base_label"]),
         ("Yeni snapshot", source["target_label"]), ("Karşılaştırma görünümü", source["comparison_mode"]), ("Rapor kimliği", view["report_id"]),
     )]
+    impact = view.get("impact_analysis", {
+        "status": "not_reviewed", "candidate_count": 0, "provided_count": 0,
+        "external_sources": {name: "not_run" for name in ("oracle_metadata", "application_repositories", "jenkins_deployments", "runtime_usage")},
+    })
+    risk = view.get("risk_assessment", {
+        "level": "unknown", "confidence": "unknown", "method": "deterministic_source_rules",
+        "basis": {level: [] for level in ("critical", "high", "medium", "low", "unknown")},
+        "limitations": ["Canlı veritabanı ve çalışma zamanı kullanımı doğrulanmadı."],
+    })
+    risk_tokens = {
+        "critical": ("Kritik", "#8F1D2C", "#FBE8EC"), "high": ("Yüksek", "#A44A16", "#FFF0E5"),
+        "medium": ("Orta", "#8A6500", "#FFF7D6"), "low": ("Düşük", "#2F6B4F", "#EAF5EE"),
+        "unknown": ("Belirsiz", "#596574", "#F3F6F8"),
+    }
+    risk_label, risk_fg, risk_bg = risk_tokens.get(risk.get("level"), risk_tokens["unknown"])
+    confidence_label = {"limited": "Sınırlı güven", "unknown": "Güven doğrulanmadı"}.get(risk.get("confidence"), "Güven doğrulanmadı")
+    impact_status_label = {
+        "static_repository_evidence": "Repository içi statik kanıt bulundu",
+        "no_static_dependency_evidence": "Repository içi statik bağımlılık kanıtı bulunmadı",
+        "not_reviewed": "Etki analizi kaydı bulunmuyor",
+    }.get(impact.get("status"), "Etki analizi doğrulanmadı")
+    source_labels = {
+        "oracle_metadata": "Oracle metadata", "application_repositories": "Uygulama repository'leri",
+        "jenkins_deployments": "Jenkins deployment geçmişi", "runtime_usage": "Çalışma zamanı kullanımı",
+    }
+    source_status_labels = {"connected": "Bağlı", "not_connected": "Bağlı değil", "not_run": "Çalıştırılmadı"}
+    impact_summary = {
+        "status_label": impact_status_label, "candidate_count": impact.get("candidate_count", 0),
+        "provided_count": impact.get("provided_count", 0),
+        "external_rows": [{"label": label, "value": source_status_labels.get(impact.get("external_sources", {}).get(key), "Çalıştırılmadı")}
+                          for key, label in source_labels.items()],
+    }
+    risk_summary = {
+        "label": risk_label, "level": risk.get("level", "unknown"), "fg": risk_fg, "bg": risk_bg,
+        "confidence_label": confidence_label, "method": "Kaynak farkı ve repository içi statik kurallar",
+        "basis_rows": [{"label": label, "count": len(risk.get("basis", {}).get(key, []))}
+                       for key, label in (("critical", "Kritik sınıflandırılan nesne"), ("high", "Yüksek sınıflandırılan nesne"),
+                                          ("medium", "Orta sınıflandırılan nesne"), ("low", "Düşük sınıflandırılan nesne"),
+                                          ("unknown", "Belirsiz sınıflandırılan nesne"))],
+        "static_dependency_candidates": risk.get("basis", {}).get("static_dependency_candidates", 0),
+        "limitations": risk.get("limitations", []),
+    }
     return {
         "counts": counts, "headline": headline, "summary_tr": summary,
         "preheader": f"{counts['primary_total']} nesne kaynak farkı. {summary}",
@@ -257,7 +312,8 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
         "ledger_rows": ledger, "comparison_rows": comparison,
         "artifact_notices": view["artifact_notices"], "coverage_notes": coverage["limitations_tr"],
         "critical_notes": [obj["display_name"] + ": " + obj["summary"] for index, obj in enumerate(transformed) if obj["limited"] and index not in detail_slots][:4],
-        "report_url": report_url,
+        "report_url": report_url, "impact_summary": impact_summary, "risk_summary": risk_summary,
+        "show_risk_summary": profile[0] != "minimal",
     }
 
 

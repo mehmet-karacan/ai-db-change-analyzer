@@ -10,6 +10,7 @@ from antlr4.atn.PredictionMode import PredictionMode
 from .generated.PlSqlLexer import PlSqlLexer
 from .generated.PlSqlParser import PlSqlParser
 from .ddl_tokens import code_tokens
+from .dynamic_sql import DynamicSqlProfile, classify_dynamic_sql
 from .parser_worker import CollectingErrorListener
 
 
@@ -37,6 +38,7 @@ class Routine:
     transactions: tuple[str, ...]
     exception_handlers: tuple[str, ...]
     dynamic_sql: tuple[str, ...]
+    dynamic_sql_profiles: tuple[DynamicSqlProfile, ...]
     sql_statements: tuple[str, ...]
     conditions: tuple[str, ...]
     assignments: tuple[str, ...]
@@ -79,6 +81,17 @@ def _walk_current_routine(context: ParserRuleContext):
         yield from _walk_current_routine(child)
 
 
+def _walk_current_routine_with_parents(context: ParserRuleContext, parents: tuple[ParserRuleContext, ...] = ()):
+    """Yield nodes with bounded ancestry while excluding nested routines."""
+    yield context, parents
+    for child in context.getChildren():
+        if not isinstance(child, ParserRuleContext):
+            continue
+        if child is not context and isinstance(child, (PlSqlParser.Procedure_bodyContext, PlSqlParser.Function_bodyContext)):
+            continue
+        yield from _walk_current_routine_with_parents(child, (*parents, context))
+
+
 def _parse(source: str) -> ParserRuleContext | None:
     for mode in (PredictionMode.SLL, PredictionMode.LL):
         lexer = PlSqlLexer(InputStream(source))
@@ -113,8 +126,11 @@ def _parameters(source: str, context: ParserRuleContext) -> tuple[Parameter, ...
 
 
 def _routine(source: str, context: ParserRuleContext, *, body: bool) -> Routine:
-    kind = "FUNCTION" if isinstance(context, (PlSqlParser.Function_specContext, PlSqlParser.Function_bodyContext)) else "PROCEDURE"
-    name = _span(source, context.identifier()) or ""
+    kind = "FUNCTION" if isinstance(context, (PlSqlParser.Function_specContext, PlSqlParser.Function_bodyContext, PlSqlParser.Create_function_bodyContext)) else "PROCEDURE"
+    identifier_context = getattr(context, "identifier", lambda: None)()
+    if identifier_context is None:
+        identifier_context = getattr(context, "procedure_name", lambda: None)() if kind == "PROCEDURE" else getattr(context, "function_name", lambda: None)()
+    name = _span(source, identifier_context) or ""
     parameters = _parameters(source, context)
     return_type = _span(source, context.type_spec()) if kind == "FUNCTION" else None
     declaration_end = context.body().start.start if body and context.body() is not None else context.stop.stop + 1
@@ -128,14 +144,20 @@ def _routine(source: str, context: ParserRuleContext, *, body: bool) -> Routine:
     control_flow: list[str] = []
     raises: list[str] = []
     call_references: list[str] = []
+    dynamic_sql_profiles: list[DynamicSqlProfile] = []
     if body:
-        for child in _walk_current_routine(context):
+        for child, parents in _walk_current_routine_with_parents(context):
             if isinstance(child, (PlSqlParser.Commit_statementContext, PlSqlParser.Rollback_statementContext, PlSqlParser.Savepoint_statementContext)):
                 transactions.append(_span(source, child) or "")
             elif isinstance(child, PlSqlParser.Exception_handlerContext):
                 exceptions.append(_span(source, child) or "")
             elif isinstance(child, PlSqlParser.Execute_immediateContext):
-                dynamic_sql.append(_span(source, child) or "")
+                statement = _span(source, child) or ""
+                dynamic_sql.append(statement)
+                dynamic_sql_profiles.append(classify_dynamic_sql(
+                    statement,
+                    loop=any(isinstance(parent, PlSqlParser.Loop_statementContext) for parent in parents),
+                ))
             elif isinstance(child, PlSqlParser.Sql_statementContext) and child.data_manipulation_language_statements() is not None:
                 sql_statements.append(_span(source, child) or "")
             elif isinstance(child, PlSqlParser.If_statementContext):
@@ -161,7 +183,8 @@ def _routine(source: str, context: ParserRuleContext, *, body: bool) -> Routine:
         parameters=parameters, source=_span(source, context) or "",
         start_line=context.start.line, end_line=context.stop.line,
         transactions=tuple(transactions), exception_handlers=tuple(exceptions),
-        dynamic_sql=tuple(dynamic_sql), sql_statements=tuple(sql_statements),
+        dynamic_sql=tuple(dynamic_sql), dynamic_sql_profiles=tuple(dynamic_sql_profiles),
+        sql_statements=tuple(sql_statements),
         conditions=tuple(conditions), assignments=tuple(assignments),
         control_flow=tuple(control_flow), raises=tuple(raises),
         call_references=tuple(call_references),
@@ -220,6 +243,34 @@ def extract_package(source: str, object_type: str) -> PackageExtraction:
         diagnostics.append("NESTED_ROUTINE_LIMITED")
     initialization = _span(source, package.seq_of_statements()) if object_type == "PACKAGE_BODY" else None
     return PackageExtraction(object_type, authid, tuple(routines), {key: tuple(value) for key, value in declarations.items()}, tuple(diagnostics), initialization)
+
+
+def extract_standalone_routine(source: str, object_type: str) -> PackageExtraction:
+    """Parse one standalone procedure/function with the bounded routine model."""
+    if object_type not in {"PROCEDURE", "FUNCTION"}:
+        raise ValueError("Not a standalone routine object")
+    if len(source.encode("utf-8")) > 128_000:
+        return PackageExtraction(object_type, None, (), {}, ("PACKAGE_EXTRACTION_SIZE_LIMIT",))
+    if "WRAPPED" in {token.text.upper() for token in _visible_tokens(source)}:
+        return PackageExtraction(object_type, None, (), {}, ("WRAPPED_SOURCE_OPAQUE",))
+    root = _parse(source)
+    if root is None:
+        return PackageExtraction(object_type, None, (), {}, ("PACKAGE_PARSE_UNRESOLVED",))
+    expected = PlSqlParser.Create_procedure_bodyContext if object_type == "PROCEDURE" else PlSqlParser.Create_function_bodyContext
+    matches = [context for context in _walk(root) if isinstance(context, expected)]
+    if len(matches) != 1:
+        return PackageExtraction(object_type, None, (), {}, ("PACKAGE_IDENTITY_UNRESOLVED",))
+    context = matches[0]
+    invoker_context = getattr(context, "invoker_rights_clause", lambda: None)()
+    if isinstance(invoker_context, (list, tuple)):
+        invoker_context = invoker_context[0] if invoker_context else None
+    return PackageExtraction(
+        object_type,
+        _span(source, invoker_context),
+        (_routine(source, context, body=True),),
+        {},
+        (),
+    )
 
 
 def _visible_tokens(source: str):

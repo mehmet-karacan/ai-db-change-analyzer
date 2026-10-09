@@ -1,4 +1,4 @@
-from db_change_analyzer.oracle.package import extract_package
+from db_change_analyzer.oracle.package import extract_package, extract_standalone_routine
 
 
 def test_package_spec_public_signature_and_overload_limit() -> None:
@@ -15,6 +15,34 @@ def test_package_spec_public_signature_and_overload_limit() -> None:
     assert package.routines[0].parameters[1].nocopy
     assert package.routines[1].return_type == "VARCHAR2"
     assert "OVERLOAD_PAIRING_REQUIRES_REVIEW" in package.diagnostics
+
+
+def test_standalone_routine_reuses_bounded_signature_and_body_facts() -> None:
+    source = """CREATE OR REPLACE PROCEDURE S.RUN_JOB(P_ID NUMBER, P_LABEL VARCHAR2 DEFAULT 'x') AUTHID DEFINER IS
+    BEGIN
+      COMMIT;
+    EXCEPTION WHEN OTHERS THEN
+      ROLLBACK;
+    END RUN_JOB;
+    /"""
+    routine = extract_standalone_routine(source, "PROCEDURE")
+    assert routine.diagnostics == ()
+    assert len(routine.routines) == 1
+    assert [parameter.name for parameter in routine.routines[0].parameters] == ["P_ID", "P_LABEL"]
+    assert routine.routines[0].parameters[1].default == "DEFAULT 'x'"
+    assert routine.routines[0].transactions == ("COMMIT", "ROLLBACK")
+    assert len(routine.routines[0].exception_handlers) == 1
+
+
+def test_standalone_function_signature_is_extracted() -> None:
+    routine = extract_standalone_routine(
+        "CREATE OR REPLACE FUNCTION S.GET_VALUE(P_ID NUMBER) RETURN NUMBER IS BEGIN RETURN P_ID; END GET_VALUE; /",
+        "FUNCTION",
+    )
+    assert routine.diagnostics == ()
+    assert routine.routines[0].kind == "FUNCTION"
+    assert routine.routines[0].return_type == "NUMBER"
+    assert routine.routines[0].parameters[0].data_type == "NUMBER"
 
 
 def test_package_body_counts_real_transaction_and_exception_nodes() -> None:
@@ -36,7 +64,58 @@ def test_package_body_counts_real_transaction_and_exception_nodes() -> None:
     assert len(routine.transactions) == 2
     assert len(routine.exception_handlers) == 1
     assert len(routine.dynamic_sql) == 1
+    assert routine.dynamic_sql_profiles[0].as_text() == "mode=literal,target=static,bind=no,concat=no,validation=not_applicable,loop=no"
     assert routine.start_line < routine.end_line
+
+
+def test_dynamic_sql_profiles_distinguish_static_bind_and_runtime_targets() -> None:
+    source = """CREATE OR REPLACE PACKAGE BODY S.P AS
+      PROCEDURE RUN_JOB(P_ID NUMBER, P_TABLE VARCHAR2) IS
+      BEGIN
+        EXECUTE IMMEDIATE 'UPDATE S.T SET X = 1';
+        EXECUTE IMMEDIATE 'UPDATE S.T SET X = :1' USING P_ID;
+        EXECUTE IMMEDIATE 'UPDATE ' || P_TABLE || ' SET X = :1' USING P_ID;
+      END RUN_JOB;
+    END P;
+    /"""
+    package = extract_package(source, "PACKAGE_BODY")
+    profiles = [profile.as_text() for profile in package.routines[0].dynamic_sql_profiles]
+
+    assert profiles == [
+        "mode=literal,target=static,bind=no,concat=no,validation=not_applicable,loop=no",
+        "mode=literal,target=static,bind=yes,concat=no,validation=not_applicable,loop=no",
+        "mode=expression,target=runtime,bind=yes,concat=yes,validation=not_observed,loop=no",
+    ]
+
+
+def test_dynamic_sql_profile_marks_visible_identifier_validation_without_claiming_safety() -> None:
+    source = """CREATE OR REPLACE PACKAGE BODY S.P AS
+      PROCEDURE RUN_JOB(P_TABLE VARCHAR2) IS
+      BEGIN
+        EXECUTE IMMEDIATE 'UPDATE ' || DBMS_ASSERT.SQL_OBJECT_NAME(P_TABLE) || ' SET X = :1' USING 1;
+      END RUN_JOB;
+    END P;
+    /"""
+    package = extract_package(source, "PACKAGE_BODY")
+    assert [profile.as_text() for profile in package.routines[0].dynamic_sql_profiles] == [
+        "mode=expression,target=runtime,bind=yes,concat=yes,validation=visible,loop=no",
+    ]
+
+
+def test_dynamic_sql_profile_marks_loop_context() -> None:
+    source = """CREATE OR REPLACE PACKAGE BODY S.P AS
+      PROCEDURE RUN_JOB IS
+      BEGIN
+        FOR I IN 1..2 LOOP
+          EXECUTE IMMEDIATE 'UPDATE S.T SET X = 1';
+        END LOOP;
+      END RUN_JOB;
+    END P;
+    /"""
+    package = extract_package(source, "PACKAGE_BODY")
+    assert [profile.as_text() for profile in package.routines[0].dynamic_sql_profiles] == [
+        "mode=literal,target=static,bind=no,concat=no,validation=not_applicable,loop=yes",
+    ]
 
 
 def test_wrapped_package_remains_opaque() -> None:

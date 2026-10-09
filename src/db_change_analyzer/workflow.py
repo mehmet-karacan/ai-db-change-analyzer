@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 import uuid
 from collections import defaultdict
@@ -21,17 +22,23 @@ from .identities import stable_id
 from .inventory import FileInventory, _parse_in_worker, inventory_revision
 from .litellm_http import LiteLLMClient, ModelTransportError
 from .mail_commentary import accept_commentary, build_source_unit_input
-from .notification import finalize_auto_delivery, insert_notification, send_persisted_notification
+from .notification import finalize_artifact_checkpoint, finalize_auto_delivery, insert_notification, send_persisted_notification
+from .policy import load_policy_bundle
 from .oracle.changes import Change, ChangeSet, Value, compare_projections
 from .oracle.projections import Projection, project
 from .oracle.table import TableContextStatement, extract_table, table_context_statements
 from .reporting import ReportError, render_report
+from .research_tools import ResearchToolDispatcher, ResearchToolError, research_tool_definitions
+from .research_journal import ResearchJournal, ResearchJournalError
 from .security import scan_secret
 from .source_classification import sequence_start_value_only, whitespace_only_source_change
+from .source_review import build_source_review_input, source_review_comments, source_review_evidence_ids
+from .review_contracts import ReviewContractError, bind_source_review, validate_source_review
 from .smtp_transport import SmtpTransport
 from .taxonomy.catalog import supported_types
 from .validation import ResponseValidationError
-from .v5_adapter import build_mail_view
+from .v5_adapter import build_innova_mail_view, build_mail_view
+from .innova_rendering import InnovaRenderError, build_innova_render_manifest, render_innova_view
 from .v5_rendering import V5RenderError, build_render_manifest, render_v5_view
 
 
@@ -48,12 +55,45 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _extend_unique_evidence(registry: list[dict[str, Any]], items: list[dict[str, Any]]) -> None:
+    """Keep one registry entry when the same snapshot evidence is shared by objects."""
+    known = {item["evidence_id"] for item in registry}
+    for item in items:
+        evidence_id = item["evidence_id"]
+        if evidence_id not in known:
+            registry.append(item)
+            known.add(evidence_id)
+
+
+def _build_analysis_fingerprint(*, config, plan: RangePlan, generation: int,
+                                policy_fingerprint: str, response_schema_digest: str) -> str:
+    return hashlib.sha256(json.dumps({
+        "base_sha": plan.base_sha, "target_sha": plan.target_sha, "scope_hash": config.scope_hash,
+        "analysis_generation": generation, "config_digest": config.config_digest,
+        "policy_fingerprint": policy_fingerprint, "response_schema": response_schema_digest,
+        "review_mode": config.analysis.review_mode,
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def compute_analysis_fingerprint(config, plan: RangePlan, generation: int = 0) -> str:
+    """Compute the cache identity before an archive range gate is evaluated."""
+    source_review_mode = config.analysis.review_mode == "source_review"
+    schema_path = (Path(__file__).parent / "schemas" / "source-review.schema.json") if source_review_mode else (Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json")
+    response_schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    response_schema_digest = hashlib.sha256(json.dumps(response_schema, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    return _build_analysis_fingerprint(
+        config=config, plan=plan, generation=generation,
+        policy_fingerprint=load_policy_bundle().fingerprint,
+        response_schema_digest=response_schema_digest,
+    )
+
+
 def _index(git: GitClient, revision: str, inventories: list[FileInventory], maximum: int) -> dict[str, list[OccurrenceRef]]:
     result: dict[str, list[OccurrenceRef]] = defaultdict(list)
     for inventory in inventories:
         if not inventory.occurrences:
             continue
-        raw = git.read_blob(inventory.entry.oid, maximum)
+        raw = inventory.raw if inventory.raw is not None else git.read_blob(inventory.entry.oid, maximum)
         for occurrence, projection in zip(inventory.occurrences, inventory.projections, strict=True):
             result[occurrence.object_key].append(OccurrenceRef(inventory, occurrence, raw, projection))
     return result
@@ -109,7 +149,7 @@ def _context_evidence(inventory: FileInventory, raw: bytes, source: str,
 
 def _attach_table_contexts(
     git: GitClient, revision: str, roots: dict[str, str], inventories: list[FileInventory],
-    index: dict[str, list[OccurrenceRef]], maximum: int, timeout_seconds: int,
+    index: dict[str, list[OccurrenceRef]], maximum: int, timeout_seconds: int, parser_cache=None,
 ) -> tuple[dict[str, list[OccurrenceRef]], set[bytes]]:
     """Join standalone ALTER/COMMENT files only when every target is known."""
     targets: dict[tuple[str, str], list[tuple[str, int]]] = defaultdict(list)
@@ -126,7 +166,7 @@ def _attach_table_contexts(
             continue
         if "UNRESOLVED_PREFIX_OR_ARTIFACT" not in inventory.diagnostics:
             continue
-        raw = git.read_blob(inventory.entry.oid, maximum)
+        raw = inventory.raw if inventory.raw is not None else git.read_blob(inventory.entry.oid, maximum)
         source = raw.decode("utf-8")
         matching = [(root, schema) for root, schema in roots.items()
                     if inventory.entry.path == root.encode() or inventory.entry.path.startswith(root.encode() + b"/")]
@@ -134,14 +174,14 @@ def _attach_table_contexts(
         statements = table_context_statements(source, default_schema)
         if not statements or any(len(targets.get(statement.target_parts, ())) != 1 for statement in statements):
             continue
-        if inventory.parse_status != "parsed" and not _parse_in_worker(raw, timeout_seconds)[0]:
+        if inventory.parse_status != "parsed" and not _parse_in_worker(raw, timeout_seconds, parser_cache)[0]:
             continue
         per_location: dict[tuple[str, int], int] = defaultdict(int)
         for statement in statements:
             per_location[targets[statement.target_parts][0]] += 1
         if any(len(additions[location]) + count > 12 for location, count in per_location.items()):
             continue
-        if any(index[key][position].projection.support != "structural" and not _parse_in_worker(index[key][position].raw, timeout_seconds)[0]
+        if any(index[key][position].projection.support != "structural" and not _parse_in_worker(index[key][position].raw, timeout_seconds, parser_cache)[0]
                for key, position in per_location):
             continue
         for statement in statements:
@@ -168,7 +208,7 @@ def _attach_table_contexts(
     return updated, matched_paths
 
 
-def _verify_changed_refs(index: dict[str, list[OccurrenceRef]], keys: list[str], timeout_seconds: int) -> None:
+def _verify_changed_refs(index: dict[str, list[OccurrenceRef]], keys: list[str], timeout_seconds: int, parser_cache=None) -> None:
     """Verify unchanged CREATE files when related context makes an object changed."""
     verified_blobs: dict[str, bool] = {}
     for key in keys:
@@ -177,7 +217,7 @@ def _verify_changed_refs(index: dict[str, list[OccurrenceRef]], keys: list[str],
                 continue
             oid = ref.inventory.entry.oid
             if oid not in verified_blobs:
-                verified_blobs[oid] = _parse_in_worker(ref.raw, timeout_seconds)[0]
+                verified_blobs[oid] = _parse_in_worker(ref.raw, timeout_seconds, parser_cache)[0]
             if not verified_blobs[oid]:
                 continue
             fragment = ref.raw[ref.occurrence.start_byte:ref.occurrence.end_byte_exclusive].decode(ref.inventory.encoding or "utf-8")
@@ -246,6 +286,90 @@ def _evidence(item: OccurrenceRef, revision: str) -> dict[str, Any]:
     }
 
 
+def _research_receipts(
+    dispatcher: ResearchToolDispatcher, *, key: str, representative: OccurrenceRef,
+    old_refs: list[OccurrenceRef], new_refs: list[OccurrenceRef], base_sha: str | None, target_sha: str,
+) -> list[dict[str, Any]]:
+    """Collect a bounded, deterministic research set before a source-review call."""
+    receipts: list[dict[str, Any]] = []
+    paths = list(dict.fromkeys(ref.inventory.entry.path.decode("utf-8", errors="replace") for ref in (*old_refs, *new_refs)))
+    def add(tool_name: str, arguments: dict[str, Any], call_number: int) -> None:
+        try:
+            receipts.append(dispatcher.execute(tool_name, arguments, tool_call_id=f"research-{call_number}-{stable_id('call', {'key': key, 'tool': tool_name, 'args': arguments})[:24]}"))
+        except ResearchToolError as exc:
+            receipts.append({
+                "tool_call_id": f"research-error-{call_number}", "tool_name": tool_name,
+                "arguments_digest": hashlib.sha256(json.dumps(arguments, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                "revision": arguments.get("revision") or arguments.get("target_revision") or target_sha,
+                "scope_hash": dispatcher.scope_hash, "status": "error", "evidence_ids": [], "items": [],
+                "continuation": None, "coverage": {"complete": False}, "diagnostics": [exc.code], "elapsed_ms": 0,
+            })
+    call_number = 0
+    if old_refs and new_refs and paths:
+        # One bounded diff is enough to anchor the unit; the separate source
+        # reads below preserve base/target provenance for the review model.
+        call_number += 1
+        add("get_diff", {"base_revision": base_sha, "target_revision": target_sha, "path": paths[0]}, call_number)
+
+    # Keep the two revisions separate.  For a removed object, a target-side
+    # reference search is the evidence that a surviving consumer still exists;
+    # choosing only `target_sha if new_refs else base_sha` loses that signal.
+    side_refs = (("base", base_sha, old_refs), ("target", target_sha, new_refs))
+    for _side, revision, refs in side_refs:
+        if not revision or not refs:
+            continue
+        ref = refs[0]
+        call_number += 1
+        add("read_source", {
+            "revision": revision, "path": ref.inventory.entry.path.decode("utf-8", errors="replace"),
+            "start_line": ref.occurrence.start_line, "end_line": ref.occurrence.end_line,
+        }, call_number)
+
+    symbol = representative.occurrence.raw_name
+    if symbol and re.fullmatch(r"[A-Za-z][A-Za-z0-9_$#]*", symbol):
+        for _side, revision, refs in side_refs:
+            # Search both snapshots even when the changed object itself is
+            # absent on one side.  This is what reveals a surviving target
+            # consumer after a table/view/package is removed.
+            if not revision:
+                continue
+            call_number += 1
+            add("find_references", {"revision": revision, "symbol": symbol}, call_number)
+
+    history_revision = target_sha if new_refs else base_sha
+    if history_revision:
+        call_number += 1
+        add("get_history", {"revision": history_revision, "path": paths[0] if paths else None, "limit": 20}, call_number)
+    return receipts[:6]
+
+
+def _model_tool_handlers(dispatcher: ResearchToolDispatcher, receipt_sink: list[dict[str, Any]], *, journal: ResearchJournal | None = None, unit_id: str = "", attempt: int = 0) -> dict[str, Any]:
+    """Adapt the closed dispatcher to the model loop and retain every receipt."""
+    turn_counter = 0
+
+    def make_handler(tool_name: str):
+        def handler(arguments: dict[str, Any], tool_call_id: str) -> dict[str, Any]:
+            nonlocal turn_counter
+            try:
+                receipt = dispatcher.execute(tool_name, arguments, tool_call_id=tool_call_id)
+            except ResearchToolError as exc:
+                receipt = {
+                    "tool_call_id": tool_call_id, "tool_name": tool_name,
+                    "arguments_digest": hashlib.sha256(json.dumps(arguments, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                    "revision": arguments.get("revision") or arguments.get("target_revision"),
+                    "scope_hash": dispatcher.scope_hash, "status": "error", "evidence_ids": [], "items": [],
+                    "continuation": None, "coverage": {"complete": False}, "diagnostics": [exc.code], "elapsed_ms": 0,
+                }
+            receipt_sink.append(receipt)
+            turn_counter += 1
+            if journal is not None:
+                if not journal.has_receipt(unit_id=unit_id, tool_call_id=tool_call_id):
+                    journal.append_receipt(receipt, unit_id=unit_id, attempt=attempt, turn=turn_counter)
+            return receipt
+        return handler
+    return {item["function"]["name"]: make_handler(item["function"]["name"]) for item in research_tool_definitions()}
+
+
 def _dependency_snapshot(
     git: GitClient, revision: str, inventories: list[FileInventory], maximum: int,
 ) -> tuple[dict[str, list[OccurrenceRef]], list[SnapshotObject], dict[tuple[str, str], dict[str, Any]]]:
@@ -299,6 +423,8 @@ def _risk_assessment(
     high: list[str] = []
     medium: list[str] = []
     low: list[str] = []
+    unknown: list[str] = []
+    object_levels: dict[str, dict[str, str]] = {}
     limitations: list[str] = [
         "Oracle metadata, veri hacmi ve canlı kullanım durumu bağlı değil.",
         "Sınıflandırma Git kaynak farkı ve repository içi statik ilişkilere dayanır.",
@@ -309,37 +435,62 @@ def _risk_assessment(
         taxonomy_ids = {fact.taxonomy_id for fact in change_set.facts} if change_set else set()
         operation = item["net_operation"]
         label = item["identity"]["object_type"]
+        item_level = "unknown"
+        reason = "insufficient_context"
         constraint_kind_change = any(
             fact.taxonomy_id == "table.constraint.kind"
             and any(token in (fact.before.value or "").upper() + " " + (fact.after.value or "").upper()
                     for token in ("PRIMARY", "FOREIGN", "UNIQUE"))
             for fact in (change_set.facts if change_set else ())
         )
-        if constraint_kind_change or any(
+        if change_set is None or item.get("status") == "unresolved":
+            reason = "insufficient_context"
+            unknown.append(label)
+        elif operation in {"removed", "unknown", "relocated"}:
+            reason = "removed_or_unresolved_object"
+            unknown.append(label)
+        elif constraint_kind_change or any(
             tax in taxonomy_ids for tax in {
                 "package_spec.routine.signature", "sequence.sequence_property.increment_by",
                 "sequence.sequence_property.cycle", "sequence.sequence_property.cache",
             }
         ):
+            item_level = "critical"
+            reason = "critical_source_rule"
             critical.append(label)
-        elif operation == "removed" or any(
+        elif any(
             tax in taxonomy_ids for tax in {
                 "table.column.data_type", "table.column.length", "table.column.nullable",
                 "table.constraint.reference",
             }
         ):
+            item_level = "high"
+            reason = "high_source_rule"
             high.append(label)
         elif any(tax.startswith("package_spec.routine.") for tax in taxonomy_ids) or any(
             tax.startswith("view.query_property.") or tax.startswith("index.index_property.")
             or tax.startswith("table.table_property.") for tax in taxonomy_ids
         ):
+            item_level = "medium"
+            reason = "medium_source_rule"
             medium.append(label)
         elif taxonomy_ids and taxonomy_ids <= {
             "common.source.format", "common.source.occurrence_order", "common.source.path", "common.source.text",
         }:
+            item_level = "low"
+            reason = "low_source_rule"
             low.append(label)
         elif taxonomy_ids or operation in {"added", "modified"}:
+            item_level = "medium"
+            reason = "medium_source_rule"
             medium.append(label)
+        else:
+            unknown.append(label)
+        object_levels[key] = {
+            "level": item_level,
+            "confidence": "limited" if item_level != "unknown" else "unknown",
+            "reason": reason,
+        }
 
     dependency_count = len(dependency_edges)
     if dependency_count >= 2 and high:
@@ -367,9 +518,11 @@ def _risk_assessment(
             "high": sorted(set(high)),
             "medium": sorted(set(medium)),
             "low": sorted(set(low)),
+            "unknown": sorted(set(unknown)),
             "static_dependency_candidates": dependency_count,
         },
         "limitations": limitations,
+        "object_levels": object_levels,
     }
 
 
@@ -624,15 +777,17 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     planned_at = _now()
     first_analysis_started_at = _now()
     previous_ai_phase_started_at: str | None = None
+    analysis_generation = 0
     epoch = store.verify()["epoch"]
     git.pin_target(run_id, plan.target_sha)
     connection = store.connection()
     try:
         with connection:
             if resume_run_id:
-                row = connection.execute("SELECT planned_at,analysis_started_at,ai_phase_started_at FROM runs WHERE run_id=? AND status='ANALYZING'", (run_id,)).fetchone()
+                row = connection.execute("SELECT analysis_generation,planned_at,analysis_started_at,ai_phase_started_at FROM runs WHERE run_id=? AND status IN ('ANALYZING','PLANNED')", (run_id,)).fetchone()
                 if row is None:
                     raise RuntimeError("pinned analysis run is no longer resumable")
+                analysis_generation = int(row["analysis_generation"])
                 planned_at = row["planned_at"]
                 first_analysis_started_at = row["analysis_started_at"] or planned_at
                 previous_ai_phase_started_at = row["ai_phase_started_at"]
@@ -649,12 +804,12 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     analysis_started_mono = time.monotonic()
     roots = {root.path: root.default_schema for root in config.scope.roots}
     changed_paths = {delta.path for delta in plan.scope_deltas}
-    old_inventories = [] if plan.base_sha is None else inventory_revision(git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths)
-    new_inventories = inventory_revision(git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths)
+    old_inventories = [] if plan.base_sha is None else inventory_revision(git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths, parser_cache=store)
+    new_inventories = inventory_revision(git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths, parser_cache=store)
     old_index = _index(git, plan.base_sha, old_inventories, config.parser.max_file_bytes) if plan.base_sha else {}
     new_index = _index(git, plan.target_sha, new_inventories, config.parser.max_file_bytes)
-    old_index, old_context_paths = _attach_table_contexts(git, plan.base_sha, roots, old_inventories, old_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds) if plan.base_sha else ({}, set())
-    new_index, new_context_paths = _attach_table_contexts(git, plan.target_sha, roots, new_inventories, new_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds)
+    old_index, old_context_paths = _attach_table_contexts(git, plan.base_sha, roots, old_inventories, old_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store) if plan.base_sha else ({}, set())
+    new_index, new_context_paths = _attach_table_contexts(git, plan.target_sha, roots, new_inventories, new_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store)
     incomplete_paths = _incomplete_changed_paths(old_inventories, changed_paths) | _incomplete_changed_paths(new_inventories, changed_paths)
     incomplete_paths |= _identity_incomplete_paths(old_inventories) | _identity_incomplete_paths(new_inventories)
     old_incomplete = (_incomplete_changed_paths(old_inventories, changed_paths)
@@ -665,11 +820,8 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     scope_incomplete = bool(incomplete_paths)
     reordered_keys = _reordered_keys(old_inventories, new_inventories)
     changed_keys = sorted({key for key in old_index.keys() | new_index.keys() if _signature(old_index.get(key, [])) != _signature(new_index.get(key, []))} | reordered_keys)
-    _verify_changed_refs(old_index, changed_keys, config.parser.worker_timeout_seconds)
-    _verify_changed_refs(new_index, changed_keys, config.parser.worker_timeout_seconds)
-    if len(changed_keys) > config.analysis.max_new_units_per_invocation:
-        return _finish(args, mode="RUN", outcome="RETRY_PENDING", exit_code=11, error_code="UNIT_BUDGET", checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
-
+    _verify_changed_refs(old_index, changed_keys, config.parser.worker_timeout_seconds, store)
+    _verify_changed_refs(new_index, changed_keys, config.parser.worker_timeout_seconds, store)
     dependency_edges: tuple[dict[str, object], ...] = ()
     dependency_evidence: list[dict[str, Any]] = []
     dependency_omissions: tuple[str, ...] = ()
@@ -679,14 +831,14 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         if plan.base_sha:
             old_dependency_inventories = inventory_revision(
                 git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes,
-                timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(),
+                timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(), parser_cache=store,
             )
             _, old_dependency_objects, old_dependency_evidence = _dependency_snapshot(
                 git, plan.base_sha, old_dependency_inventories, config.parser.max_file_bytes,
             )
         new_dependency_inventories = inventory_revision(
             git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes,
-            timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(),
+            timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(), parser_cache=store,
         )
         _, new_dependency_objects, new_dependency_evidence = _dependency_snapshot(
             git, plan.target_sha, new_dependency_inventories, config.parser.max_file_bytes,
@@ -704,9 +856,96 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         dependency_omissions = selected_dependencies.omissions
     dependency_by_object = _dependency_records_by_object(dependency_edges, changed_keys)
 
-    system_prompt = (Path(__file__).parent / "prompts" / "mail_commentary.tr.txt").read_text(encoding="utf-8")
-    response_schema = json.loads((Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json").read_text(encoding="utf-8"))
-    report_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"db-change-analyzer/v5/report/{run_id}"))
+    source_review_mode = config.analysis.review_mode == "source_review"
+    system_prompt = (Path(__file__).parent / "prompts" / ("source_review.tr.txt" if source_review_mode else "mail_commentary.tr.txt")).read_text(encoding="utf-8")
+    policy_bundle = load_policy_bundle()
+    response_schema_path = (Path(__file__).parent / "schemas" / "source-review.schema.json") if source_review_mode else (Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json")
+    response_schema = json.loads(response_schema_path.read_text(encoding="utf-8"))
+    research_dispatcher = ResearchToolDispatcher(
+        git, {root.path: root.default_schema for root in config.scope.roots},
+        scope_hash=config.scope_hash, max_file_bytes=config.parser.max_file_bytes,
+    ) if source_review_mode else None
+    research_journal = ResearchJournal(
+        store.paths.scope, scope_hash=config.scope_hash, run_id=run_id, generation=analysis_generation,
+    ) if source_review_mode else None
+    if research_journal is not None:
+        try:
+            research_journal.ensure()
+        except ResearchJournalError:
+            return _finish(
+                args, mode="RUN", outcome="STATE_INVALID", exit_code=23,
+                error_code="RESEARCH_JOURNAL_INVALID", checkpoint_before=plan.base_sha,
+                checkpoint_after=plan.base_sha, run_id=run_id,
+            )
+    response_schema_digest = hashlib.sha256(json.dumps(response_schema, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    analysis_fingerprint = _build_analysis_fingerprint(
+        config=config, plan=plan, generation=analysis_generation,
+        policy_fingerprint=policy_bundle.fingerprint, response_schema_digest=response_schema_digest,
+    )
+    run_fingerprint: dict[str, Any] = {"analysis_fingerprint": analysis_fingerprint, "processed_keys": []}
+    if resume_run_id:
+        connection = store.connection()
+        try:
+            run_row = connection.execute("SELECT fingerprint_json FROM runs WHERE run_id=?", (run_id,)).fetchone()
+        finally:
+            connection.close()
+        if run_row is None:
+            return _finish(args, mode="RUN", outcome="STATE_INVALID", exit_code=23, error_code="RUN_MISSING", checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha, run_id=run_id)
+        try:
+            run_fingerprint = json.loads(run_row["fingerprint_json"])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return _finish(
+                args, mode="RUN", outcome="STATE_INVALID", exit_code=23,
+                error_code="RUN_FINGERPRINT_INVALID", checkpoint_before=plan.base_sha,
+                checkpoint_after=plan.base_sha, run_id=run_id,
+            )
+        if not isinstance(run_fingerprint, dict):
+            return _finish(
+                args, mode="RUN", outcome="STATE_INVALID", exit_code=23,
+                error_code="RUN_FINGERPRINT_INVALID", checkpoint_before=plan.base_sha,
+                checkpoint_after=plan.base_sha, run_id=run_id,
+            )
+        stored_fingerprint = run_fingerprint.get("analysis_fingerprint")
+        if stored_fingerprint and stored_fingerprint != analysis_fingerprint:
+            return _finish(
+                args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20,
+                error_code="ANALYSIS_FINGERPRINT_MISMATCH", checkpoint_before=plan.base_sha,
+                checkpoint_after=plan.base_sha, run_id=run_id,
+            )
+    stored_processed_keys = run_fingerprint.get("processed_keys", [])
+    if not isinstance(stored_processed_keys, list) or not all(isinstance(key, str) for key in stored_processed_keys):
+        return _finish(
+            args, mode="RUN", outcome="STATE_INVALID", exit_code=23,
+            error_code="RUN_FINGERPRINT_INVALID", checkpoint_before=plan.base_sha,
+            checkpoint_after=plan.base_sha, run_id=run_id,
+        )
+    processed_keys = set(stored_processed_keys)
+    if resume_run_id and not processed_keys:
+        connection = store.connection()
+        try:
+            stored_units = connection.execute(
+                "SELECT unit_id FROM units WHERE run_id=? AND analysis_generation=? AND status='VALIDATED'",
+                (run_id, analysis_generation),
+            ).fetchall()
+        finally:
+            connection.close()
+        stored_unit_ids = {row["unit_id"] for row in stored_units}
+        processed_keys = {
+            key for key in changed_keys
+            if stable_id("unit", {"run": run_id, "generation": analysis_generation, "key": key})[:100] in stored_unit_ids
+        }
+    remaining_keys = [key for key in changed_keys if key not in processed_keys]
+    active_keys = set(remaining_keys[:config.analysis.max_new_units_per_invocation])
+    budget_limited = len(remaining_keys) > len(active_keys)
+    run_fingerprint["analysis_fingerprint"] = analysis_fingerprint
+    run_fingerprint["processed_keys"] = sorted(processed_keys)
+    connection = store.connection()
+    try:
+        with connection:
+            connection.execute("UPDATE runs SET fingerprint_json=?,last_attempt_at=? WHERE run_id=?", (json.dumps(run_fingerprint, sort_keys=True, separators=(",", ":")), _now(), run_id))
+    finally:
+        connection.close()
+    report_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"db-change-analyzer/v5/report/{run_id}/{analysis_generation}"))
     evidence_registry: list[dict[str, Any]] = []
     objects: list[dict[str, Any]] = []
     changes_by_key: dict[str, Any] = {}
@@ -719,6 +958,8 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     ai_phase_completed_at: str | None = None
     ai_phase_elapsed_ms: int | None = None
     returned_models_by_unit: dict[str, set[str]] = {}
+    ai_execution_records_by_unit: dict[str, dict[str, Any]] = {}
+    source_reviews_by_key: dict[str, dict[str, Any]] = {}
     try:
         with LiteLLMClient(config.model) as model:
             for key in changed_keys:
@@ -728,7 +969,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 old_evidence = [evidence for item in old_refs for evidence in (_evidence(item, plan.base_sha), *item.context_evidence)]
                 new_evidence = [evidence for item in new_refs for evidence in (_evidence(item, plan.target_sha), *item.context_evidence)]
                 local_evidence = [*old_evidence, *new_evidence]
-                evidence_registry.extend(local_evidence)
+                _extend_unique_evidence(evidence_registry, local_evidence)
                 conflict = _conflicting_definitions(old_refs) or _conflicting_definitions(new_refs)
                 secret = any(scan_secret(item["snippet"], config.security.extra_secret_patterns).blocked for item in local_evidence)
                 mandatory_bytes = sum(len(json.dumps(item, ensure_ascii=False).encode("utf-8")) for item in local_evidence)
@@ -807,40 +1048,72 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                         "source_pair": {"old_revision": plan.base_sha, "new_revision": plan.target_sha},
                         "event_ids": [], "view_tags": ["net"],
                         })
-                elif (not diagnostics and key in changes_by_key and old_refs and new_refs
-                      and any(change.taxonomy_id not in {"common.source.format", "common.source.occurrence_order", "common.source.path", "common.source.text"}
-                              for change in changes_by_key[key].facts)):
-                    unit_id = stable_id("unit", {"run": run_id, "key": key})[:100]
-                    unit_input = build_source_unit_input(
-                        report_id=report_id, unit_id=unit_id, changes=changes_by_key[key],
-                        old_evidence=old_evidence, new_evidence=new_evidence,
-                        base_sha=plan.base_sha, target_sha=plan.target_sha,
-                        extra_secret_patterns=config.security.extra_secret_patterns,
+                if (key in active_keys or key in processed_keys) and (not diagnostics and key in changes_by_key
+                      and any(change.taxonomy_id not in {"common.source.format", "common.source.occurrence_order", "common.source.path"}
+                              for change in changes_by_key[key].facts)
+                      and (source_review_mode or (old_refs and new_refs
+                          and any(change.taxonomy_id not in {"common.source.format", "common.source.occurrence_order", "common.source.path", "common.source.text"}
+                                   for change in changes_by_key[key].facts)))):
+                    unit_id = stable_id("unit", {"run": run_id, "generation": analysis_generation, "key": key})[:100]
+                    research_receipts = _research_receipts(
+                        research_dispatcher, key=key, representative=representative,
+                        old_refs=old_refs, new_refs=new_refs, base_sha=plan.base_sha, target_sha=plan.target_sha,
+                    ) if research_dispatcher is not None else []
+                    if research_journal is not None:
+                        for receipt_turn, receipt in enumerate(research_receipts, 1):
+                            if not research_journal.has_receipt(unit_id=unit_id, tool_call_id=receipt["tool_call_id"]):
+                                research_journal.append_receipt(receipt, unit_id=unit_id, attempt=0, turn=receipt_turn)
+                    unit_input = (
+                        build_source_review_input(
+                            report_id=report_id, unit_id=unit_id, changes=changes_by_key[key],
+                            old_evidence=old_evidence, new_evidence=new_evidence,
+                            research_receipts=research_receipts, base_sha=plan.base_sha, target_sha=plan.target_sha,
+                            extra_secret_patterns=config.security.extra_secret_patterns,
+                        ) if source_review_mode else build_source_unit_input(
+                            report_id=report_id, unit_id=unit_id, changes=changes_by_key[key],
+                            old_evidence=old_evidence, new_evidence=new_evidence,
+                            base_sha=plan.base_sha, target_sha=plan.target_sha,
+                            extra_secret_patterns=config.security.extra_secret_patterns,
+                        )
                     )
                     if unit_input["facts"]:
                         ai_unit_ids_by_key[key] = unit_id
                         response: dict[str, Any] | None = None
                         comments: list[dict[str, Any]] = []
                         gate_errors: list[str] = []
+                        tool_receipts: list[dict[str, Any]] = []
                         attempts_used = 0
+                        stored_attempt_count = 0
                         stored_unit = None
                         if resume_run_id:
                             existing_connection = store.connection()
                             try:
                                 stored_unit = existing_connection.execute(
-                                    "SELECT request_digest,status,result_json,returned_models_json FROM units WHERE run_id=? AND analysis_generation=0 AND unit_id=?",
-                                    (run_id, unit_id),
+                                    "SELECT request_digest,status,result_json,returned_models_json,http_attempts FROM units WHERE run_id=? AND analysis_generation=? AND unit_id=?",
+                                    (run_id, analysis_generation, unit_id),
                                 ).fetchone()
                             finally:
                                 existing_connection.close()
                         if stored_unit is not None and stored_unit["request_digest"] == unit_input["input_digest"]:
                             returned_models_by_unit[unit_id] = set(json.loads(stored_unit["returned_models_json"]))
+                            stored_attempt_count = int(stored_unit["http_attempts"])
                             if stored_unit["status"] == "VALIDATED":
-                                response, comments = accept_commentary(
-                                    stored_unit["result_json"], unit_input,
-                                    prompt_json=config.model.output_mode == "prompt_json",
-                                    extra_secret_patterns=config.security.extra_secret_patterns,
-                                )
+                                if source_review_mode:
+                                    try:
+                                        response = validate_source_review(
+                                            stored_unit["result_json"], unit_id=unit_id,
+                                            input_digest=unit_input["input_digest"],
+                                            evidence_ids=source_review_evidence_ids(unit_input),
+                                        ).model_dump(mode="json")
+                                    except ReviewContractError as exc:
+                                        raise ResponseValidationError(str(exc)) from exc
+                                else:
+                                    response, comments = accept_commentary(
+                                        stored_unit["result_json"], unit_input,
+                                        prompt_json=config.model.output_mode == "prompt_json",
+                                        extra_secret_patterns=config.security.extra_secret_patterns,
+                                    )
+                        execution_started_at = _now()
                         for attempt in range(0 if response is not None else 2):
                             if ai_phase_started_mono is None:
                                 if ai_phase_started_at is None:
@@ -854,20 +1127,50 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                                 ai_phase_started_mono = time.monotonic()
                             attempts_used += 1
                             http_attempts += 1
-                            reply = model.complete(
-                                api_key=read_secret("LITELLM_API_KEY").get_secret_value(),
-                                system_message=system_prompt if attempt == 0 else system_prompt + "\nÖnceki yanıt geçersizdi; yalnız sözleşmeye uygun JSON döndür.",
-                                user_payload=unit_input, response_schema=response_schema,
-                                output_tokens=config.analysis.output_tokens,
-                            )
-                            if reply.returned_model:
-                                returned_models_by_unit.setdefault(unit_id, set()).add(reply.returned_model)
-                            try:
-                                response, comments = accept_commentary(
-                                    reply.content, unit_input,
-                                    prompt_json=config.model.output_mode == "prompt_json",
-                                    extra_secret_patterns=config.security.extra_secret_patterns,
+                            request_system = system_prompt if attempt == 0 else system_prompt + "\nÖnceki yanıt geçersizdi; yalnız sözleşmeye uygun JSON döndür."
+                            if source_review_mode and hasattr(model, "complete_with_tools"):
+                                loop_result = model.complete_with_tools(
+                                    api_key=read_secret("LITELLM_API_KEY").get_secret_value(),
+                                    system_message=request_system, user_payload=unit_input,
+                                    response_schema=response_schema, output_tokens=config.analysis.output_tokens,
+                                    tools=research_tool_definitions(),
+                                    handlers=_model_tool_handlers(
+                                        research_dispatcher, tool_receipts, journal=research_journal,
+                                        unit_id=unit_id, attempt=attempt + 1,
+                                    ), max_turns=8,
                                 )
+                                reply_content = loop_result.final_content
+                                reply_returned_model = loop_result.returned_model
+                            else:
+                                reply = model.complete(
+                                    api_key=read_secret("LITELLM_API_KEY").get_secret_value(),
+                                    system_message=request_system, user_payload=unit_input,
+                                    response_schema=response_schema, output_tokens=config.analysis.output_tokens,
+                                )
+                                reply_content = reply.content
+                                reply_returned_model = reply.returned_model
+                            if reply_returned_model:
+                                returned_models_by_unit.setdefault(unit_id, set()).add(reply_returned_model)
+                            try:
+                                if source_review_mode:
+                                    try:
+                                        response = validate_source_review(
+                                            reply_content, unit_id=unit_id,
+                                            input_digest=unit_input["input_digest"],
+                                            evidence_ids=source_review_evidence_ids(unit_input) | {
+                                                evidence_id for receipt in tool_receipts
+                                                for evidence_id in receipt.get("evidence_ids", [])
+                                            },
+                                        ).model_dump(mode="json")
+                                        comments = []
+                                    except ReviewContractError as exc:
+                                        raise ResponseValidationError(str(exc)) from exc
+                                else:
+                                    response, comments = accept_commentary(
+                                        reply_content, unit_input,
+                                        prompt_json=config.model.output_mode == "prompt_json",
+                                        extra_secret_patterns=config.security.extra_secret_patterns,
+                                    )
                                 break
                             except ResponseValidationError as exc:
                                 gate_errors.extend(exc.codes)
@@ -876,12 +1179,43 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                             ai_phase_elapsed_ms = int((datetime.fromisoformat(ai_phase_completed_at) - datetime.fromisoformat(ai_phase_started_at)).total_seconds() * 1000) if previous_ai_phase_started_at else int((time.monotonic() - ai_phase_started_mono) * 1000)
                         ai_comments_by_key[key] = comments
                         ai_status_by_key[key] = "displayed" if comments else "withheld"
+                        if response is not None:
+                            returned_model = sorted(returned_models_by_unit.get(unit_id, set()))[0] if returned_models_by_unit.get(unit_id) else None
+                            execution_attempt = max(1, attempts_used or stored_attempt_count)
+                            execution_id = stable_id("execution", {"run": run_id, "unit": unit_id, "attempt": execution_attempt, "generation": analysis_generation})[:100]
+                            ai_execution_records_by_unit[unit_id] = {
+                                "execution_id": execution_id, "unit_id": unit_id, "attempt": execution_attempt,
+                                "turn": execution_attempt, "generation": analysis_generation,
+                                "requested_route": config.model.base_url + config.model.chat_path,
+                                "requested_model": config.model.id, "returned_model": returned_model,
+                                "started_at": execution_started_at, "completed_at": _now(), "status": "accepted",
+                                "policy_versions": {
+                                    name: f"{metadata['version']};sha256={metadata['sha256']}"
+                                    for name, metadata in policy_bundle.metadata().items()
+                                }, "policy_fingerprint": policy_bundle.fingerprint,
+                                "response_schema": "source-review/1.0" if source_review_mode else "mail-commentary/1.1", "error_code": None,
+                            }
+                            if source_review_mode:
+                                bound_response = bind_source_review(response, author_execution_id=execution_id)
+                                merged_receipts = {item["tool_call_id"]: item for item in unit_input.get("research_receipts", [])}
+                                merged_receipts.update({item["tool_call_id"]: item for item in tool_receipts})
+                                bound_response["research_receipts"] = list(merged_receipts.values())
+                                source_reviews_by_key[key] = bound_response
+                                comments = source_review_comments(
+                                    bound_response, execution_id=execution_id,
+                                    unit_id=unit_id, input_digest=unit_input["input_digest"],
+                                )
+                                ai_comments_by_key[key] = comments
+                            else:
+                                ai_comments_by_key[key] = [
+                                    {**comment, "author_execution_id": execution_id} for comment in comments
+                                ]
                         connection = store.connection()
                         try:
                             with connection:
                                 connection.execute(
-                                    "INSERT INTO units(run_id,analysis_generation,unit_id,canonical_sources_json,alias_events_json,context_digest,request_digest,status,result_json,diagnostics_json,http_attempts,returned_models_json) VALUES (?,0,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(run_id,analysis_generation,unit_id) DO UPDATE SET canonical_sources_json=excluded.canonical_sources_json,context_digest=excluded.context_digest,request_digest=excluded.request_digest,status=excluded.status,result_json=excluded.result_json,diagnostics_json=excluded.diagnostics_json,http_attempts=units.http_attempts+excluded.http_attempts,returned_models_json=excluded.returned_models_json",
-                                    (run_id, unit_id, json.dumps(local_evidence), "[]", unit_input["input_digest"],
+                                    f"INSERT INTO units(run_id,analysis_generation,unit_id,canonical_sources_json,alias_events_json,context_digest,request_digest,status,result_json,diagnostics_json,http_attempts,returned_models_json) VALUES (?,?,?, ?,?,?,?,?,?,?,?,?) ON CONFLICT(run_id,analysis_generation,unit_id) DO UPDATE SET canonical_sources_json=excluded.canonical_sources_json,context_digest=excluded.context_digest,request_digest=excluded.request_digest,status=excluded.status,result_json=excluded.result_json,diagnostics_json=excluded.diagnostics_json,http_attempts=units.http_attempts+excluded.http_attempts,returned_models_json=excluded.returned_models_json",
+                                    (run_id, analysis_generation, unit_id, json.dumps(local_evidence), "[]", unit_input["input_digest"],
                                      unit_input["input_digest"], "VALIDATED" if response is not None else "INVALID",
                                      json.dumps(response, ensure_ascii=False) if response is not None else None,
                                      json.dumps(sorted(set(gate_errors))), attempts_used,
@@ -889,6 +1223,18 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                                 )
                         finally:
                             connection.close()
+                        if research_journal is not None:
+                            result_digest = hashlib.sha256(
+                                json.dumps(response, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                            ).hexdigest() if response is not None else None
+                            research_journal.append_unit_status(
+                                unit_id=unit_id,
+                                attempt=max(1, attempts_used or stored_attempt_count),
+                                status="VALIDATED" if response is not None else "INVALID",
+                                request_digest=unit_input["input_digest"],
+                                result_digest=result_digest,
+                                diagnostics=sorted(set(gate_errors)),
+                            )
                         if response is None:
                             raise ResponseValidationError(*gate_errors)
                 objects.append({
@@ -904,22 +1250,46 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                     "parser_level": "structural" if status == "analyzed" else "limited" if status == "limited" else "unresolved",
                     "old_evidence_ids": [item["evidence_id"] for item in old_evidence],
                     "new_evidence_ids": [item["evidence_id"] for item in new_evidence],
-                    "facts": facts, "assessments": assessments, "diagnostics": diagnostics,
+                    "facts": facts, "assessments": assessments, "source_review": source_reviews_by_key.get(key), "diagnostics": diagnostics,
                     "dependency_edges": dependency_by_object.get(key, []),
                 })
     except ModelTransportError as exc:
-        return _finish(args, mode="RUN", outcome="AI_TRANSPORT_OR_AUTH", exit_code=30, error_code=exc.code, checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
+        return _finish(
+            args, mode="RUN", outcome="AI_TRANSPORT_OR_AUTH", exit_code=30, error_code=exc.code,
+            checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha, run_id=run_id,
+            ai_http_attempts=http_attempts, analysis_fingerprint=analysis_fingerprint,
+        )
     except ResponseValidationError as exc:
-        return _finish(args, mode="RUN", outcome="AI_CONTEXT_INVALID", exit_code=31, error_code=exc.codes[0], checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
+        return _finish(
+            args, mode="RUN", outcome="AI_CONTEXT_INVALID", exit_code=31, error_code=exc.codes[0],
+            checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha, run_id=run_id,
+            ai_http_attempts=http_attempts, analysis_fingerprint=analysis_fingerprint,
+        )
+    except ResearchJournalError:
+        return _finish(
+            args, mode="RUN", outcome="STATE_INVALID", exit_code=23,
+            error_code="RESEARCH_JOURNAL_INVALID", checkpoint_before=plan.base_sha,
+            checkpoint_after=plan.base_sha, run_id=run_id, ai_http_attempts=http_attempts,
+            analysis_fingerprint=analysis_fingerprint,
+        )
 
+    run_fingerprint["processed_keys"] = sorted(processed_keys | active_keys)
     connection = store.connection()
     try:
+        with connection:
+            connection.execute("UPDATE runs SET fingerprint_json=?,last_attempt_at=? WHERE run_id=?", (json.dumps(run_fingerprint, sort_keys=True, separators=(",", ":")), _now(), run_id))
         total_http_attempts = connection.execute(
-            "SELECT COALESCE(SUM(http_attempts),0) FROM units WHERE run_id=? AND analysis_generation=0",
-            (run_id,),
+            "SELECT COALESCE(SUM(http_attempts),0) FROM units WHERE run_id=? AND analysis_generation=?",
+            (run_id, analysis_generation),
         ).fetchone()[0]
     finally:
         connection.close()
+    if budget_limited:
+        return _finish(
+            args, mode="RUN", outcome="RETRY_PENDING", exit_code=11, error_code="UNIT_BUDGET",
+            checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha, run_id=run_id,
+            ai_http_attempts=total_http_attempts,
+        )
     if previous_ai_phase_started_at and ai_phase_completed_at is None:
         ai_phase_completed_at = _now()
         ai_phase_elapsed_ms = int((datetime.fromisoformat(ai_phase_completed_at) - datetime.fromisoformat(previous_ai_phase_started_at)).total_seconds() * 1000)
@@ -998,44 +1368,66 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     }
     risk_assessment = _risk_assessment(objects, changes_by_key, dependency_edges)
     deployment_preparation = _deployment_preparation(objects, changes_by_key)
+    _extend_unique_evidence(evidence_registry, dependency_evidence)
     report = {
-        "schema_version": "1.0", "synthetic": False, "report_id": report_id, "supersedes_report_id": None,
-        "run": {"run_id": run_id, "mode": mode, "repository_id": config.repository.id, "branch": config.repository.branch, "scope_hash": config.scope_hash, "epoch": epoch, "base_sha": plan.base_sha, "target_sha": plan.target_sha, "planned_at": planned_at, "analysis_started_at": analysis_started, "analysis_completed_at": analysis_completed, "analysis_generation": 0, "observed_git_at": _now(), "snapshot_captured_at": None, "actual_db_change_at": None, "originating_analyzer_build": None, "sync_build": None},
+        "schema_version": "2.0", "synthetic": False, "report_id": report_id, "analysis_fingerprint": analysis_fingerprint, "supersedes_report_id": None,
+        "run": {"run_id": run_id, "mode": mode, "repository_id": config.repository.id, "branch": config.repository.branch, "scope_hash": config.scope_hash, "epoch": epoch, "base_sha": plan.base_sha, "target_sha": plan.target_sha, "planned_at": planned_at, "analysis_started_at": analysis_started, "analysis_completed_at": analysis_completed, "analysis_generation": analysis_generation, "observed_git_at": _now(), "snapshot_captured_at": None, "actual_db_change_at": None, "originating_analyzer_build": None, "sync_build": None},
         "quality": quality, "automatic_commit_eligible": quality != "blocked", "summary_tr": summary, "overall_ai_risk": "unknown",
-        "counts": counts, "versions": {"analyzer": "0.1.0", "grammar_commit": config.parser.grammar_commit, "parser_adapter": "1.0", "prompt": "mail-commentary-tr-1.1", "unit_response_schema": "1.0", "report_schema": "1.0", "configured_model": config.model.id, "returned_model": returned_models[0] if len(returned_models) == 1 else None, "resolved_model_version": None, "config_digest": config.config_digest},
+        "counts": counts, "versions": {"analyzer": "0.1.0", "grammar_commit": config.parser.grammar_commit, "parser_adapter": "1.0", "prompt": "mail-commentary-tr-1.1", "unit_response_schema": "1.0", "report_schema": "2.0", "configured_model": config.model.id, "returned_model": returned_models[0] if len(returned_models) == 1 else None, "resolved_model_version": None, "config_digest": config.config_digest, "analysis_fingerprint": analysis_fingerprint},
         "commits": commits, "events": events, "artifacts": artifacts,
-        "evidence_registry": evidence_registry + dependency_evidence, "objects": objects,
+        "evidence_registry": evidence_registry, "objects": objects,
         "impact_analysis": impact_analysis, "risk_assessment": risk_assessment,
         "deployment_preparation": deployment_preparation,
         "limitations": limitations,
     }
     try:
         rendered = render_report(report, max_object_details=config.reports.mail_max_object_details)
-        view = build_mail_view(
+        view_builder = build_innova_mail_view if (config.schema_version >= 2 or config.delivery.mode == "jenkins_artifact") else build_mail_view
+        view = view_builder(
             report, changes_by_key, analysis_elapsed_ms=analysis_elapsed_ms,
             analysis_duration_basis="timestamp_difference" if resume_run_id else "monotonic",
             ai_phase_started_at=ai_phase_started_at, ai_phase_completed_at=ai_phase_completed_at,
             ai_phase_elapsed_ms=ai_phase_elapsed_ms, returned_models_by_unit=returned_models_by_unit,
             extra_secret_patterns=config.security.extra_secret_patterns,
             ai_comments_by_key=ai_comments_by_key, ai_unit_ids_by_key=ai_unit_ids_by_key,
-            ai_status_by_key=ai_status_by_key,
+            ai_status_by_key=ai_status_by_key, ai_execution_records_by_unit=ai_execution_records_by_unit,
         )
         notification_id = str(uuid.uuid4())
-        message_id = f"<{notification_id}@{config.smtp.message_id_domain}>"
-        v5 = render_v5_view(
-            view, sender=config.smtp.sender, recipients=config.smtp.recipients,
-            message_id=message_id, date=datetime.now(UTC),
-            mime_limit=config.reports.mail_max_bytes,
-        )
-        manifest = build_render_manifest(view, v5, source_report_sha256=rendered.sha256)
+        smtp_sender = config.smtp.sender if config.smtp is not None else "ai-db-analyzer@invalid.example"
+        smtp_recipients = config.smtp.recipients if config.smtp is not None else ["artifact@invalid.example"]
+        message_domain = config.smtp.message_id_domain if config.smtp is not None else "invalid.example"
+        message_id = f"<{notification_id}@{message_domain}>"
+        if view["template_version"] == "innova-db-report/1.0":
+            rendered_view = render_innova_view(
+                view, sender=smtp_sender, recipients=smtp_recipients,
+                message_id=message_id, date=datetime.now(UTC),
+                mime_limit=config.reports.mail_max_bytes,
+            )
+            manifest = build_innova_render_manifest(view, rendered_view, source_report_sha256=rendered.sha256)
+            rendered_version = "innova-db-report/1.0"
+        else:
+            rendered_view = render_v5_view(
+                view, sender=smtp_sender, recipients=smtp_recipients,
+                message_id=message_id, date=datetime.now(UTC),
+                mime_limit=config.reports.mail_max_bytes,
+            )
+            manifest = build_render_manifest(view, rendered_view, source_report_sha256=rendered.sha256)
+            rendered_version = "v5.0"
+        v5 = rendered_view
         view_json = json.dumps(view, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         manifest_json = json.dumps(manifest, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    except (ReportError, V5RenderError, ValueError) as exc:
-        return _finish(args, mode="RUN", outcome="SAFETY_POLICY_VIOLATION", exit_code=50, error_code=str(exc), checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha)
+    except (ReportError, V5RenderError, InnovaRenderError, ValueError) as exc:
+        return _finish(
+            args, mode="RUN", outcome="SAFETY_POLICY_VIOLATION", exit_code=50, error_code=str(exc),
+            checkpoint_before=plan.base_sha, checkpoint_after=plan.base_sha, run_id=run_id,
+            ai_http_attempts=http_attempts, analysis_fingerprint=analysis_fingerprint,
+        )
     emit_dir = Path(args.emit_dir or config.reports.emit_dir).resolve()
+    email_html = getattr(v5, "email_html", v5.html)
     outputs = {
         emit_dir / "report.json": rendered.canonical_json + b"\n",
         emit_dir / "report.html": v5.html,
+        emit_dir / "report-email.html": email_html,
         emit_dir / "report.txt": v5.text,
         emit_dir / "mail-view.json": view_json + b"\n",
         emit_dir / "render-manifest.json": manifest_json + b"\n",
@@ -1051,11 +1443,11 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     connection = store.connection()
     try:
         with connection:
-            connection.execute("INSERT INTO reports(report_id,run_id,canonical_json,content_sha256,html,text,rendered_version,quality,created_at) VALUES (?,?,?,?,?,?,?,?,?)", (report_id, run_id, rendered.canonical_json, rendered.sha256, v5.html, v5.text, "v5.0", quality, _now()))
+            connection.execute("INSERT INTO reports(report_id,run_id,canonical_json,content_sha256,html,text,rendered_version,quality,created_at) VALUES (?,?,?,?,?,?,?,?,?)", (report_id, run_id, rendered.canonical_json, rendered.sha256, v5.html, v5.text, rendered_version, quality, _now()))
             connection.execute("INSERT INTO report_render_sidecars(report_id,render_generation,source_report_sha256,mail_view_json,mail_view_sha256,manifest_json,manifest_sha256,html,text,mime,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (report_id, 0, rendered.sha256, view_json, v5.view_sha256, manifest_json, hashlib.sha256(manifest_json).hexdigest(), v5.html, v5.text, v5.mime, _now()))
-            if mode != "MANUAL":
+            if mode != "MANUAL" and config.delivery.mode != "jenkins_artifact":
                 insert_notification(connection, notification_id=notification_id, report_id=report_id, generation=0,
-                                    recipients=config.smtp.recipients, message_id=message_id,
+                                    recipients=smtp_recipients, message_id=message_id,
                                     mime_bytes=v5.mime, mime_sha256=manifest["mime_sha256"])
             connection.execute("UPDATE runs SET report_id=?,status='REPORTED',quality=? WHERE run_id=?", (report_id, quality, run_id))
     except Exception:
@@ -1076,6 +1468,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 {
                     "report.json": rendered.canonical_json + b"\n",
                     "report.html": v5.html,
+                    "report-email.html": email_html,
                     "report.txt": v5.text,
                     "mail-view.json": view_json + b"\n",
                     "render-manifest.json": manifest_json + b"\n",
@@ -1098,7 +1491,25 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 connection.execute("UPDATE runs SET status='CLOSED' WHERE run_id=?", (run_id,))
         finally:
             connection.close()
-        return _finish(args, mode="MANUAL", outcome="MANUAL_COMPLETE", emitted_files=emitted, checkpoint_before=store.verify()["checkpoint_sha"], checkpoint_after=store.verify()["checkpoint_sha"], run_id=run_id, report_id=report_id, report_sha256=rendered.sha256, quality=quality, ai_http_attempts=http_attempts)
+        return _finish(args, mode="MANUAL", outcome="MANUAL_COMPLETE", emitted_files=emitted, checkpoint_before=store.verify()["checkpoint_sha"], checkpoint_after=store.verify()["checkpoint_sha"], run_id=run_id, report_id=report_id, report_sha256=rendered.sha256, quality=quality, ai_http_attempts=http_attempts, delivery_mode=config.delivery.mode)
+    if config.delivery.mode == "jenkins_artifact":
+        connection = store.connection()
+        try:
+            with connection:
+                finalize_artifact_checkpoint(connection, report_id, config.scope_hash)
+        finally:
+            connection.close()
+        committed_checkpoint = store.verify()["checkpoint_sha"]
+        return _finish(
+            args, mode="RUN", outcome="ARTIFACT_READY" if quality != "blocked" else "REVIEW_REQUIRED",
+            exit_code=11 if quality == "blocked" else 0, emitted_files=emitted,
+            checkpoint_before=plan.base_sha, checkpoint_after=committed_checkpoint,
+            run_id=run_id, report_id=report_id, report_sha256=rendered.sha256,
+            notification_status="NOT_APPLICABLE", quality=quality, ai_http_attempts=http_attempts,
+            delivery_mode="jenkins_artifact", analysis_fingerprint=analysis_fingerprint,
+            artifact_ready=quality != "blocked", artifact_manifest_sha256=hashlib.sha256(manifest_json + b"\n").hexdigest(),
+            email_html_path="report-email.html", email_html_sha256=manifest["email_html_sha256"],
+        )
     connection = store.connection()
     try:
         def finalize_delivery(transaction, delivery_status: str) -> None:

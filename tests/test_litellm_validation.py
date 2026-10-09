@@ -8,7 +8,7 @@ import pytest
 
 from db_change_analyzer.analysis import analyze_with_single_repair
 from db_change_analyzer.config import load_config
-from db_change_analyzer.litellm_http import LiteLLMClient, ModelTransportError
+from db_change_analyzer.litellm_http import LiteLLMClient, ModelTransportError, capability_record_digest, load_capability_record
 from db_change_analyzer.models import AnalysisUnit, FindingKind, SourcePair
 from db_change_analyzer.validation import ResponseValidationError, parse_json_object, validate_unit_response
 
@@ -172,3 +172,109 @@ def test_unverified_synthetic_probe_uses_fixed_safe_payload() -> None:
     assert sent["coverage_manifest"] == {"synthetic": True}
     assert sent["artifact_paths"] == ["synthetic/smoke.sql"]
     assert captured["max_tokens"] == 4096
+
+
+def _tool_capability_model(tmp_path: Path):
+    raw = (ROOT / "config" / "gpu.example.toml").read_text(encoding="utf-8")
+    record_path = tmp_path / "capability.json"
+    raw = raw.replace("route_verified = false", "route_verified = true")
+    raw = raw.replace("capabilities_verified = false", "capabilities_verified = true")
+    raw = raw.replace('capability_record = ""', f'capability_record = "{record_path.as_posix()}"')
+    raw = raw.replace("verified_context_window_tokens = 0", "verified_context_window_tokens = 32768")
+    path = tmp_path / "tool-config.toml"
+    path.write_text(raw, encoding="utf-8")
+    config = load_config(path).model
+    record = {
+        "schema_version": "capability/1.0", "synthetic": True,
+        "route": "https://aihub-api.turktelekom.com.tr/chat/completions",
+        "configured_model": config.id, "features": {"tools": True, "json_schema": True},
+        "verified_context_window_tokens": 32768,
+    }
+    record["record_sha256"] = capability_record_digest(record)
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+    return config
+
+
+def test_tool_loop_carries_multiple_calls_and_final_content(tmp_path: Path) -> None:
+    config = _tool_capability_model(tmp_path)
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        if len(requests) == 1:
+            return httpx.Response(200, json={"model": "tool-route", "choices": [{"message": {"content": None, "tool_calls": [
+                {"id": "call-a", "type": "function", "function": {"name": "lookup", "arguments": '{"key":"A"}'}},
+                {"id": "call-b", "type": "function", "function": {"name": "lookup", "arguments": '{"key":"B"}'}},
+            ]}, "finish_reason": "tool_calls"}], "usage": {"prompt_tokens": 3, "completion_tokens": 4}})
+        messages = body["messages"]
+        assert [item["tool_call_id"] for item in messages[-2:]] == ["call-a", "call-b"]
+        assert [json.loads(item["content"])["value"] for item in messages[-2:]] == ["A", "B"]
+        return httpx.Response(200, json={"model": "tool-route", "choices": [{"message": {"content": '{"ok":true}'}, "finish_reason": "stop"}]})
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client:
+        result = client.complete_with_tools(
+            api_key="local-test-key", system_message="safe", user_payload={"request": "x"},
+            response_schema={"type": "object"}, output_tokens=64,
+            tools=[{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}],
+            handlers={"lookup": lambda args: {"value": args["key"]}},
+        )
+    assert result.turns == 2 and result.tool_call_count == 2 and result.final_content == '{"ok":true}'
+    assert requests[0]["messages"][0]["role"] == "system" and "tools" in requests[0]
+
+
+@pytest.mark.parametrize(("response", "code"), [
+    ({"message": {"content": None, "tool_calls": [{"id": "c", "type": "function", "function": {"name": "lookup", "arguments": '{"x":1,"x":2}'}}]}, "finish_reason": "tool_calls"}, "TOOL_ARGUMENTS_DUPLICATE_KEY"),
+    ({"message": {"content": None, "refusal": "no", "tool_calls": []}, "finish_reason": "stop"}, "MODEL_REFUSAL"),
+    ({"message": {"content": '{"x":1}'}, "finish_reason": "length"}, "MODEL_FINISH_REASON"),
+])
+def test_tool_loop_rejects_unsafe_envelopes(tmp_path: Path, response: dict, code: str) -> None:
+    config = _tool_capability_model(tmp_path)
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": [response], "usage": {"prompt_tokens": {"nested": 1}}})
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client, pytest.raises(ModelTransportError, match=code):
+        client.complete_with_tools(
+            api_key="local-test-key", system_message="safe", user_payload={}, response_schema={"type": "object"}, output_tokens=64,
+            tools=[{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}],
+            handlers={"lookup": lambda _: {"ok": True}},
+        )
+
+
+def test_tool_loop_rejects_wrong_call_id_and_missing_result(tmp_path: Path) -> None:
+    config = _tool_capability_model(tmp_path)
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(lambda _: pytest.fail("history error must be local"))) as client, pytest.raises(ModelTransportError, match="TOOL_CALL_ID_UNKNOWN"):
+        client.complete_with_tools(
+            api_key="local-test-key", system_message="safe", user_payload={}, response_schema={"type": "object"}, output_tokens=64,
+            tools=[{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}],
+            handlers={"lookup": lambda _: {"ok": True}},
+            initial_messages=[{"role": "tool", "tool_call_id": "wrong", "content": "{}"}],
+        )
+
+    def missing(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [{"id": "c", "type": "function", "function": {"name": "lookup", "arguments": "{}"}}]}, "finish_reason": "tool_calls"}]})
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(missing)) as client, pytest.raises(ModelTransportError, match="TOOL_RESULT_MISSING"):
+        client.complete_with_tools(
+            api_key="local-test-key", system_message="safe", user_payload={}, response_schema={"type": "object"}, output_tokens=64,
+            tools=[{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}],
+            handlers={"lookup": lambda _: None},
+        )
+
+
+def test_capability_record_digest_and_route_are_bound(tmp_path: Path) -> None:
+    config = _tool_capability_model(tmp_path)
+    path = Path(config.capability_record)
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["record_sha256"] = "0" * 64
+    path.write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(ModelTransportError, match="CAPABILITY_RECORD_DIGEST_MISMATCH"):
+        load_capability_record(path, expected_route="https://aihub-api.turktelekom.com.tr/chat/completions", expected_model=config.id, required_features=("tools",))
+    record["record_sha256"] = capability_record_digest({**record, "record_sha256": None})
+    record["route"] = "https://wrong.example.test/chat/completions"
+    record["record_sha256"] = capability_record_digest(record)
+    path.write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(ModelTransportError, match="CAPABILITY_RECORD_ROUTE_MISMATCH"):
+        load_capability_record(path, expected_route="https://aihub-api.turktelekom.com.tr/chat/completions", expected_model=config.id, required_features=("tools",))

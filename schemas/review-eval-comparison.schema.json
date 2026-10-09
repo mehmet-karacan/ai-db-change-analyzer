@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-db-change-analyzer.invalid/schemas/review-eval-comparison.schema.json",
+  "title": "Source review evaluation comparison",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "mode", "status", "metrics_status", "rubric_version",
+    "corpus_sha256", "baseline_policy", "candidate_policy", "baseline_exit_code",
+    "candidate_exit_code", "baseline_passed_cases", "candidate_passed_cases",
+    "passed_case_delta", "changed_cases", "generated_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "review-eval-comparison/1.0"},
+    "mode": {"enum": ["mock", "live"]},
+    "status": {"enum": ["MOCK_ONLY", "PASS", "FAIL"]},
+    "metrics_status": {"enum": ["not_a_model_quality_pass", "measured_live_route"]},
+    "rubric_version": {"type": "string", "minLength": 1},
+    "corpus_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "baseline_policy": {"$ref": "#/$defs/policy"},
+    "candidate_policy": {"$ref": "#/$defs/policy"},
+    "baseline_exit_code": {"type": "integer"},
+    "candidate_exit_code": {"type": "integer"},
+    "baseline_passed_cases": {"type": "integer", "minimum": 0},
+    "candidate_passed_cases": {"type": "integer", "minimum": 0},
+    "passed_case_delta": {"type": "integer"},
+    "changed_cases": {"type": "array", "items": {"type": "object"}},
+    "generated_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fingerprint", "documents"],
+      "properties": {
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "documents": {"type": "object", "additionalProperties": {"type": "object"}}
+      }
+    }
+  }
+}

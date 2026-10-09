@@ -16,6 +16,25 @@ Bu ürün yalnız sabit Git snapshot'larını okur. Oracle'a bağlanmaz, DDL ça
 azami bağlam penceresini doğrulamaz. Bu değer ayrı bir sağlayıcı kaydıyla teyit
 edilmeden üretim profilinde `capabilities_verified=true` yapılmaz.
 
+Policy/corpus karşılaştırması dış sisteme erişmeden çalıştırılabilir:
+
+```text
+python tools/compare_source_review_eval.py --config config/gpu.artifact.example.toml --corpus tests/fixtures/review_eval/corpus.json --output eval-compare.json --baseline-policy-root src/db_change_analyzer --candidate-policy-root src/db_change_analyzer --mode mock
+```
+
+Çıktı `MOCK_ONLY` ise sözleşme ve rubrik tesisatı doğrulanmıştır; model kalitesi
+ve kurum route'u kabul edilmiş sayılmaz. İnsan inceleme kaydı için
+`docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md` kullanılır.
+
+Son yerel bütünlük denetimi, dış kapıları yerel PASS gibi göstermeden tek JSON
+çıktıda toplar:
+
+```text
+python tools/final_audit.py %TEMP%\ai-db-change-analyzer-final-audit.json
+```
+
+Beklenen yerel sonuç `LOCAL_COMPLETE_EXTERNAL_NOT_RUN` değeridir.
+
 Tam `inventory` bütün kapsamdaki dosyaları yapısal olarak ayrıştırmayı dener.
 Değişiklik analizi ise bütün dosyaları nesne imzası için tarar, pahalı yapısal
 ayrıştırmayı yalnız planın değişen yollarında çalıştırır. Timeout alan değişen
@@ -40,4 +59,4 @@ dosya raporda `limited` olarak görünür.
 
 ## Exit özeti
 
-0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Repository'deki Analyzer `Jenkinsfile` yerel kabul sırasında no-op kalır; Analyzer CLI'yi çalıştırmaz ve bu exit kodlarını Jenkins sonucuna eşlemez. Kurumdaki Jenkins job'u korunur; yerel tetikleme provası tamamlandıktan sonra yalnız CLI tetikleyicisi olacak biçimde düzenlenir. İş kuralları ve state/teslimat kararı CLI'da kalır.
+0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Analyzer `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` sonrasında yalnız commit geçmişini analiz eder; doğrulanmış `ARTIFACT_READY` çıktısını arşivler ve mevcut `emailext` mekanizmasıyla `mkaracan@innova.com.tr` adresine gönderir. İş kuralları ve state/teslimat kararı CLI'da kalır.

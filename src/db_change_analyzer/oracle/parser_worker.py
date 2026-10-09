@@ -64,14 +64,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--encoding", default="utf-8")
     parser.add_argument("--memory-mib", type=int, default=1024)
+    parser.add_argument("--fragments", action="store_true")
     args = parser.parse_args(argv)
     if os.name != "nt":
         import resource
 
         maximum = args.memory_mib * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (maximum, maximum))
-    raw = sys.stdin.buffer.read(2 * 1024 * 1024 + 1)
-    if len(raw) > 2 * 1024 * 1024:
+    input_limit = 8 * 1024 * 1024 if args.fragments else 2 * 1024 * 1024
+    raw = sys.stdin.buffer.read(input_limit + 1)
+    if len(raw) > input_limit:
         print(json.dumps({"ok": False, "code": "PARSE_UNIT_TOO_LARGE"}))
         return 2
     try:
@@ -79,6 +81,18 @@ def main(argv: list[str] | None = None) -> int:
     except (LookupError, UnicodeDecodeError):
         print(json.dumps({"ok": False, "code": "ENCODING_UNRESOLVED"}))
         return 2
+    if args.fragments:
+        try:
+            payload = json.loads(text)
+            fragments = payload["fragments"]
+        except (KeyError, TypeError, json.JSONDecodeError):
+            print(json.dumps({"ok": False, "code": "FRAGMENT_PAYLOAD_INVALID"}))
+            return 2
+        if not isinstance(fragments, list) or not all(isinstance(fragment, str) for fragment in fragments):
+            print(json.dumps({"ok": False, "code": "FRAGMENT_PAYLOAD_INVALID"}))
+            return 2
+        print(json.dumps({"results": [asdict(parse_text(fragment)) for fragment in fragments]}, sort_keys=True))
+        return 0
     result = parse_text(text)
     print(json.dumps(asdict(result), sort_keys=True))
     return 0

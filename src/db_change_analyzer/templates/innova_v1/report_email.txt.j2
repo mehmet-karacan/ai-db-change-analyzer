@@ -1,0 +1,33 @@
+İNNOVA · VERİTABANI DEĞİŞİKLİK RAPORU
+{{ headline }}
+{{ summary_tr }}
+
+{% if show_risk_summary %}ETKİ VE RİSK
+Kaynak tabanlı risk: {{ risk_summary.label }} ({{ risk_summary.confidence_label }})
+Etki kapsamı: {{ impact_summary.status_label }}. {{ impact_summary.provided_count }} doğrulanmış aday / {{ impact_summary.candidate_count }} aday.
+{% for row in impact_summary.external_rows %}{{ row.label }}: {{ row.value }}
+{% endfor %}{% endif %}
+
+EKLENEN: {{ counts.added }} | GÜNCELLENEN: {{ counts.modified }} | SİLİNEN: {{ counts.removed }}
+{{ coverage_display }}
+
+DEĞİŞİKLİKLER
+{% for obj in detail_objects %}
+{{ obj.number }} {{ obj.type_label }} · {{ obj.display_name }}
+Durum: {{ obj.action.label }}
+Risk düzeyi: {{ obj.risk.label }}
+{{ obj.summary }}
+{% for row in obj.rows %}{{ row.field }}: {{ row.change }} | Önce: {{ row.before }} | Sonra: {{ row.after }}
+{% endfor %}{% for comment in obj.comments %}{{ comment.label }}: {{ comment.text }}{% if comment.author_execution_id %} [Model yürütme kaydı: {{ comment.author_execution_id }}]{% endif %}
+{% endfor %}{% for check in obj.checks %}Kontrol: {{ check }}
+{% endfor %}{% for note in obj.notes %}Kapsam: {{ note }}
+{% endfor %}Yöntem: {{ obj.method }}
+{% endfor %}
+ANALİZ KAYDI
+{% for row in ledger_rows %}{{ row.label }}: {{ row.value }}
+{% endfor %}
+
+KARŞILAŞTIRMA
+{% for row in comparison_rows %}{{ row.label }}: {{ row.value }}
+{% endfor %}
+Bu rapor Git snapshot kaynak farklarıyla sınırlıdır; canlı veritabanı ve deployment doğrulaması değildir.

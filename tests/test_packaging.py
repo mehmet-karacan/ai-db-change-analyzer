@@ -19,5 +19,13 @@ def test_wheel_excludes_private_inputs(tmp_path: Path) -> None:
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
     assert any(name.endswith("prompts/system.tr.txt") for name in names)
+    assert any(name.endswith("prompts/analysis_policy.tr.md") for name in names)
+    assert any(name.endswith("prompts/report_language.tr.md") for name in names)
     assert any(name.endswith("templates/report_email.html.j2") for name in names)
+    assert any(name.endswith("templates/innova_v1/report_email.html.j2") for name in names)
+    assert any(name.endswith("templates/innova_v1/report_email.txt.j2") for name in names)
+    assert any(name.endswith("assets/innova-logo-approved.png") for name in names)
+    assert any(name.endswith("schemas/result.schema.json") for name in names)
+    assert any(name.endswith("schemas/source-review-input.schema.json") for name in names)
+    assert any(name.endswith("source_review.py") for name in names)
     assert not any(name.endswith(".sql.zip") or "AKTIF_GOREV" in name or ".ai-db-change-analyzer" in name for name in names)
