@@ -336,6 +336,8 @@ class LiteLLMClient:
         format_value = response_format(self.config.output_mode, response_schema)
         if format_value is not None:
             body["response_format"] = format_value
+        if self.config.id.startswith("Qwen/"):
+            body["chat_template_kwargs"] = {"enable_thinking": False}
         return self._validate_envelope(self._send_json(api_key, body))
 
     def _tool_request(self, *, api_key: str, messages: list[dict[str, Any]], tools: Sequence[dict[str, Any]],
@@ -347,6 +349,8 @@ class LiteLLMClient:
         format_value = response_format(self.config.output_mode, response_schema)
         if format_value is not None:
             body["response_format"] = format_value
+        if self.config.id.startswith("Qwen/"):
+            body["chat_template_kwargs"] = {"enable_thinking": False}
         return self._validate_tool_envelope(self._send_json(api_key, body))
 
     def _send_json(self, api_key: str, body: dict[str, Any]) -> Any:
