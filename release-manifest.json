@@ -19,7 +19,7 @@
     "schemas/unit-response.schema.json": "14eee526d9ecb6b46496f2b16874c23a755382602d7481640deb7d16f368d9eb",
     "schemas/v5/mail-view-model.schema.json": "7fac9955b063b1a0d7c2e33d7f4c14a6f6acf72f07bc740d8a783dd5810213be",
     "schemas/v5/render-manifest.schema.json": "8ad7d94cf3a2912cad963cbf8a8c7934aca309b93212dd12b369d82ee6c2268a",
-    "src/db_change_analyzer/cli.py": "32de2e37844c204057681257fc0e9bf98de10ffdb09d45f1e533df92969aff78",
+    "src/db_change_analyzer/cli.py": "497d36e9a7f9a87f72aa82f6a01ab27c8e3b9aa1d728bf055a0fa0a82683f146",
     "src/db_change_analyzer/config.py": "1a8cd2d8591b8f8f29502368dac496f68c5a85d71e450916d20353cf18715eec",
     "src/db_change_analyzer/dependencies.py": "7d88400a0c639b3ed3dcca3221d943c95cfe32eea26da0d2dd356ec77de2af6b",
     "src/db_change_analyzer/git_client.py": "a0897c1b45ec14252bf3bb1b67fec0c69064ed9c552bedafd5bc7387b5b2a774",

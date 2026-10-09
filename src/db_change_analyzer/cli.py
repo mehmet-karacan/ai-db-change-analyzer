@@ -80,7 +80,10 @@ def doctor(args: argparse.Namespace) -> int:
     git_ok, git_version = _git_version()
     grammar_manifest = Path(__file__).parent / "oracle" / "generated" / "manifest.json"
     checks = {
-        "python": {"ok": sys.version_info[:2] == (3, 13), "version": platform.python_version()},
+        "python": {
+            "ok": (3, 10) <= sys.version_info[:2] < (3, 14),
+            "version": platform.python_version(),
+        },
         "git": {"ok": git_ok, "version": git_version},
         "config": {"ok": True, "digest": config.config_digest, "scope_hash": config.scope_hash},
         "grammar_manifest": {"ok": grammar_manifest.is_file()},
