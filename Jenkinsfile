@@ -104,11 +104,15 @@ pipeline {
                         for wheel in "$ANALYZER_WHEELHOUSE"/*.whl; do
                             python3 -m zipfile -e "$wheel" .site
                         done
-                        PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
-                            --config "$ANALYZER_CONFIG" \
-                            doctor --offline
                         python3 tools/prepare_runtime_config.py \
                             "$ANALYZER_CONFIG" "$WORKSPACE/.analyzer-runtime.toml"
+                        if [ -L .analyzer-state ]; then
+                            echo 'Analyzer state klasörü symlink olamaz.' >&2
+                            exit 2
+                        fi
+                        if [ -e .analyzer-state ] && [ ! -f .analyzer-state/INSTALLATION.json ]; then
+                            mv .analyzer-state "$WORKSPACE/.analyzer-state-orphaned-$BUILD_NUMBER"
+                        fi
                         if [ ! -f .analyzer-state/INSTALLATION.json ]; then
                             printf '1\n' > "$WORKSPACE/.analyzer-first-run"
                             PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
@@ -117,6 +121,9 @@ pipeline {
                         else
                             printf '0\n' > "$WORKSPACE/.analyzer-first-run"
                         fi
+                        PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
+                            --config "$WORKSPACE/.analyzer-runtime.toml" \
+                            doctor --offline
                         '''
                     }
                 }
