@@ -229,6 +229,7 @@ def test_tool_loop_carries_multiple_calls_and_final_content(tmp_path: Path) -> N
                 {"id": "call-b", "type": "function", "function": {"name": "lookup", "arguments": '{"key":"B"}'}},
             ]}, "finish_reason": "tool_calls"}], "usage": {"prompt_tokens": 3, "completion_tokens": 4}})
         messages = body["messages"]
+        assert "response_format" not in requests[0]
         assert [item["tool_call_id"] for item in messages[-2:]] == ["call-a", "call-b"]
         assert [json.loads(item["content"])["value"] for item in messages[-2:]] == ["A", "B"]
         return httpx.Response(200, json={"model": "tool-route", "choices": [{"message": {"content": '{"ok":true}'}, "finish_reason": "stop"}]})
@@ -254,6 +255,7 @@ def test_synthetic_tool_probe_requires_tool_and_uses_probe_schema(tmp_path: Path
         requests.append(body)
         if len(requests) == 1:
             assert body["tool_choice"] == "auto"
+            assert "response_format" not in body
             return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [
                 {"id": "probe-call", "type": "function", "function": {"name": "synthetic_lookup", "arguments": '{"nonce":"probe-nonce-1"}'}},
             ]}, "finish_reason": "tool_calls"}]})

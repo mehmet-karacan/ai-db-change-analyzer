@@ -308,6 +308,7 @@ class LiteLLMClient:
             assistant = self._tool_request(
                 api_key=api_key, messages=messages, tools=tools,
                 response_schema=response_schema, output_tokens=output_tokens, tool_choice=tool_choice,
+                include_response_format=messages[-1].get("role") == "tool",
             )
             returned_model = assistant.returned_model or returned_model
             assistant_message: dict[str, Any] = {"role": "assistant", "content": assistant.content}
@@ -377,12 +378,13 @@ class LiteLLMClient:
         return self._validate_envelope(self._send_json(api_key, body))
 
     def _tool_request(self, *, api_key: str, messages: list[dict[str, Any]], tools: Sequence[dict[str, Any]],
-                      response_schema: dict[str, Any], output_tokens: int, tool_choice: str) -> ToolAssistantReply:
+                      response_schema: dict[str, Any], output_tokens: int, tool_choice: str,
+                      include_response_format: bool) -> ToolAssistantReply:
         body: dict[str, Any] = {
             "model": self.config.id, "messages": messages, "tools": list(tools), "tool_choice": tool_choice,
             "stream": False, self.config.output_limit_parameter: output_tokens,
         }
-        format_value = response_format(self.config.output_mode, response_schema)
+        format_value = response_format(self.config.output_mode, response_schema) if include_response_format else None
         if format_value is not None:
             body["response_format"] = format_value
         if self.config.id.startswith("Qwen/"):
