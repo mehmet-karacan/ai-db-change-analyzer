@@ -369,7 +369,8 @@ class LiteLLMClient:
         except ModelTransportError:
             raise
         except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise ModelTransportError("MODEL_TRANSPORT", retryable=True) from exc
+            error_type = type(exc).__name__.upper()
+            raise ModelTransportError(f"MODEL_TRANSPORT_{error_type}", retryable=True) from exc
         try:
             payload = json.loads(b"".join(chunks).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
