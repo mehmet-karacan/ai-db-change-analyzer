@@ -4,10 +4,14 @@ import hashlib
 import json
 import os
 import re
-import tomllib
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10
+    import tomli as tomllib
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 

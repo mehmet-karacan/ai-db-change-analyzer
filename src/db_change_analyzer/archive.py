@@ -7,10 +7,12 @@ import json
 import os
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+from .compat import UTC
 
 
 ARCHIVE_PREFIX = Path("db-change-analyzer") / "reports"

@@ -4,7 +4,7 @@ Bu ürün yalnız sabit Git snapshot'larını okur. Oracle'a bağlanmaz, DDL ça
 
 ## İlk kurulum
 
-1. Jenkins agent üzerinde Python 3.13 ve Git bulunur; uygulama config'i ve hash kilitli Linux wheelhouse Analyzer repository'sinden checkout edilir. CA dosyaları ve ACL'ler kurum ortamında ayrıca yönetilir.
+1. Jenkins agent üzerinde Python 3.10+ ve Git bulunur; uygulama config'i ve Python 3.10 uyumlu Linux wheelhouse Analyzer repository'sinden checkout edilir. Paketler `.site` klasörüne doğrudan açılır; pip, venv ve internet gerekmez. CA dosyaları ve ACL'ler kurum ortamında ayrıca yönetilir.
 2. `config/gpu.example.toml` kopyalanır; `docs/KURULUM_DEGERLERI.md` alanları doldurulur. Secret TOML'a yazılmaz.
 3. `doctor --offline` çalıştırılır; ağ, model ve SMTP çağrısı yapmadığı stderr kaydından doğrulanır.
 4. Boş owned state için bir kez `state init --confirm-new-install` kullanılır. Otomatik oluşturma veya kayıp state'i baseline sayma yoktur.

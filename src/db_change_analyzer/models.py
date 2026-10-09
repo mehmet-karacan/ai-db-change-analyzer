@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import IntEnum, StrEnum
+from enum import IntEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from .compat import StrEnum
 
 
 StrictStr100 = Annotated[str, Field(min_length=1, max_length=100)]

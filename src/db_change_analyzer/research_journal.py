@@ -7,9 +7,11 @@ import json
 import os
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from .compat import UTC
 
 
 class ResearchJournalError(RuntimeError):

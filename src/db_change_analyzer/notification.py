@@ -5,9 +5,10 @@ import json
 import sqlite3
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Callable
 
+from .compat import UTC
 from .smtp_transport import SmtpDeliveryError, SmtpResult, SmtpTransport
 from .state import StateError
 

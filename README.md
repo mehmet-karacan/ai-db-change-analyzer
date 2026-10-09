@@ -1,15 +1,15 @@
 # AI Database Change Analyzer
 
-Oracle DDL snapshot’larının sabit Git revision’ları arasındaki değişikliklerini kaynak kanıtından ayırmadan analiz eden, tek süreçli CPython 3.13 CLI ürünüdür. Ürün kaynak DDL repository’sine yazmaz, Oracle SQL çalıştırmaz ve mevcut DB Sync pipeline’ını değiştirmez. Açıkça etkinleştirilen arşiv ayarı, çıktıyı ayrı bir uygulama repository checkout’unda kalıcı kayıt olarak tutabilir; commit/push işlemi Analyzer dışında yürütülür.
+Oracle DDL snapshot’larının sabit Git revision’ları arasındaki değişikliklerini kaynak kanıtından ayırmadan analiz eden, Python 3.10+ CLI ürünüdür. Ürün kaynak DDL repository’sine yazmaz, Oracle SQL çalıştırmaz ve mevcut DB Sync pipeline’ını değiştirmez. Açıkça etkinleştirilen arşiv ayarı, çıktıyı ayrı bir uygulama repository checkout’unda kalıcı kayıt olarak tutabilir; commit/push işlemi Analyzer dışında yürütülür.
 
-Repository'deki Analyzer `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` job'ının başarılı tamamlanmasından sonra çalışacak artifact pipeline'ını tanımlar. Pipeline yalnız `gpu-db` Git geçmişini analiz eder, canlı Oracle'a bağlanmaz; doğrulanmış HTML/JSON/text artifact'lerini Jenkins'e arşivletir ve doğrulanmış HTML raporunu `mkaracan@innova.com.tr` adresine mevcut `emailext` mekanizmasıyla gönderir. `BASELINED` ve `NO_CHANGE` sonuçlarında mail gönderilmez. Kaynak kod, GPU artifact config'i ve hash kilitli Python wheelhouse doğrudan bu repository checkout'undan okunur; Jenkins agent'a ayrıca runtime klasörü kurulması gerekmez. Job, upstream tetikleyicisinin yanında Jenkins'teki **Build with Parameters** ile manuel çalıştırılabilir; ilk manuel çalıştırma baseline oluşturur, yeni commit varsa analiz üretir. Kurumdaki mevcut `09-AI-DB-CHANGE-ANALYZER` job'ı bu dosya pushlandıktan ve model credential'ı tanımlandıktan sonra çalıştırılmalıdır. `docs/Jenkinsfile.txt` ayrı DB Sync referansıdır ve değiştirilmemiştir.
+Repository'deki Analyzer `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` job'ının başarılı tamamlanmasından sonra çalışacak artifact pipeline'ını tanımlar. Pipeline yalnız `gpu-db` Git geçmişini analiz eder, canlı Oracle'a bağlanmaz; doğrulanmış HTML/JSON/text artifact'lerini Jenkins'e arşivletir ve doğrulanmış HTML raporunu `mkaracan@innova.com.tr` adresine mevcut `emailext` mekanizmasıyla gönderir. `BASELINED` ve `NO_CHANGE` sonuçlarında mail gönderilmez. Kaynak kod, GPU artifact config'i ve Python 3.10 uyumlu Linux wheelhouse doğrudan bu repository checkout'undan okunur; Jenkins agent'ta yalnız genel `python3` ve Git bulunması gerekir, pip, venv veya internet gerekmez. Wheel'ler `.site` klasörüne doğrudan açılarak kullanılır. Job, upstream tetikleyicisinin yanında Jenkins'teki **Build with Parameters** ile manuel çalıştırılabilir; ilk manuel çalıştırma baseline oluşturur, yeni commit varsa analiz üretir. Kurumdaki mevcut `09-AI-DB-CHANGE-ANALYZER` job'ı bu dosya pushlandıktan ve model credential'ı tanımlandıktan sonra çalıştırılmalıdır. `docs/Jenkinsfile.txt` ayrı DB Sync referansıdır ve değiştirilmemiştir.
 
 Yerel güvenlik ve kalite denetimi: `docs/GUVENLIK_KALITE_DENETIMI.md`.
 
 Geliştirme kurulumu:
 
 ```text
-python3.13 -m venv .venv
+python3 -m venv .venv
 .venv/bin/python -m pip install --require-hashes -r requirements-dev.lock
 PYTHONPATH=src .venv/bin/python -m db_change_analyzer --config config/gpu.example.toml doctor --offline
 ```

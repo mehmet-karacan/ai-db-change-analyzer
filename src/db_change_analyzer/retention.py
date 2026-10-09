@@ -3,10 +3,11 @@ from __future__ import annotations
 import os
 import shutil
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from .compat import UTC
 from .config import RetentionConfig
 from .security import contained_path
 from .state import SqliteStateStore, StateError

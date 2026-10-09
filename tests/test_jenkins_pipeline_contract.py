@@ -25,9 +25,9 @@ def test_analyzer_pipeline_is_git_only_and_sends_only_verified_artifacts() -> No
 
 
 def test_analyzer_pipeline_uses_locked_offline_runtime() -> None:
-    assert "python3.13 -m venv .venv" in JENKINSFILE
-    assert "--no-index" in JENKINSFILE
-    assert "--require-hashes" in JENKINSFILE
+    assert "python3 -m zipfile -e" in JENKINSFILE
+    assert "ANALYZER_WHEELHOUSE" in JENKINSFILE
+    assert "PYTHONPATH=\"$PWD/.site:$PWD/src\" python3 -m db_change_analyzer" in JENKINSFILE
     assert "doctor --offline" in JENKINSFILE
 
 

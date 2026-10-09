@@ -71,3 +71,13 @@
 /src/db_change_analyzer/inventory.py text eol=lf
 /src/db_change_analyzer/oracle/parser_worker.py text eol=lf
 /tools/profile_performance.py text eol=lf
+/src/db_change_analyzer/compat.py text eol=lf
+/requirements.cp310.lock text eol=crlf
+/config/gpu.artifact.toml text eol=lf
+/docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md text eol=lf
+/schemas/review-eval-comparison.schema.json text eol=lf
+/src/db_change_analyzer/archive.py text eol=lf
+/src/db_change_analyzer/models.py text eol=lf
+/src/db_change_analyzer/notification.py text eol=lf
+/tools/compare_source_review_eval.py text eol=lf
+/tools/final_audit.py text eol=lf

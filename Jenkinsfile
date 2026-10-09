@@ -17,8 +17,10 @@ def requestedAnalyzerWheelhouse = (params.ANALYZER_WHEELHOUSE ?: '').trim()
 def analyzerConfig = (!requestedAnalyzerConfig || requestedAnalyzerConfig.startsWith('/etc/ai-db-change-analyzer/'))
     ? 'config/gpu.artifact.toml'
     : requestedAnalyzerConfig
-def analyzerWheelhouse = (!requestedAnalyzerWheelhouse || requestedAnalyzerWheelhouse.startsWith('/opt/ai-db-change-analyzer/'))
-    ? 'vendor/wheels'
+def analyzerWheelhouse = (!requestedAnalyzerWheelhouse
+    || requestedAnalyzerWheelhouse.startsWith('/opt/ai-db-change-analyzer/')
+    || requestedAnalyzerWheelhouse == 'vendor/wheels')
+    ? 'vendor/wheels/cp310'
     : requestedAnalyzerWheelhouse
 def analyzerGitCredentialId = params.ANALYZER_GIT_CREDENTIAL_ID ?: 'gpu-db-http-oracle-ddl-sync'
 def analyzerModelKeyCredentialId = params.ANALYZER_MODEL_KEY_CREDENTIAL_ID ?: 'aihub-api-key'
@@ -49,7 +51,7 @@ pipeline {
         )
         string(
             name: 'ANALYZER_WHEELHOUSE',
-            defaultValue: 'vendor/wheels',
+            defaultValue: 'vendor/wheels/cp310',
             description: 'Analyzer repository içindeki onaylı, hash kilitli Python wheel klasörü.'
         )
         credentials(
@@ -92,18 +94,17 @@ pipeline {
                             echo "ANALYZER_WHEELHOUSE bulunamadı: $ANALYZER_WHEELHOUSE" >&2
                             exit 2
                         }
-                        command -v python3.13 >/dev/null 2>&1 || {
-                            echo "Jenkins agent üzerinde python3.13 bulunamadı." >&2
+                        command -v python3 >/dev/null 2>&1 || {
+                            echo "Jenkins agent üzerinde python3 bulunamadı." >&2
                             exit 2
                         }
-                        rm -rf .venv
-                        python3.13 -m venv .venv
-                        .venv/bin/python -m pip install \
-                            --no-index \
-                            --find-links "$ANALYZER_WHEELHOUSE" \
-                            --require-hashes \
-                            -r requirements.lock
-                        PYTHONPATH="$PWD/src" .venv/bin/python -m db_change_analyzer \
+                        python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else "Python 3.10+ gerekli")'
+                        rm -rf .site
+                        mkdir -p .site
+                        for wheel in "$ANALYZER_WHEELHOUSE"/*.whl; do
+                            python3 -m zipfile -e "$wheel" .site
+                        done
+                        PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                             --config "$ANALYZER_CONFIG" \
                             doctor --offline
                         '''
@@ -139,7 +140,7 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
-                                    PYTHONPATH="$PWD/src" .venv/bin/python -m db_change_analyzer \
+                                    PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                         --config "$ANALYZER_CONFIG" \
                                         --emit-dir "$WORKSPACE/out" \
                                         run --allow-ai

@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Iterable
 
+from .compat import StrEnum
 from .oracle.scanner import _mask_sql
 
 

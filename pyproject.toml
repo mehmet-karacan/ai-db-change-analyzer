@@ -7,7 +7,7 @@ name = "ai-db-change-analyzer"
 version = "0.1.0"
 description = "Evidence-bound Oracle DDL change analysis from fixed Git revisions"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.10,<3.14"
 license = "LicenseRef-Proprietary"
 authors = [{name = "mehmet-karacan"}]
 dependencies = [
@@ -16,6 +16,8 @@ dependencies = [
   "Jinja2==3.1.6",
   "jsonschema==4.26.0",
   "pydantic==2.13.4",
+  "rpds-py==0.30.0",
+  "tomli==2.4.1; python_version < '3.11'",
   "tzdata==2026.4",
 ]
 
