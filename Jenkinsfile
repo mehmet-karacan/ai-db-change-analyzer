@@ -162,6 +162,34 @@ pipeline {
                                             echo "MODEL_${proxy_name}_SET=true"
                                         fi
                                     done
+                                    PYTHONPATH="$PWD/.site:$PWD/src" python3 - <<'PY'
+import os
+import httpx
+
+payload = {
+    "model": "Qwen/Qwen3.8-27B-FP8",
+    "messages": [{"role": "user", "content": "Return only the word OK"}],
+    "stream": False,
+    "max_tokens": 16,
+}
+headers = {
+    "Authorization": f"Bearer {os.environ['LITELLM_API_KEY']}",
+    "Content-Type": "application/json",
+}
+checks = (
+    ("CUSTOM_CA", "config/certs/turktelekom-sub-g3-01.pem"),
+    ("SYSTEM_CA", True),
+    ("NO_VERIFY", False),
+)
+for label, verify in checks:
+    try:
+        with httpx.Client(verify=verify, timeout=20, trust_env=False, follow_redirects=False) as client:
+            response = client.post("https://aihub-api.turktelekom.com.tr/chat/completions", headers=headers, json=payload)
+        print(f"MODEL_HTTPX_{label}_HTTP={response.status_code}")
+    except Exception as exc:
+        cause = type(exc.__cause__).__name__.upper() if exc.__cause__ is not None else "NOCAUSE"
+        print(f"MODEL_HTTPX_{label}_ERROR={type(exc).__name__.upper()}_{cause}")
+PY
                                     model_probe_body="$WORKSPACE/out/model-probe-response.json"
                                     model_http_status="$(curl --silent --show-error --output "$model_probe_body" --write-out '%{http_code}' \
                                         --connect-timeout 10 --max-time 60 \
