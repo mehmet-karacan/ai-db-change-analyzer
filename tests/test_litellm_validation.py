@@ -121,6 +121,27 @@ def test_http_request_shape_and_envelope_are_strict(tmp_path: Path) -> None:
     assert captured["response_format"]["type"] == "json_schema"
 
 
+def test_http_diagnostics_are_detailed_without_logging_secret_or_payload(tmp_path: Path, capsys) -> None:
+    config = verified_model_config(tmp_path)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("certificate verify failed", request=request)
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client, pytest.raises(ModelTransportError):
+        client.complete(
+            api_key="local-secret-key", system_message="private prompt", user_payload={"private": "value"},
+            response_schema={"type": "object"}, output_tokens=64,
+        )
+    logs = capsys.readouterr().err
+    assert '"event":"model_http_request"' in logs
+    assert '"event":"model_http_error"' in logs
+    assert '"endpoint_host":"aihub-api.turktelekom.com.tr"' in logs
+    assert '"tls_verify":true' in logs
+    assert "local-secret-key" not in logs
+    assert "private prompt" not in logs
+    assert "private" not in logs
+
+
 def test_json_object_mode_includes_schema_in_prompt(tmp_path: Path) -> None:
     captured: dict = {}
 

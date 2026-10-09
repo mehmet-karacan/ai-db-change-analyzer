@@ -4,6 +4,8 @@ import hashlib
 import inspect
 import json
 import ssl
+import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -13,6 +15,19 @@ import httpx
 from jsonschema import Draft202012Validator
 
 from .config import ModelConfig
+
+
+def _safe_log(event: str, **fields: Any) -> None:
+    """Write troubleshooting metadata without request or response contents."""
+    payload = {"event": event, **fields}
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")), file=sys.stderr, flush=True)
+
+
+def _safe_exception_detail(exc: BaseException, secret: str) -> str:
+    detail = " ".join(str(exc).split())[:240]
+    if secret:
+        detail = detail.replace(secret, "<redacted>")
+    return detail
 
 
 class ModelTransportError(RuntimeError):
@@ -155,6 +170,10 @@ class LiteLLMClient:
         parsed = urlsplit(self.url)
         if parsed.scheme != "https" or parsed.hostname != config.allowed_host:
             raise ModelTransportError("ENDPOINT_HOST_INVALID")
+        self._endpoint_host = parsed.hostname or ""
+        self._endpoint_path = parsed.path or "/"
+        self._ca_file_name = Path(config.ca_file).name if config.ca_file else "system-default"
+        self._ca_file_present = bool(config.ca_file) and Path(config.ca_file).is_file()
         context = ssl.create_default_context(cafile=config.ca_file or None)
         timeout = httpx.Timeout(
             connect=config.connect_timeout_seconds,
@@ -355,8 +374,35 @@ class LiteLLMClient:
 
     def _send_json(self, api_key: str, body: dict[str, Any]) -> Any:
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        request_kind = "tools" if "tools" in body else "json_schema" if "response_format" in body else "chat"
+        started = time.perf_counter()
+        _safe_log(
+            "model_http_request",
+            endpoint_host=self._endpoint_host,
+            endpoint_path=self._endpoint_path,
+            model=self.config.id,
+            request_kind=request_kind,
+            message_count=len(body.get("messages", [])),
+            tls_verify=True,
+            ca_file=self._ca_file_name,
+            ca_file_present=self._ca_file_present,
+            trust_env=False,
+            follow_redirects=False,
+        )
         try:
             with self._client.stream("POST", self.url, headers=headers, json=body) as response:
+                content_type = response.headers.get("content-type", "")
+                _safe_log(
+                    "model_http_response",
+                    endpoint_host=self._endpoint_host,
+                    endpoint_path=self._endpoint_path,
+                    model=self.config.id,
+                    request_kind=request_kind,
+                    status=response.status_code,
+                    content_type=content_type[:120],
+                    content_length=response.headers.get("content-length", ""),
+                    elapsed_ms=round((time.perf_counter() - started) * 1000),
+                )
                 if response.status_code != 200:
                     self._raise_status(response)
                 chunks: list[bytes] = []
@@ -366,11 +412,31 @@ class LiteLLMClient:
                     if size > self.config.max_response_bytes:
                         raise ModelTransportError("MODEL_RESPONSE_TOO_LARGE")
                     chunks.append(chunk)
+                _safe_log(
+                    "model_http_body_read",
+                    endpoint_host=self._endpoint_host,
+                    endpoint_path=self._endpoint_path,
+                    model=self.config.id,
+                    request_kind=request_kind,
+                    response_bytes=size,
+                    elapsed_ms=round((time.perf_counter() - started) * 1000),
+                )
         except ModelTransportError:
             raise
         except (httpx.TimeoutException, httpx.NetworkError) as exc:
             error_type = type(exc).__name__.upper()
             cause_type = type(exc.__cause__).__name__.upper() if exc.__cause__ is not None else "NOCAUSE"
+            _safe_log(
+                "model_http_error",
+                endpoint_host=self._endpoint_host,
+                endpoint_path=self._endpoint_path,
+                model=self.config.id,
+                request_kind=request_kind,
+                exception_type=error_type,
+                cause_type=cause_type,
+                detail=_safe_exception_detail(exc, api_key),
+                elapsed_ms=round((time.perf_counter() - started) * 1000),
+            )
             raise ModelTransportError(f"MODEL_TRANSPORT_{error_type}_{cause_type}", retryable=True) from exc
         try:
             payload = json.loads(b"".join(chunks).decode("utf-8"))
