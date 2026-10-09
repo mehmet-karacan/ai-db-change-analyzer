@@ -41,4 +41,6 @@ def test_analyzer_pipeline_is_manually_startable_with_parameters() -> None:
     assert "name: 'ANALYZER_WHEELHOUSE'" in JENKINSFILE
     assert "name: 'ANALYZER_GIT_CREDENTIAL_ID'" in JENKINSFILE
     assert "name: 'ANALYZER_MODEL_KEY_CREDENTIAL_ID'" in JENKINSFILE
+    assert 'cp "$WORKSPACE/out/capability-record.json" "$PWD/.analyzer-state/capability-record.json"' in JENKINSFILE
+    assert 'if [ ! -f "$PWD/.analyzer-state/capability-record.json" ]; then' in JENKINSFILE
     assert "disableJob()" not in JENKINSFILE

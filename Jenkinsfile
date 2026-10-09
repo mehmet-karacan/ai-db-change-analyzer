@@ -242,12 +242,12 @@ JSON
                                         echo "MODEL_TOOLS_BODY=$model_tools_message"
                                     fi
                                     rm -f "$model_tools_payload" "$model_tools_body"
-                                    if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
+                                    if [ ! -f "$PWD/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
                                             --emit-dir "$WORKSPACE/out" \
                                             smoke-model --allow-ai --record "$WORKSPACE/out/capability-record.json"
-                                        cp "$WORKSPACE/out/capability-record.json" "$WORKSPACE/.analyzer-state/capability-record.json"
+                                        cp "$WORKSPACE/out/capability-record.json" "$PWD/.analyzer-state/capability-record.json"
                                     fi
                                     if [ "$(cat "$WORKSPACE/.analyzer-first-run")" = '1' ]; then
                                         set -- $(PYTHONPATH="$PWD/.site:$PWD/src" python3 \
