@@ -5,7 +5,7 @@
     ".gitattributes": "c6f58b140366ec7aab896bd4aa0be06aa6273ed2af8bdd73d9357bd7af10fdae",
     "Jenkinsfile": "d57c6cc7d8c1ee931dc57d1a41d6a3425ecdca3b96cd42afabfc8e79f8aac07d",
     "config/gpu.artifact.example.toml": "8172289fc3e4654f812158ea433337ad842d5ee569e61b5fa42239eb2ace1ed2",
-    "config/gpu.artifact.toml": "9ae74b05658914b8b9f016a88059bc18d990f17f7731b35ba4a79f608e47e91c",
+    "config/gpu.artifact.toml": "e1c8c927bf3485e1f21614aa5804230194b5e6a2c3dd4d945daf914a1bbe7714",
     "docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md": "8b4ece6d6a62a6a5b9673c5975588a4f9dbea5d4ed4d388928fdb98049635122",
     "pyproject.toml": "663dbeb7957d618e03da6e7724662ef4b8628d4582e0761b322f7da47b74072c",
     "requirements-dev.lock": "b4e9a6ce6c4b0c896c7c22e495af0a151bb1cdb354f89bb5953d6ecd162eef2e",
