@@ -188,7 +188,9 @@ for label, verify in checks:
         print(f"MODEL_HTTPX_{label}_HTTP={response.status_code}")
     except Exception as exc:
         cause = type(exc.__cause__).__name__.upper() if exc.__cause__ is not None else "NOCAUSE"
+        detail = " ".join(str(exc).split())[:240]
         print(f"MODEL_HTTPX_{label}_ERROR={type(exc).__name__.upper()}_{cause}")
+        print(f"MODEL_HTTPX_{label}_DETAIL={detail}")
 PY
                                     model_probe_body="$WORKSPACE/out/model-probe-response.json"
                                     model_http_status="$(curl --silent --show-error --output "$model_probe_body" --write-out '%{http_code}' \
