@@ -23,7 +23,7 @@ busy_timeout_ms = 5000
 [git]
 timeout_seconds = 120
 max_new_commits = 250
-ca_file = ""
+ca_file = "config/certs/turktelekom-sub-g3-01.pem"
 
 [parser]
 default_encoding = "utf-8"

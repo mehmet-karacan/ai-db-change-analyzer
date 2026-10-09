@@ -2,10 +2,10 @@
   "schema_version": 1,
   "release": "0.1.0",
   "files": {
-    ".gitattributes": "76cabab175252ed825e4310742f9cd0e4b41c96c7ace4db2aad32b3df06346a7",
+    ".gitattributes": "c6f58b140366ec7aab896bd4aa0be06aa6273ed2af8bdd73d9357bd7af10fdae",
     "Jenkinsfile": "7f87bcd24e4e6f4267495c3493f4a7cd255d90a525ded9dbea0f852fc569dbc0",
     "config/gpu.artifact.example.toml": "8172289fc3e4654f812158ea433337ad842d5ee569e61b5fa42239eb2ace1ed2",
-    "config/gpu.artifact.toml": "0b389c89707b3321136f6066bbffae565c9d73fe9ad9dd6c8ba362136fa2ae0e",
+    "config/gpu.artifact.toml": "9ae74b05658914b8b9f016a88059bc18d990f17f7731b35ba4a79f608e47e91c",
     "docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md": "8b4ece6d6a62a6a5b9673c5975588a4f9dbea5d4ed4d388928fdb98049635122",
     "pyproject.toml": "663dbeb7957d618e03da6e7724662ef4b8628d4582e0761b322f7da47b74072c",
     "requirements-dev.lock": "b4e9a6ce6c4b0c896c7c22e495af0a151bb1cdb354f89bb5953d6ecd162eef2e",
@@ -126,6 +126,7 @@
     "vendor/wheels/rpds_py-0.30.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl": "9027da1ce107104c50c81383cae773ef5c24d296dd11c99e2629dbd7967a20c6",
     "vendor/wheels/typing_extensions-4.16.0-py3-none-any.whl": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
     "vendor/wheels/typing_inspection-0.4.4-py3-none-any.whl": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
-    "vendor/wheels/tzdata-2026.4-py2.py3-none-any.whl": "c2169a8b0a7a5e9674da5a135ccdfb2b3e671b333ed9fed17b41f73c34476e81"
+    "vendor/wheels/tzdata-2026.4-py2.py3-none-any.whl": "c2169a8b0a7a5e9674da5a135ccdfb2b3e671b333ed9fed17b41f73c34476e81",
+    "config/certs/turktelekom-sub-g3-01.pem": "88eb9aa33f7320ffe6478145ca66eedc15e430b6486bf18ea41b7418ee2b8cb0"
   }
 }

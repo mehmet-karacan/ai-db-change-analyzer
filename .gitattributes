@@ -74,6 +74,7 @@
 /src/db_change_analyzer/compat.py text eol=lf
 /requirements.cp310.lock text eol=crlf
 /config/gpu.artifact.toml text eol=lf
+/config/certs/turktelekom-sub-g3-01.pem text eol=lf
 /docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md text eol=lf
 /schemas/review-eval-comparison.schema.json text eol=lf
 /src/db_change_analyzer/archive.py text eol=lf
