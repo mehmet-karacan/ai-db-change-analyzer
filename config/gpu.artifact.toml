@@ -1,0 +1,103 @@
+schema_version = 2
+
+[repository]
+id = "gpu-db"
+url = "https://tlcbitbucket.innova.com.tr/scm/skyrsm/gpu-db.git"
+branch = "master"
+allowed_host = "tlcbitbucket.innova.com.tr"
+
+[scope]
+name = "gpu-oracle"
+explicit_excludes = []
+roots = [
+  { path = "gpu_user", default_schema = "GPU_USER" },
+  { path = "innova_odi", default_schema = "INNOVA_ODI" }
+]
+encoding_overrides = []
+
+[state]
+root = "./.analyzer-state"
+lock_wait_seconds = 0
+busy_timeout_ms = 5000
+
+[git]
+timeout_seconds = 120
+max_new_commits = 250
+ca_file = ""
+
+[parser]
+default_encoding = "utf-8"
+grammar_commit = "b434a051c56dcc2a5de0a0f2d86575ed192b59da"
+runtime_version = "4.13.2"
+max_file_bytes = 67108864
+max_parse_unit_bytes = 2097152
+worker_timeout_seconds = 60
+worker_memory_mib = 1024
+
+[analysis]
+review_mode = "source_review"
+max_job_seconds = 1500
+shutdown_reserve_seconds = 60
+max_new_units_per_invocation = 40
+max_http_attempts_per_invocation = 80
+max_http_attempts_per_unit_per_invocation = 4
+max_repairs_per_unit_generation = 1
+max_chunks_per_object_transition = 16
+max_overflow_split_depth = 2
+max_request_utf8_bytes = 24000
+hunk_context_lines = 30
+dependency_depth = 1
+max_dependency_depth = 2
+max_neighbors_per_side = 8
+max_synonym_hops = 5
+output_tokens = 16384
+safety_tokens = 4096
+
+[model]
+base_url = "https://aihub-api.turktelekom.com.tr/"
+chat_path = "chat/completions"
+allowed_host = "aihub-api.turktelekom.com.tr"
+id = "GLM5.3-Flash-IT"
+route_verified = false
+capabilities_verified = false
+capability_record = ""
+verified_context_window_tokens = 0
+output_mode = "json_schema"
+output_limit_parameter = "max_tokens"
+connect_timeout_seconds = 10
+read_timeout_seconds = 120
+write_timeout_seconds = 30
+pool_timeout_seconds = 5
+max_response_bytes = 1048576
+retry_after_cap_seconds = 60
+backoff_cap_seconds = 30
+ca_file = ""
+proxy_url = ""
+
+[delivery]
+mode = "jenkins_artifact"
+result_path = "./out/result.json"
+
+[reports]
+emit_dir = "./out"
+archive_enabled = true
+archive_root = "./reports"
+mail_max_bytes = 150000
+mail_max_object_details = 12
+commit_url_template = ""
+artifact_url_template = ""
+allowed_link_hosts = []
+include_raw_sources_in_mail = false
+error_emails = false
+
+[security]
+extra_secret_patterns = []
+
+[retention]
+completed_report_days = 90
+log_days = 30
+cache_days = 30
+receipt_days = 365
+backup_days = 7
+disk_warning_percent = 80
+disk_stop_percent = 90

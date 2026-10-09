@@ -9,8 +9,17 @@ def analyzerUpstream = 'sky/GPU/GPU-FUSION/10-ORACLE_DB_DDL_SYNC'
 def analyzerMailRecipients = 'mkaracan@innova.com.tr'
 // Declarative parameters are materialized after the first Jenkins run. Keep
 // the first run usable as well so it can install the job parameters/trigger.
-def analyzerConfig = params.ANALYZER_CONFIG ?: '/etc/ai-db-change-analyzer/gpu.artifact.toml'
-def analyzerWheelhouse = params.ANALYZER_WHEELHOUSE ?: '/opt/ai-db-change-analyzer/wheelhouse'
+def requestedAnalyzerConfig = (params.ANALYZER_CONFIG ?: '').trim()
+def requestedAnalyzerWheelhouse = (params.ANALYZER_WHEELHOUSE ?: '').trim()
+// Runtime inputs belong to this checkout. The absolute paths were an older
+// agent provisioning contract; map them to the repository copy so a normal
+// GitHub checkout is sufficient.
+def analyzerConfig = (!requestedAnalyzerConfig || requestedAnalyzerConfig.startsWith('/etc/ai-db-change-analyzer/'))
+    ? 'config/gpu.artifact.toml'
+    : requestedAnalyzerConfig
+def analyzerWheelhouse = (!requestedAnalyzerWheelhouse || requestedAnalyzerWheelhouse.startsWith('/opt/ai-db-change-analyzer/'))
+    ? 'vendor/wheels'
+    : requestedAnalyzerWheelhouse
 def analyzerGitCredentialId = params.ANALYZER_GIT_CREDENTIAL_ID ?: 'gpu-db-http-oracle-ddl-sync'
 def analyzerModelKeyCredentialId = params.ANALYZER_MODEL_KEY_CREDENTIAL_ID ?: 'aihub-api-key'
 
@@ -35,13 +44,13 @@ pipeline {
     parameters {
         string(
             name: 'ANALYZER_CONFIG',
-            defaultValue: '/etc/ai-db-change-analyzer/gpu.artifact.toml',
-            description: 'Jenkins agent üzerinde bulunan, delivery.mode=jenkins_artifact olan doğrulanmış GPU config yolu.'
+            defaultValue: 'config/gpu.artifact.toml',
+            description: 'Analyzer repository içindeki delivery.mode=jenkins_artifact olan GPU config yolu.'
         )
         string(
             name: 'ANALYZER_WHEELHOUSE',
-            defaultValue: '/opt/ai-db-change-analyzer/wheelhouse',
-            description: 'İnternetsiz kurulum için onaylı, hash kilitli Python wheel klasörü.'
+            defaultValue: 'vendor/wheels',
+            description: 'Analyzer repository içindeki onaylı, hash kilitli Python wheel klasörü.'
         )
         credentials(
             name: 'ANALYZER_GIT_CREDENTIAL_ID',
