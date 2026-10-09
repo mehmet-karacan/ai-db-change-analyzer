@@ -157,6 +157,11 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
+                                    for proxy_name in HTTPS_PROXY HTTP_PROXY ALL_PROXY https_proxy http_proxy all_proxy; do
+                                        if printenv "$proxy_name" >/dev/null 2>&1; then
+                                            echo "MODEL_${proxy_name}_SET=true"
+                                        fi
+                                    done
                                     model_probe_body="$WORKSPACE/out/model-probe-response.json"
                                     model_http_status="$(curl --silent --show-error --output "$model_probe_body" --write-out '%{http_code}' \
                                         --connect-timeout 10 --max-time 60 \
