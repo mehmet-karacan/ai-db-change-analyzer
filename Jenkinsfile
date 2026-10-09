@@ -157,25 +157,6 @@ pipeline {
                                     umask 077
                                     rm -rf "$WORKSPACE/out"
                                     mkdir -p "$WORKSPACE/out"
-                                    MODEL_ROUTE=$(PYTHONPATH="$PWD/.site:$PWD/src" python3 -c 'from db_change_analyzer.config import load_config; import os; c=load_config(os.environ["ANALYZER_CONFIG"]); print(c.model.base_url.rstrip("/") + "/" + c.model.chat_path.lstrip("/"))')
-                                    MODEL_CA=$(PYTHONPATH="$PWD/.site:$PWD/src" python3 -c 'from db_change_analyzer.config import load_config; import os; print(load_config(os.environ["ANALYZER_CONFIG"]).model.ca_file)')
-                                    curl --silent --show-error --connect-timeout 5 --max-time 10 \
-                                        --cacert "$MODEL_CA" \
-                                        --output /dev/null --write-out 'MODEL_ROUTE_HTTP=%{http_code} MODEL_ROUTE_REMOTE=%{remote_ip}\n' \
-                                        "$MODEL_ROUTE"
-                                    curl --silent --show-error --connect-timeout 5 --max-time 20 \
-                                        --cacert "$MODEL_CA" --request POST \
-                                        --header 'Content-Type: application/json' \
-                                        --data '{"model":"GLM5.3-Flash-IT","messages":[{"role":"user","content":"health-check"}],"stream":false,"max_tokens":1}' \
-                                        --output /dev/null --write-out 'MODEL_UNAUTH_POST_HTTP=%{http_code}\n' \
-                                        "$MODEL_ROUTE" || true
-                                    curl --silent --show-error --connect-timeout 5 --max-time 20 \
-                                        --cacert "$MODEL_CA" --request POST \
-                                        --header 'Authorization: Bearer '"$LITELLM_API_KEY" \
-                                        --header 'Content-Type: application/json' \
-                                        --data '{"model":"GLM5.3-Flash-IT","messages":[{"role":"user","content":"health-check"}],"stream":false,"max_tokens":1}' \
-                                        --output /dev/null --write-out 'MODEL_AUTH_POST_HTTP=%{http_code}\n' \
-                                        "$MODEL_ROUTE" || true
                                     if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
