@@ -250,14 +250,30 @@ class LiteLLMClient:
     def probe_tools_synthetic(self, *, api_key: str, response_schema: dict[str, Any], output_tokens: int) -> ToolLoopResult:
         """Probe tool continuation with fixed synthetic data only."""
         sentinel = "synthetic-tool-sentinel-7f3a"
+        probe_schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"sentinel": {"type": "string", "const": sentinel}},
+            "required": ["sentinel"],
+        }
         tool = {"type": "function", "function": {"name": "synthetic_lookup", "description": "fixed synthetic probe", "parameters": {"type": "object", "properties": {"nonce": {"type": "string"}}, "required": ["nonce"], "additionalProperties": False}}}
         result = self._tool_loop(
             api_key=api_key, system_message="Use synthetic_lookup exactly once, then return JSON containing its sentinel.",
             user_payload={"synthetic": True, "nonce": "probe-nonce-1", "sentinel": sentinel},
-            response_schema=response_schema, output_tokens=output_tokens, tools=[tool],
-            handlers={"synthetic_lookup": lambda args: {"sentinel": sentinel, "nonce": args.get("nonce")}}, max_turns=4,
+            response_schema=probe_schema, output_tokens=output_tokens, tools=[tool],
+            handlers={"synthetic_lookup": lambda args: {"sentinel": sentinel, "nonce": args.get("nonce")}},
+            max_turns=4, tool_choice="required",
         )
-        if result.tool_call_count != 1 or sentinel not in result.final_content:
+        sentinel_present = sentinel in result.final_content
+        _safe_log(
+            "model_tool_probe",
+            model=self.config.id,
+            turns=result.turns,
+            tool_call_count=result.tool_call_count,
+            sentinel_present=sentinel_present,
+            final_content_length=len(result.final_content),
+        )
+        if result.tool_call_count != 1 or not sentinel_present:
             raise ModelTransportError("SYNTHETIC_TOOL_SENTINEL_MISSING")
         return result
 
@@ -265,9 +281,10 @@ class LiteLLMClient:
         self, *, api_key: str, system_message: str, user_payload: dict[str, Any],
         response_schema: dict[str, Any], output_tokens: int, tools: Sequence[dict[str, Any]],
         handlers: Mapping[str, Callable[..., Any]], max_turns: int,
+        tool_choice: str = "auto",
         initial_messages: Sequence[dict[str, Any]] = (),
     ) -> ToolLoopResult:
-        if max_turns < 1 or max_turns > 64 or not tools:
+        if max_turns < 1 or max_turns > 64 or not tools or tool_choice not in {"auto", "required"}:
             raise ModelTransportError("TOOL_LOOP_LIMIT_INVALID")
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_message},
@@ -290,7 +307,7 @@ class LiteLLMClient:
         for turn in range(1, max_turns + 1):
             assistant = self._tool_request(
                 api_key=api_key, messages=messages, tools=tools,
-                response_schema=response_schema, output_tokens=output_tokens,
+                response_schema=response_schema, output_tokens=output_tokens, tool_choice=tool_choice,
             )
             returned_model = assistant.returned_model or returned_model
             assistant_message: dict[str, Any] = {"role": "assistant", "content": assistant.content}
@@ -360,9 +377,9 @@ class LiteLLMClient:
         return self._validate_envelope(self._send_json(api_key, body))
 
     def _tool_request(self, *, api_key: str, messages: list[dict[str, Any]], tools: Sequence[dict[str, Any]],
-                      response_schema: dict[str, Any], output_tokens: int) -> ToolAssistantReply:
+                      response_schema: dict[str, Any], output_tokens: int, tool_choice: str) -> ToolAssistantReply:
         body: dict[str, Any] = {
-            "model": self.config.id, "messages": messages, "tools": list(tools), "tool_choice": "auto",
+            "model": self.config.id, "messages": messages, "tools": list(tools), "tool_choice": tool_choice,
             "stream": False, self.config.output_limit_parameter: output_tokens,
         }
         format_value = response_format(self.config.output_mode, response_schema)

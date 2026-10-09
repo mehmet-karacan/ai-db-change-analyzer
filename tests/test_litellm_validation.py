@@ -244,6 +244,27 @@ def test_tool_loop_carries_multiple_calls_and_final_content(tmp_path: Path) -> N
     assert requests[0]["messages"][0]["role"] == "system" and "tools" in requests[0]
 
 
+def test_synthetic_tool_probe_requires_tool_and_uses_probe_schema(tmp_path: Path) -> None:
+    config = verified_model_config(tmp_path)
+    requests: list[dict] = []
+    sentinel = "synthetic-tool-sentinel-7f3a"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        if len(requests) == 1:
+            assert body["tool_choice"] == "required"
+            return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [
+                {"id": "probe-call", "type": "function", "function": {"name": "synthetic_lookup", "arguments": '{"nonce":"probe-nonce-1"}'}},
+            ]}, "finish_reason": "tool_calls"}]})
+        assert body["response_format"]["json_schema"]["schema"]["properties"]["sentinel"]["const"] == sentinel
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"sentinel": sentinel}), "tool_calls": []}, "finish_reason": "stop"}]})
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(handler)) as client:
+        result = client.probe_tools_synthetic(api_key="local-test-key", response_schema={"type": "object"}, output_tokens=64)
+    assert result.tool_call_count == 1 and sentinel in result.final_content
+
+
 @pytest.mark.parametrize(("response", "code"), [
     ({"message": {"content": None, "tool_calls": [{"id": "c", "type": "function", "function": {"name": "lookup", "arguments": '{"x":1,"x":2}'}}]}, "finish_reason": "tool_calls"}, "TOOL_ARGUMENTS_DUPLICATE_KEY"),
     ({"message": {"content": None, "refusal": "no", "tool_calls": []}, "finish_reason": "stop"}, "MODEL_REFUSAL"),
