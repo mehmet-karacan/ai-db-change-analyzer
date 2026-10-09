@@ -171,6 +171,24 @@ pipeline {
                                         echo "MODEL_VALID_ID_SIMPLE_BODY=$model_probe_message"
                                     fi
                                     rm -f "$model_probe_body"
+                                    model_schema_payload="$WORKSPACE/out/model-schema-payload.json"
+                                    cat > "$model_schema_payload" <<'JSON'
+{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"system","content":"Return a JSON object."},{"role":"user","content":"Return an object with ok=true."}],"stream":false,"max_tokens":64,"response_format":{"type":"json_schema","json_schema":{"name":"smoke","strict":true,"schema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}}},"chat_template_kwargs":{"enable_thinking":false}}
+JSON
+                                    model_schema_body="$WORKSPACE/out/model-schema-response.json"
+                                    model_schema_http_status="$(curl --silent --show-error --output "$model_schema_body" --write-out '%{http_code}' \
+                                        --connect-timeout 10 --max-time 60 \
+                                        --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
+                                        --header "Authorization: Bearer $LITELLM_API_KEY" \
+                                        --header 'Content-Type: application/json' \
+                                        --data-binary "@$model_schema_payload" \
+                                        'https://aihub-api.turktelekom.com.tr/chat/completions' || true)"
+                                    echo "MODEL_JSON_SCHEMA_HTTP=$model_schema_http_status"
+                                    if [ "$model_schema_http_status" != '200' ]; then
+                                        model_schema_message="$(tr '\\n' ' ' < "$model_schema_body" | cut -c1-1000)"
+                                        echo "MODEL_JSON_SCHEMA_BODY=$model_schema_message"
+                                    fi
+                                    rm -f "$model_schema_payload" "$model_schema_body"
                                     if [ ! -f "$WORKSPACE/.analyzer-state/capability-record.json" ]; then
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
