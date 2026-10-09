@@ -3,9 +3,9 @@
   "release": "0.1.0",
   "files": {
     ".gitattributes": "c6f58b140366ec7aab896bd4aa0be06aa6273ed2af8bdd73d9357bd7af10fdae",
-    "Jenkinsfile": "197b6241bbd6bc6eae91e35a46cbeab9479b5866f5d49c03fccff4728b228dfa",
+    "Jenkinsfile": "a33cf9507097a3070abb3bdee9c054d137e68ae23b88f39db5938297d831868b",
     "config/gpu.artifact.example.toml": "8172289fc3e4654f812158ea433337ad842d5ee569e61b5fa42239eb2ace1ed2",
-    "config/gpu.artifact.toml": "52c7cf4afd2b5ac1e2de427d5db56821db937d75df52c4e93d6e189f53dcce26",
+    "config/gpu.artifact.toml": "a199280ea350c1a2391a5b5cf07d4b8e0a4944467ede27b51a3dcf65da5f6a9f",
     "docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md": "8b4ece6d6a62a6a5b9673c5975588a4f9dbea5d4ed4d388928fdb98049635122",
     "pyproject.toml": "663dbeb7957d618e03da6e7724662ef4b8628d4582e0761b322f7da47b74072c",
     "requirements-dev.lock": "b4e9a6ce6c4b0c896c7c22e495af0a151bb1cdb354f89bb5953d6ecd162eef2e",
@@ -127,6 +127,7 @@
     "vendor/wheels/typing_extensions-4.16.0-py3-none-any.whl": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
     "vendor/wheels/typing_inspection-0.4.4-py3-none-any.whl": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
     "vendor/wheels/tzdata-2026.4-py2.py3-none-any.whl": "c2169a8b0a7a5e9674da5a135ccdfb2b3e671b333ed9fed17b41f73c34476e81",
-    "config/certs/turktelekom-sub-g3-01.pem": "7715e9a3a88430c2d49590ec0b77951d531d6d38e0f06e4c447bb84ab1e049f2"
+    "config/certs/turktelekom-sub-g3-01.pem": "7715e9a3a88430c2d49590ec0b77951d531d6d38e0f06e4c447bb84ab1e049f2",
+    "config/certs/turktelekom-aihub-ca-bundle.pem": "4785f464cf92e8781584b5eeb332cbecfd9b6363b8c5c6512f45292a9e36ae6b"
   }
 }

@@ -177,7 +177,7 @@ headers = {
     "Content-Type": "application/json",
 }
 checks = (
-    ("CUSTOM_CA", "config/certs/turktelekom-sub-g3-01.pem"),
+    ("CUSTOM_CA", "config/certs/turktelekom-aihub-ca-bundle.pem"),
     ("SYSTEM_CA", True),
     ("NO_VERIFY", False),
 )
@@ -195,7 +195,7 @@ PY
                                     model_probe_body="$WORKSPACE/out/model-probe-response.json"
                                     model_http_status="$(curl --silent --show-error --output "$model_probe_body" --write-out '%{http_code}' \
                                         --connect-timeout 10 --max-time 60 \
-                                        --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
+                                        --cacert "$PWD/config/certs/turktelekom-aihub-ca-bundle.pem" \
                                         --header "Authorization: Bearer $LITELLM_API_KEY" \
                                         --header 'Content-Type: application/json' \
                                         --data '{"model":"Qwen/Qwen3.8-27B-FP8","messages":[{"role":"user","content":"Return only the word OK"}],"stream":false,"max_tokens":16}' \
@@ -213,7 +213,7 @@ JSON
                                     model_schema_body="$WORKSPACE/out/model-schema-response.json"
                                     model_schema_http_status="$(curl --silent --show-error --output "$model_schema_body" --write-out '%{http_code}' \
                                         --connect-timeout 10 --max-time 60 \
-                                        --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
+                                        --cacert "$PWD/config/certs/turktelekom-aihub-ca-bundle.pem" \
                                         --header "Authorization: Bearer $LITELLM_API_KEY" \
                                         --header 'Content-Type: application/json' \
                                         --data-binary "@$model_schema_payload" \
@@ -231,7 +231,7 @@ JSON
                                     model_tools_body="$WORKSPACE/out/model-tools-response.json"
                                     model_tools_http_status="$(curl --silent --show-error --output "$model_tools_body" --write-out '%{http_code}' \
                                         --connect-timeout 10 --max-time 60 \
-                                        --cacert "$PWD/config/certs/turktelekom-sub-g3-01.pem" \
+                                        --cacert "$PWD/config/certs/turktelekom-aihub-ca-bundle.pem" \
                                         --header "Authorization: Bearer $LITELLM_API_KEY" \
                                         --header 'Content-Type: application/json' \
                                         --data-binary "@$model_tools_payload" \
