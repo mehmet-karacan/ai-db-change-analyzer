@@ -151,13 +151,32 @@ def _context_evidence(inventory: FileInventory, raw: bytes, source: str,
 def _attach_table_contexts(
     git: GitClient, revision: str, roots: dict[str, str], inventories: list[FileInventory],
     index: dict[str, list[OccurrenceRef]], maximum: int, timeout_seconds: int, parser_cache=None,
+    relevant_paths: set[bytes] | None = None,
 ) -> tuple[dict[str, list[OccurrenceRef]], set[bytes]]:
     """Join standalone ALTER/COMMENT files only when every target is known."""
+    context_target_parts: set[tuple[str, ...]] = set()
+    if relevant_paths is not None:
+        for inventory in inventories:
+            if inventory.entry.path not in relevant_paths or inventory.occurrences or not inventory.entry.path.lower().endswith(b".sql"):
+                continue
+            raw = inventory.raw if inventory.raw is not None else git.read_blob(inventory.entry.oid, maximum)
+            source = raw.decode(inventory.encoding or "utf-8")
+            matching = [(root, schema) for root, schema in roots.items()
+                        if inventory.entry.path == root.encode() or inventory.entry.path.startswith(root.encode() + b"/")]
+            default_schema = max(matching, key=lambda pair: len(pair[0]))[1] if matching else None
+            statements = table_context_statements(source, default_schema)
+            context_target_parts.update(statement.target_parts for statement in statements or ())
+
     targets: dict[tuple[str, str], list[tuple[str, int]]] = defaultdict(list)
     for key, refs in index.items():
         for position, ref in enumerate(refs):
             if ref.occurrence.object_type == "TABLE":
-                targets[_table_parts(ref)].append((key, position))
+                if relevant_paths is None or ref.inventory.entry.path in relevant_paths or _table_parts(ref) in context_target_parts:
+                    targets[_table_parts(ref)].append((key, position))
+    if not targets:
+        # Context files can only enrich a known table. Avoid scanning every
+        # SQL sidecar in sequence-only or removed-table ranges.
+        return index, set()
     additions: dict[tuple[str, int], list[tuple[TableContextStatement, dict[str, Any]]]] = defaultdict(list)
     matched_paths: set[bytes] = set()
     for inventory in inventories:
@@ -260,6 +279,12 @@ def _incomplete_changed_paths(inventories: list[FileInventory], changed_paths: s
         item.entry.path
         for item in inventories
         if item.entry.path in changed_paths
+        # README, manifest, grants and comments files are repository
+        # artefacts. They are reported in the file inventory, but they do not
+        # define an Oracle object whose identity or DDL facts can be compared.
+        # Only an inventory that actually yielded an object occurrence can
+        # make the object-level analysis incomplete.
+        and (not hasattr(item, "occurrences") or item.occurrences)
         and (
             item.parse_status != "parsed" or "UNRESOLVED_PREFIX_OR_ARTIFACT" in item.diagnostics
             or any(projection.diagnostics for projection in item.projections)
@@ -809,14 +834,18 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     new_inventories = inventory_revision(git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths, parser_cache=store)
     old_index = _index(git, plan.base_sha, old_inventories, config.parser.max_file_bytes) if plan.base_sha else {}
     new_index = _index(git, plan.target_sha, new_inventories, config.parser.max_file_bytes)
-    old_index, old_context_paths = _attach_table_contexts(git, plan.base_sha, roots, old_inventories, old_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store) if plan.base_sha else ({}, set())
-    new_index, new_context_paths = _attach_table_contexts(git, plan.target_sha, roots, new_inventories, new_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store)
+    old_index, old_context_paths = _attach_table_contexts(git, plan.base_sha, roots, old_inventories, old_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store, changed_paths) if plan.base_sha else ({}, set())
+    new_index, new_context_paths = _attach_table_contexts(git, plan.target_sha, roots, new_inventories, new_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store, changed_paths)
     incomplete_paths = _incomplete_changed_paths(old_inventories, changed_paths) | _incomplete_changed_paths(new_inventories, changed_paths)
-    incomplete_paths |= _identity_incomplete_paths(old_inventories) | _identity_incomplete_paths(new_inventories)
+    # Identity completeness is relevant to the changed range. Unchanged
+    # sidecar files elsewhere in a generated repository may contain grants,
+    # comments or metadata that the Oracle object scanner intentionally does
+    # not model; they must not prevent a precise snapshot comparison.
+    incomplete_paths |= (_identity_incomplete_paths(old_inventories) | _identity_incomplete_paths(new_inventories)) & changed_paths
     old_incomplete = (_incomplete_changed_paths(old_inventories, changed_paths)
-                      | _identity_incomplete_paths(old_inventories)) - old_context_paths
+                      | (_identity_incomplete_paths(old_inventories) & changed_paths)) - old_context_paths
     new_incomplete = (_incomplete_changed_paths(new_inventories, changed_paths)
-                      | _identity_incomplete_paths(new_inventories)) - new_context_paths
+                      | (_identity_incomplete_paths(new_inventories) & changed_paths)) - new_context_paths
     incomplete_paths = old_incomplete | new_incomplete
     scope_incomplete = bool(incomplete_paths)
     reordered_keys = _reordered_keys(old_inventories, new_inventories)
@@ -1052,7 +1081,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 if (key in active_keys or key in processed_keys) and (not diagnostics and key in changes_by_key
                       and any(change.taxonomy_id not in {"common.source.format", "common.source.occurrence_order", "common.source.path"}
                               for change in changes_by_key[key].facts)
-                      and (source_review_mode or (old_refs and new_refs
+                      and (source_review_mode or ((old_refs or new_refs)
                           and any(change.taxonomy_id not in {"common.source.format", "common.source.occurrence_order", "common.source.path", "common.source.text"}
                                    for change in changes_by_key[key].facts)))):
                     unit_id = stable_id("unit", {"run": run_id, "generation": analysis_generation, "key": key})[:100]

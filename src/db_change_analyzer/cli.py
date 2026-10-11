@@ -632,7 +632,11 @@ def _extract_persisted_html(mime: bytes) -> bytes | None:
     body_end = mime.find(newline + b"--", body_start)
     if body_end < 0:
         return None
+    # The MIME writer adds the line ending that separates this part from the
+    # next boundary. It is transport framing, not part of the original HTML.
     payload = mime[body_start:body_end]
+    if payload.endswith(newline):
+        payload = payload[:-len(newline)]
     if b"content-transfer-encoding: quoted-printable" in headers:
         payload = quopri.decodestring(payload)
     elif b"content-transfer-encoding: base64" in headers:

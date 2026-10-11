@@ -72,7 +72,7 @@
 /src/db_change_analyzer/oracle/parser_worker.py text eol=lf
 /tools/profile_performance.py text eol=lf
 /src/db_change_analyzer/compat.py text eol=lf
-/requirements.cp310.lock text eol=crlf
+/requirements.cp310.lock text eol=lf
 /config/gpu.artifact.toml text eol=lf
 /config/certs/turktelekom-sub-g3-01.pem text eol=lf
 /docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md text eol=lf
@@ -82,3 +82,47 @@
 /src/db_change_analyzer/notification.py text eol=lf
 /tools/compare_source_review_eval.py text eol=lf
 /tools/final_audit.py text eol=lf
+/tools/prepare_runtime_config.py text eol=lf
+/tools/resolve_initial_range.py text eol=lf
+/vendor/wheels/annotated_types-0.8.0-py3-none-any.whl -text
+/vendor/wheels/antlr4_python3_runtime-4.13.2-py3-none-any.whl -text
+/vendor/wheels/anyio-4.15.1-py3-none-any.whl -text
+/vendor/wheels/attrs-26.1.0-py3-none-any.whl -text
+/vendor/wheels/certifi-2026.7.22-py3-none-any.whl -text
+/vendor/wheels/cp310/annotated_types-0.8.0-py3-none-any.whl -text
+/vendor/wheels/cp310/antlr4_python3_runtime-4.13.2-py3-none-any.whl -text
+/vendor/wheels/cp310/anyio-4.15.1-py3-none-any.whl -text
+/vendor/wheels/cp310/attrs-26.1.0-py3-none-any.whl -text
+/vendor/wheels/cp310/certifi-2026.7.22-py3-none-any.whl -text
+/vendor/wheels/cp310/h11-0.16.0-py3-none-any.whl -text
+/vendor/wheels/cp310/httpcore-1.0.9-py3-none-any.whl -text
+/vendor/wheels/cp310/httpx-0.28.1-py3-none-any.whl -text
+/vendor/wheels/cp310/idna-3.20-py3-none-any.whl -text
+/vendor/wheels/cp310/jinja2-3.1.6-py3-none-any.whl -text
+/vendor/wheels/cp310/jsonschema-4.26.0-py3-none-any.whl -text
+/vendor/wheels/cp310/jsonschema_specifications-2025.9.1-py3-none-any.whl -text
+/vendor/wheels/cp310/markupsafe-3.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl -text
+/vendor/wheels/cp310/pydantic-2.13.4-py3-none-any.whl -text
+/vendor/wheels/cp310/pydantic_core-2.46.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl -text
+/vendor/wheels/cp310/referencing-0.37.0-py3-none-any.whl -text
+/vendor/wheels/cp310/rpds_py-0.30.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl -text
+/vendor/wheels/cp310/tomli-2.4.1-py3-none-any.whl -text
+/vendor/wheels/cp310/typing_extensions-4.16.0-py3-none-any.whl -text
+/vendor/wheels/cp310/typing_inspection-0.4.4-py3-none-any.whl -text
+/vendor/wheels/cp310/tzdata-2026.4-py2.py3-none-any.whl -text
+/vendor/wheels/h11-0.16.0-py3-none-any.whl -text
+/vendor/wheels/httpcore-1.0.9-py3-none-any.whl -text
+/vendor/wheels/httpx-0.28.1-py3-none-any.whl -text
+/vendor/wheels/idna-3.20-py3-none-any.whl -text
+/vendor/wheels/jinja2-3.1.6-py3-none-any.whl -text
+/vendor/wheels/jsonschema-4.26.0-py3-none-any.whl -text
+/vendor/wheels/jsonschema_specifications-2025.9.1-py3-none-any.whl -text
+/vendor/wheels/markupsafe-3.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl -text
+/vendor/wheels/pydantic-2.13.4-py3-none-any.whl -text
+/vendor/wheels/pydantic_core-2.46.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl -text
+/vendor/wheels/referencing-0.37.0-py3-none-any.whl -text
+/vendor/wheels/rpds_py-0.30.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl -text
+/vendor/wheels/typing_extensions-4.16.0-py3-none-any.whl -text
+/vendor/wheels/typing_inspection-0.4.4-py3-none-any.whl -text
+/vendor/wheels/tzdata-2026.4-py2.py3-none-any.whl -text
+/config/certs/turktelekom-aihub-ca-bundle.pem -text

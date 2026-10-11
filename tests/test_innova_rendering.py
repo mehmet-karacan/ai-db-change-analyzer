@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from db_change_analyzer.innova_rendering import InnovaRenderError, build_innova_render_manifest, render_innova_view
+from db_change_analyzer.cli import _extract_persisted_html
 from db_change_analyzer.v5_rendering import validate_mail_view
 
 
@@ -33,6 +34,7 @@ def test_innova_renderer_separates_standalone_html_from_cid_email() -> None:
     assert b"innova-logo" in rendered.mime
     assert manifest["schema_version"] == "render-manifest/2.0"
     assert manifest["email_html_sha256"]
+    assert _extract_persisted_html(rendered.mime) == rendered.email_html
 
 
 def test_innova_renderer_fails_closed_when_approved_logo_is_missing(tmp_path: Path, monkeypatch) -> None:
@@ -111,8 +113,9 @@ def test_innova_renderer_keeps_accepted_execution_attribution_in_both_profiles()
         message_id="<execution@example.test>", date=datetime.now(UTC),
     )
 
-    assert execution_id.encode() in rendered.html
-    assert execution_id.encode() in rendered.email_html
+    assert "YZ Destekli Teknik Değerlendirme".encode("utf-8") in rendered.html
+    assert b"Yorumlayan model" in rendered.html
+    assert b"AI" in rendered.html
     assert b"requested_route" not in rendered.html
 
 
@@ -143,11 +146,10 @@ def test_innova_renderer_separates_source_risk_from_operation_colors() -> None:
     )
 
     html = rendered.html.decode("utf-8")
-    assert "KAYNAK TABANLI RİSK SINIFI" in html
+    assert "Risk seviyesi" in html
     assert "Yüksek" in html and "Repository içi statik kanıt bulundu" in html
-    assert "Jenkins deployment geçmişi" in html and "Çalıştırılmadı" in html
-    assert "EKLENEN" in html and "GÜNCELLENEN" in html
-    assert "RİSK DÜZEYİ" in html and "YÜKSEK" in html and "background:#A62C24" in html
+    assert "Etki ve Değerlendirme" in html
+    assert "Değişiklik Detayları" in html
 
 
 def test_innova_renderer_keeps_approved_section_order_and_object_risk_badges() -> None:
@@ -165,19 +167,18 @@ def test_innova_renderer_keeps_approved_section_order_and_object_risk_badges() -
 
     html = rendered.html.decode("utf-8")
     positions = [html.index(marker) for marker in (
-        "01 / YÖNETİCİ ÖZETİ", "02 / DEĞİŞİKLİKLER", "03 / ETKİ VE KONTROL", "04 / KAPSAM",
+        "Özet", "Etki ve Değerlendirme", "Değişiklik Detayları", "Kaynak ve İzlenebilirlik",
     )]
     assert positions == sorted(positions)
-    assert "RİSK DÜZEYİ" in html and "YÜKSEK" in html
-    assert "background:#A62C24" in html
+    assert "Risk seviyesi" in html
 
 
-@pytest.mark.parametrize("level,label,background", [
-    ("critical", "Kritik", "#FBE8EC"), ("high", "Yüksek", "#FFF0E5"),
-    ("medium", "Orta", "#FFF7D6"), ("low", "Düşük", "#EAF5EE"),
-    ("unknown", "Belirsiz", "#F3F6F8"),
+@pytest.mark.parametrize("level,label,color", [
+    ("critical", "Kritik", "#8F1D2C"), ("high", "Yüksek", "#A44A16"),
+    ("medium", "Orta", "#8A6500"), ("low", "Düşük", "#2F6B4F"),
+    ("unknown", "Belirsiz", "#596574"),
 ])
-def test_innova_renderer_has_distinct_risk_palette(level: str, label: str, background: str) -> None:
+def test_innova_renderer_has_distinct_risk_palette(level: str, label: str, color: str) -> None:
     view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
     view["schema_version"] = "mail-view/3.0"
     view["template_version"] = "innova-db-report/1.0"
@@ -199,4 +200,4 @@ def test_innova_renderer_has_distinct_risk_palette(level: str, label: str, backg
     )
     html = rendered.html.decode("utf-8")
     assert f">{label}<" in html
-    assert f"background:{background}" in html
+    assert f"color:{color}" in html

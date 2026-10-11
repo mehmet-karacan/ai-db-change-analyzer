@@ -14,7 +14,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from jsonschema import Draft202012Validator, FormatChecker
 
-from .v5_rendering import _PROFILES, _context, validate_mail_view
+from .v5_rendering import _PROFILES, _context, _date, _duration, validate_mail_view
 
 
 _TEMPLATES = Path(__file__).parent / "templates" / "innova_v1"
@@ -23,6 +23,80 @@ _LOGO = Path(__file__).parent / "assets" / "innova-logo-approved.png"
 
 class InnovaRenderError(ValueError):
     pass
+
+
+def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """Adapt the validated mail view to the current corporate email template."""
+    source = view["source"]
+    analysis = view["analysis"]
+    ai = analysis["ai"]
+    models = ai.get("models", [])
+    model_name = ", ".join(dict.fromkeys(item["configured_model"] for item in models)) if models else "AI çağrısı yapılmadı"
+    completed_at = analysis.get("completed_at") or source.get("observed_at")
+    timezone = analysis["display_timezone"]
+    objects = view["objects"]
+    operation_labels = {
+        "added": "Eklendi", "modified": "Güncellendi", "removed": "Silindi",
+        "relocated": "Taşındı", "unknown": "Doğrulanamadı",
+    }
+    # The complete object inventory remains in report.json and the archive.
+    # The email uses the renderer's selected detail window so a large commit
+    # still produces a deliverable message within the configured MIME limit.
+    displayed_objects = context.get("detail_objects") or context.get("index_objects") or objects
+    displayed_keys = {
+        item.get("anchor", "").removeprefix("nesne-")
+        for item in displayed_objects
+    }
+    diff_rows: list[dict[str, str]] = []
+    total_changes = 0
+    for obj in objects:
+        identity = obj["identity"]
+        facts = [fact for fact in obj["facts"] if fact["change_action"] != "unchanged" or fact["context_only"]]
+        total_changes += len(facts) or 1
+        if obj["object_id"] not in displayed_keys:
+            continue
+        comments = [comment["text_tr"] for comment in obj.get("ai_comments", [])]
+        description = comments[0] if comments else obj.get("deterministic_summary_tr", "Kaynak farkı doğrulandı.")
+        if obj.get("verification") != "verified":
+            description += " Ayrıntılı ayrıştırma sınırlı."
+        diff_rows.append({
+            "tur": identity.get("object_type") or "Diğer",
+            "nesne": ((identity.get("schema_name") + ".") if identity.get("schema_name") else "") + identity["name"],
+            "degisiklik": operation_labels.get(obj["operation"], "Doğrulanamadı"),
+            "aciklama": description,
+        })
+    risk = context["risk_summary"]
+    impact = context["impact_summary"]
+    limited_count = sum(obj.get("verification") != "verified" for obj in objects)
+    object_count = len(objects)
+    verified = f"{object_count} nesne için Git snapshot farkı, {total_changes} kaynak değişikliği olarak kaydedildi."
+    possible = f"{impact['status_label']}. Statik aday sayısı: {impact['candidate_count']}."
+    assessment = f"Risk seviyesi {risk['label'].lower()}; {risk['confidence_label'].lower()}. Canlı veritabanı kontrol edilmedi."
+    if limited_count:
+        assessment += f" {limited_count} nesnenin ayrıntılı ayrıştırması sınırlı."
+    return {
+        "report_title": "Veritabanı Değişiklik Analizi",
+        "system_context": f"{source['repository']} · Git snapshot karşılaştırması",
+        "ornek": bool(view.get("synthetic")),
+        "model_name": model_name,
+        "analysis_duration": _duration(analysis.get("elapsed_ms")),
+        "total_changes": str(total_changes),
+        "risk_level": risk["label"],
+        "risk_color": risk["fg"],
+        "analysis_datetime": _date(completed_at, timezone),
+        "summary": context["summary_tr"],
+        "verified": verified,
+        "possible": possible,
+        "assessment": assessment,
+        "diff_rows": diff_rows,
+        "old_snapshot": source["base_label"],
+        "new_snapshot": source["target_label"],
+        "analysis_id": view["report_id"],
+        "scope_name": f"{source['repository']} / {source['branch']}",
+        "scope_detail": f"{view['changed_files']} dosya · {object_count} çözümlenen nesne",
+        "scope_kinds": f"Karşılaştırma: {source['comparison_mode']} · Canlı veritabanı kullanılmadı",
+        "bottom_notice": "Bu rapor Git snapshot kaynaklarıyla hazırlanmıştır; canlı veritabanı doğrulaması içermez.",
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +140,7 @@ def render_innova_view(view: dict[str, Any], *, sender: str, recipients: list[st
         context = _context(view, profile, "")
         context["source"] = view["source"]
         context["logo_src"] = logo_data_uri
+        context["r"] = _new_analysis_context(view, context)
         html = html_env.get_template("report_email.html.j2").render(**context).encode("utf-8")
         email_context = dict(context)
         email_context["logo_src"] = "cid:innova-logo"

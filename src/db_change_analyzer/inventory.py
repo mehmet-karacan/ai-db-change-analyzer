@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import OrderedDict
@@ -23,6 +24,10 @@ _PARSE_CACHE_LIMIT = 512
 _FRAGMENT_RETRY_MAX_OBJECTS = 32
 _parse_cache: OrderedDict[tuple[str, str, int], tuple[bool, tuple[str, ...]]] = OrderedDict()
 _fragment_cache: OrderedDict[tuple[str, tuple[str, ...], int], tuple[tuple[bool, tuple[str, ...]], ...] | None] = OrderedDict()
+_SIMPLE_SEQUENCE_SOURCE = re.compile(
+    r"\A\s*CREATE\s+(?:OR\s+REPLACE\s+)?SEQUENCE\b.*;\s*\Z",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _cache_put(cache: OrderedDict, key, value) -> None:
@@ -218,6 +223,30 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
     if "ENCODING_UNRESOLVED" in result.diagnostics:
         return result, (), "unresolved", result.diagnostics
     text = raw.decode("utf-8")
+    # Sidecar files such as grants.sql, comments.sql and repository metadata
+    # can be valid SQL text without defining an Oracle object. Running the
+    # full PL/SQL parser for those files only adds a worker timeout to a
+    # repository-wide analysis and cannot improve object identity or DDL
+    # facts. Keep their scanner diagnostics as file evidence and continue.
+    if not result.occurrences:
+        return result, (), "unresolved", result.diagnostics
+    # The generated GPU repository emits standalone sequence DDL. The
+    # sequence extractor already validates and normalizes every supported
+    # option, while the bundled ANTLR grammar can spend minutes exploring an
+    # ambiguous path for the otherwise valid CACHE/GLOBAL form. Treat this
+    # narrow, single-purpose source shape as structurally verified and keep
+    # the general parser for all other object types and mixed scripts.
+    if (
+        not result.diagnostics
+        and all(item.object_type == "SEQUENCE" for item in result.occurrences)
+        and all(_SIMPLE_SEQUENCE_SOURCE.fullmatch(text[item.start_char : item.end_char]) for item in result.occurrences)
+    ):
+        projections = tuple(
+            project(item, text[item.start_char : item.end_char], parse_ok=True)
+            for item in result.occurrences
+        )
+        extraction_diagnostics = tuple(code for projection in projections for code in projection.diagnostics)
+        return result, projections, "parsed", extraction_diagnostics
     large_combined_export = len(result.occurrences) > _FRAGMENT_RETRY_MAX_OBJECTS
     parse_ok, parse_diagnostics = (
         (_parse_in_worker(raw, parse_timeout_seconds, parser_cache) if parser_cache is not None else _parse_in_worker(raw, parse_timeout_seconds))
@@ -235,7 +264,7 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
             _parse_fragments_in_worker(fragments, parse_timeout_seconds, parser_cache)
             if parser_cache is not None else _parse_fragments_in_worker(fragments, parse_timeout_seconds)
         )
-        if fragment_results is not None and all(ok for ok, _ in fragment_results):
+        if fragment_results is not None and len(fragment_results) == len(fragments) and fragment_results and all(ok for ok, _ in fragment_results):
             parse_ok = True
             parse_diagnostics = ()
     projections = tuple(
@@ -250,9 +279,17 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
 def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, max_file_bytes: int, timeout_seconds: int, parse_paths: set[bytes] | None = None, parser_cache=None) -> list[FileInventory]:
     inventories: list[FileInventory] = []
     entries = git.list_tree(revision)
+    def needs_raw(entry: TreeEntry) -> bool:
+        # A normal range run needs changed files plus SQL sidecars because
+        # standalone COMMENT/ALTER statements can enrich a changed table.
+        # Unchanged JSON, README and manifest files cannot contribute Oracle
+        # object evidence and should not be loaded into memory.
+        return parse_paths is None or entry.path in parse_paths or entry.path.lower().endswith(b".sql")
+
     matching_entries = [
         entry for entry in entries
         if entry.kind == "blob" and entry.mode not in {"120000", "160000"}
+        and needs_raw(entry)
         and any(entry.path == root.encode() or entry.path.startswith(root.encode() + b"/") for root in roots)
     ]
     raw_by_oid: dict[str, bytes] = {}
@@ -278,6 +315,8 @@ def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, 
     for entry in entries:
         matching = [(root, schema) for root, schema in roots.items() if entry.path == root.encode() or entry.path.startswith(root.encode() + b"/")]
         if not matching:
+            continue
+        if not needs_raw(entry):
             continue
         if entry.mode in {"120000", "160000"} or entry.kind != "blob":
             inventories.append(FileInventory(entry, None, None, None, "unsupported", ("UNSUPPORTED_GIT_MODE",), (), ()))

@@ -44,6 +44,35 @@ def test_revision_only_structurally_parses_selected_paths(monkeypatch) -> None:
     assert calls == [True]
 
 
+def test_objectless_sql_sidecar_skips_parser_worker(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr("db_change_analyzer.inventory._parse_in_worker", lambda *_args: calls.append("whole") or (True, ()))
+
+    scanned, projections, status, diagnostics = inventory_bytes(
+        b"GRANT SELECT ON S.T TO U;", default_schema="S", parse_timeout_seconds=20
+    )
+
+    assert not scanned.occurrences
+    assert projections == ()
+    assert status == "unresolved"
+    assert "UNRESOLVED_PREFIX_OR_ARTIFACT" in diagnostics
+    assert calls == []
+
+
+def test_generated_sequence_shape_uses_fast_structural_projection(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr("db_change_analyzer.inventory._parse_in_worker", lambda *_args: calls.append("whole") or (False, ("PARSER_TIMEOUT",)))
+    raw = b'CREATE SEQUENCE "S"."SEQ_T" MINVALUE 1 MAXVALUE 9999999999999999999999999999 INCREMENT BY 1 START WITH 86245 CACHE 20 NOORDER NOCYCLE NOKEEP NOSCALE GLOBAL;'
+
+    _scanned, projections, status, diagnostics = inventory_bytes(raw, default_schema="S", parse_timeout_seconds=20)
+
+    assert status == "parsed"
+    assert diagnostics == ()
+    assert projections[0].support == "structural"
+    assert projections[0].properties["start_with"] == "86245"
+    assert calls == []
+
+
 def test_inventory_retries_scanned_objects_when_combined_file_parse_fails(monkeypatch) -> None:
     raw = b"CREATE TABLE S.A (ID NUMBER);\nCREATE TABLE S.B (ID NUMBER);\n"
     calls: list[tuple[str, ...]] = []
@@ -131,7 +160,7 @@ def test_parser_cache_can_reuse_persisted_result_after_process_cache_clear(monke
     assert calls == 1
 
 
-def test_large_combined_export_skips_unbounded_whole_file_retry(monkeypatch) -> None:
+def test_large_combined_export_uses_bounded_fragment_retry(monkeypatch) -> None:
     raw = b"\n".join(f"CREATE TABLE S.T{index} (ID NUMBER);".encode() for index in range(33))
     calls = []
     monkeypatch.setattr("db_change_analyzer.inventory._parse_in_worker", lambda *_args: calls.append("whole") or (True, ()))
@@ -141,5 +170,5 @@ def test_large_combined_export_skips_unbounded_whole_file_retry(monkeypatch) -> 
 
     assert status == "text_fallback"
     assert diagnostics == ("PARSER_NOT_RUN_LARGE_EXPORT",)
-    assert calls == []
+    assert calls == ["fragments"]
     assert all(projection.support == "text_fallback" for projection in projections)

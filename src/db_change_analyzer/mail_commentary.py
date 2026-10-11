@@ -71,6 +71,20 @@ def build_source_unit_input(
                 "scope_complete": None, "scope_kind": "none",
             })
     facts = [_fact(change, extra_secret_patterns)[0] for change in changes.facts]
+    known_evidence = {item["evidence_id"] for item in registry}
+    for fact in facts:
+        for side_name, value in (("base", fact["before"]), ("target", fact["after"])):
+            for evidence_id in value["evidence_ids"]:
+                if evidence_id in known_evidence or value["state"] not in {"absent_in_snapshot", "not_applicable"}:
+                    continue
+                registry.append({
+                    "evidence_id": evidence_id, "kind": "snapshot_absence", "side": side_name,
+                    "path": None, "start_line": None, "end_line": None, "sha256": None,
+                    "detail_tr": "İzlenen Git snapshot kapsamında nesne tanımı bulunmadı.",
+                    "synthetic": False, "object_id": object_id, "scope_complete": True,
+                    "scope_kind": "snapshot",
+                })
+                known_evidence.add(evidence_id)
     stub = {
         "synthetic": False, "report_id": report_id,
         "source": {"base_sha": base_sha, "target_sha": target_sha,
@@ -111,9 +125,16 @@ def synthetic_probe_input() -> dict[str, Any]:
 
 def _restatement(fact: dict[str, Any]) -> str | None:
     before, after = fact["before"], fact["after"]
-    if before["state"] != "present" or after["state"] != "present":
+    if before["state"] == "present" and after["state"] == "present":
+        text = f"Git kaynağında {fact['subject_name']} değeri {before['value']} iken {after['value']} oldu."
+    elif before["state"] == "present" and after["state"] == "absent_in_snapshot":
+        subject = "nesne" if fact["subject_name"] == "Nesne tanımı" else fact["subject_name"]
+        text = f"Git kaynağında {subject} kaldırıldı."
+    elif before["state"] == "absent_in_snapshot" and after["state"] == "present":
+        subject = "nesne" if fact["subject_name"] == "Nesne tanımı" else fact["subject_name"]
+        text = f"Git kaynağında {subject} eklendi."
+    else:
         return None
-    text = f"Git kaynağında {fact['subject_name']} değeri {before['value']} iken {after['value']} oldu."
     return text if len(text) <= 360 and not _FORBIDDEN.search(text) else None
 
 

@@ -121,6 +121,18 @@ def test_checkpoint_compare_and_swap_rejects_stale_expected_base(tmp_path: Path)
             store.compare_and_swap_checkpoint(None, "b" * 40, 1)
 
 
+def test_rebaseline_accepts_initial_null_checkpoint(tmp_path: Path) -> None:
+    store = SqliteStateStore(config_for(tmp_path))
+    with store.lock():
+        store.initialize()
+
+    store.rebaseline(None, "b" * 40, "initial repository alignment")
+
+    status = store.verify()
+    assert status["checkpoint_sha"] == "b" * 40
+    assert status["epoch"] == 2
+
+
 def test_migrate_run_increments_generation_without_reusing_previous_units(tmp_path: Path) -> None:
     store = SqliteStateStore(config_for(tmp_path))
     with store.lock():

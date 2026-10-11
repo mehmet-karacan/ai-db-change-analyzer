@@ -12,6 +12,13 @@ out/
 .local-corpora/
 graft/
 
+# Local IDE metadata and the disposable bare source checkout used for
+# read-only analysis are not product inputs.
+/.idea/
+/*.iml
+/gpu-db.git/
+/.ignore
+
 # User-supplied/private design and reference inputs are local evidence, not product source.
 /AKTIF_GOREV.md
 /TEKNIK_TASARIM.md

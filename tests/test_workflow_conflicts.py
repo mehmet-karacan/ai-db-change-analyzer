@@ -62,6 +62,22 @@ def test_changed_partial_inventory_cannot_prove_absence() -> None:
     assert _identity_incomplete_paths(inventories) == {b"scope/unknown.sql"}
 
 
+def test_non_object_sidecars_do_not_block_changed_object_analysis() -> None:
+    def inventory(path: bytes, status: str, occurrences=(), *diagnostics: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            entry=SimpleNamespace(path=path), parse_status=status,
+            diagnostics=diagnostics, occurrences=occurrences,
+            projections=(),
+        )
+
+    sidecar = inventory(b"scope/T/grants.sql", "text_fallback", (), "UNRESOLVED_PREFIX_OR_ARTIFACT")
+    object_file = inventory(b"scope/T/ddl.sql", "text_fallback", (object(),), "PARSER_NOT_VERIFIED")
+
+    assert _incomplete_changed_paths(
+        [sidecar, object_file], {sidecar.entry.path, object_file.entry.path}
+    ) == {object_file.entry.path}
+
+
 def test_structural_projection_facts_keep_taxonomy_and_both_source_sides() -> None:
     def ref(sql: str) -> SimpleNamespace:
         occurrence = scan(sql.encode(), default_schema="S").occurrences[0]

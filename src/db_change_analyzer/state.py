@@ -480,7 +480,18 @@ class SqliteStateStore:
             WHERE scope_hash=?""", (self.config.scope_hash,)).fetchone()
             if row is None or row["checkpoint_sha"] != expected_base:
                 raise StateError("expected checkpoint mismatch")
-            connection.execute("UPDATE scopes SET epoch=epoch+1, checkpoint_sha=? WHERE scope_hash=? AND epoch=? AND checkpoint_sha=?", (target, self.config.scope_hash, row["epoch"], expected_base))
+            if expected_base is None:
+                cursor = connection.execute(
+                    "UPDATE scopes SET epoch=epoch+1, checkpoint_sha=? WHERE scope_hash=? AND epoch=? AND checkpoint_sha IS NULL",
+                    (target, self.config.scope_hash, row["epoch"]),
+                )
+            else:
+                cursor = connection.execute(
+                    "UPDATE scopes SET epoch=epoch+1, checkpoint_sha=? WHERE scope_hash=? AND epoch=? AND checkpoint_sha=?",
+                    (target, self.config.scope_hash, row["epoch"], expected_base),
+                )
+            if cursor.rowcount != 1:
+                raise StateError("rebaseline compare-and-swap failed")
             connection.execute("INSERT INTO audit_events(scope_hash,action,actor,expected_base,target,reason,created_at) VALUES (?,'REBASELINED','operator',?,?,?,?)", (self.config.scope_hash, expected_base, target, reason, _now()))
             connection.commit()
         except Exception:

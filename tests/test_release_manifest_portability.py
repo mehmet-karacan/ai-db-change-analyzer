@@ -14,9 +14,13 @@ def test_manifest_text_files_have_pinned_line_endings() -> None:
         if line.startswith("/") and " text eol=" in line:
             path, ending = line.removeprefix("/").split(" text eol=", 1)
             pinned[path] = ending
+        elif line.startswith("/") and line.endswith(" -text"):
+            pinned[line.removeprefix("/").removesuffix(" -text")] = "binary"
     assert paths == set(pinned)
-    assert set(pinned.values()) <= {"lf", "crlf"}
+    assert set(pinned.values()) <= {"lf", "crlf", "binary"}
     for path, ending in pinned.items():
+        if ending == "binary":
+            continue
         raw = (ROOT / path).read_bytes()
         if ending == "lf":
             assert b"\r\n" not in raw, path
