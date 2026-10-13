@@ -3,7 +3,7 @@
   "release": "0.1.0",
   "files": {
     ".gitattributes": "b2fb33501895a646119ea65a80506d668b83e06f30264d6600411dc88cb06abe",
-    "Jenkinsfile": "257e12533c83f99eadf75f10ff65bc63be695bfcf9544beed13aa1246a51c957",
+    "Jenkinsfile": "5f2577252df911768260253963f42dc13f1a37288bc00217b4ac309433dd849f",
     "config/gpu.artifact.example.toml": "084e56211ac9300883e4223216a786a2789a5894d9ad61ac4651bf3c6b6930de",
     "config/gpu.artifact.toml": "ee34f3a1c23cf64d0e7864543bd0350c5a7db47cb236613ece30f5dfae87f4d7",
     "config/gpu.example.toml": "ebfadcc0072793cefd0259858e3617bf6b95c8d69b2d3a60f7d236fdeb5b4795",

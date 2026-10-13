@@ -6,6 +6,7 @@ JENKINSFILE = (ROOT / "Jenkinsfile").read_text(encoding="utf-8")
 
 
 def test_analyzer_pipeline_is_downstream_of_gpu_sync_and_archives_artifacts() -> None:
+    assert "agent { label 'jenkins-2' }" in JENKINSFILE
     assert "upstreamProjects: analyzerUpstream" in JENKINSFILE
     assert "def analyzerUpstream = 'sky/GPU/GPU-FUSION/10-ORACLE_DB_DDL_SYNC'" in JENKINSFILE
     assert "archiveArtifacts" in JENKINSFILE

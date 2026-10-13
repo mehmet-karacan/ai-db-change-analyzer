@@ -26,7 +26,10 @@ def analyzerGitCredentialId = params.ANALYZER_GIT_CREDENTIAL_ID ?: 'gpu-db-http-
 def analyzerModelKeyCredentialId = params.ANALYZER_MODEL_KEY_CREDENTIAL_ID ?: 'aihub-api-key'
 
 pipeline {
-    agent any
+    // Analyzer state and the Git cache are node-local. Keep this job on the
+    // dedicated persistent agent so a retry cannot lose its checkpoint and
+    // start the same model review again on another node.
+    agent { label 'jenkins-2' }
 
     options {
         skipDefaultCheckout(true)
