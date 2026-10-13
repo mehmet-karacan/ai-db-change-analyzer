@@ -12,7 +12,7 @@ def sha256(byte[] bytes) {
 
 def consumeAnalyzerReportArtifact(String artifactDir, String subject, String recipients) {
     def result = readJSON file: "${artifactDir}/result.json"
-    if (result.schema_version != '2.0' || result.outcome != 'ARTIFACT_READY' ||
+    if (result.schema_version != '2.0' || !(result.outcome in ['ARTIFACT_READY', 'MANUAL_COMPLETE']) ||
         result.artifact_ready != true || result.exit_code != 0 ||
         result.delivery_mode != 'jenkins_artifact' || result.smtp_attempts != 0) {
         error("Analyzer artifact is not sendable: ${result.outcome}/${result.error_code}")

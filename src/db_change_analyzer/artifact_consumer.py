@@ -50,7 +50,7 @@ def consume_artifact_directory(root: str | Path) -> ArtifactBundle:
         raise ArtifactContractError("ARTIFACT_RESULT_INVALID") from exc
     if not isinstance(result, dict) or result.get("schema_version") != "2.0":
         raise ArtifactContractError("ARTIFACT_RESULT_VERSION")
-    if result.get("outcome") != "ARTIFACT_READY" or result.get("artifact_ready") is not True or result.get("exit_code") != 0:
+    if result.get("outcome") not in {"ARTIFACT_READY", "MANUAL_COMPLETE"} or result.get("artifact_ready") is not True or result.get("exit_code") != 0:
         raise ArtifactContractError("ARTIFACT_RESULT_NOT_READY")
     if result.get("delivery_mode") != "jenkins_artifact" or result.get("smtp_attempts") != 0:
         raise ArtifactContractError("ARTIFACT_DELIVERY_PROFILE_MISMATCH")

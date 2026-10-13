@@ -11,6 +11,8 @@ def analyzerMailRecipients = 'mkaracan@innova.com.tr'
 // the first run usable as well so it can install the job parameters/trigger.
 def requestedAnalyzerConfig = (params.ANALYZER_CONFIG ?: '').trim()
 def requestedAnalyzerWheelhouse = (params.ANALYZER_WHEELHOUSE ?: '').trim()
+def requestedManualBaseSha = (params.ANALYZER_MANUAL_BASE_SHA ?: '').trim()
+def requestedManualTargetSha = (params.ANALYZER_MANUAL_TARGET_SHA ?: '').trim()
 // Runtime inputs belong to this checkout. The absolute paths were an older
 // agent provisioning contract; map them to the repository copy so a normal
 // GitHub checkout is sufficient.
@@ -56,6 +58,16 @@ pipeline {
             name: 'ANALYZER_WHEELHOUSE',
             defaultValue: 'vendor/wheels/cp310',
             description: 'Analyzer repository içindeki onaylı, hash kilitli Python wheel klasörü.'
+        )
+        string(
+            name: 'ANALYZER_MANUAL_BASE_SHA',
+            defaultValue: '',
+            description: 'Opsiyonel manuel test aralığı başlangıç SHA değeri. Boş bırakılırsa otomatik checkpoint kullanılır.'
+        )
+        string(
+            name: 'ANALYZER_MANUAL_TARGET_SHA',
+            defaultValue: '',
+            description: 'Opsiyonel manuel test aralığı hedef SHA değeri. Base ile birlikte verilirse mail üreten manuel analiz çalışır.'
         )
         credentials(
             name: 'ANALYZER_GIT_CREDENTIAL_ID',
@@ -150,7 +162,9 @@ pipeline {
                         int rc
                         dir('analyzer-src') {
                             withEnv([
-                                "ANALYZER_CONFIG=${env.WORKSPACE}/.analyzer-runtime.toml"
+                                "ANALYZER_CONFIG=${env.WORKSPACE}/.analyzer-runtime.toml",
+                                "ANALYZER_MANUAL_BASE_SHA=${requestedManualBaseSha}",
+                                "ANALYZER_MANUAL_TARGET_SHA=${requestedManualTargetSha}"
                             ]) {
                                 rc = sh(
                                     returnStatus: true,
@@ -183,10 +197,23 @@ pipeline {
                                             --ack-unanalysed-history
                                     fi
                                     echo 'ANALYZER_PHASE=RUN_START'
-                                    PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
-                                        --config "$ANALYZER_CONFIG" \
-                                        --emit-dir "$WORKSPACE/out" \
-                                        run --allow-ai
+                                    if [ -n "$ANALYZER_MANUAL_BASE_SHA" ] || [ -n "$ANALYZER_MANUAL_TARGET_SHA" ]; then
+                                        if [ -z "$ANALYZER_MANUAL_BASE_SHA" ] || [ -z "$ANALYZER_MANUAL_TARGET_SHA" ]; then
+                                            echo 'Manuel analiz için base ve target SHA birlikte verilmelidir.' >&2
+                                            exit 2
+                                        fi
+                                        echo 'ANALYZER_PHASE=MANUAL_RUN_START'
+                                        PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
+                                            --config "$ANALYZER_CONFIG" \
+                                            --emit-dir "$WORKSPACE/out" \
+                                            manual --base "$ANALYZER_MANUAL_BASE_SHA" \
+                                            --target "$ANALYZER_MANUAL_TARGET_SHA" --allow-ai
+                                    else
+                                        PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
+                                            --config "$ANALYZER_CONFIG" \
+                                            --emit-dir "$WORKSPACE/out" \
+                                            run --allow-ai
+                                    fi
                                     echo 'ANALYZER_PHASE=RUN_COMPLETE'
                                     '''
                                 )
@@ -214,7 +241,7 @@ pipeline {
             script {
                 if (fileExists('out/result.json')) {
                     def result = readJSON file: 'out/result.json'
-                    if (result.outcome == 'ARTIFACT_READY') {
+                    if (result.outcome in ['ARTIFACT_READY', 'MANUAL_COMPLETE']) {
                         def consumer = load 'analyzer-src/jenkins/consume_report_artifact.groovy'
                         consumer.consumeAnalyzerReportArtifact(
                             'out',

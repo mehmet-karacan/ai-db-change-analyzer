@@ -9,6 +9,7 @@ def test_jenkins_consumer_is_a_reviewable_single_emailext_fragment() -> None:
 
     assert "consumeAnalyzerReportArtifact" in source
     assert source.count("emailext(") == 1
+    assert "!(result.outcome in ['ARTIFACT_READY', 'MANUAL_COMPLETE'])" in source
     assert "result.artifact_ready != true" in source
     assert "result.smtp_attempts != 0" in source
     assert "result.artifact_manifest_sha256" in source

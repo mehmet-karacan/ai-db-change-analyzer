@@ -120,6 +120,19 @@ def test_artifact_profile_runs_without_smtp_and_does_not_create_notification(tmp
     assert persisted_report["schema_version"] == "2.0"
     assert persisted_report["analysis_fingerprint"] == result["analysis_fingerprint"]
     assert consume_artifact_directory(out).manifest["report_id"] == result["report_id"]
+    checkpoint_before_manual = result["checkpoint_after"]
+    manual_out = tmp_path / "out-manual"
+    assert main([
+        "--config", str(config), "--emit-dir", str(manual_out), "manual",
+        "--base", first, "--target", second, "--allow-ai",
+    ]) == 0
+    manual_result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert manual_result["outcome"] == "MANUAL_COMPLETE"
+    assert manual_result["delivery_mode"] == "jenkins_artifact"
+    assert manual_result["artifact_ready"] is True
+    assert manual_result["checkpoint_before"] == checkpoint_before_manual
+    assert manual_result["checkpoint_after"] == checkpoint_before_manual
+    assert consume_artifact_directory(manual_out).manifest["report_id"] == manual_result["report_id"]
     replay = tmp_path / "replay"
     assert main([
         "--config", str(config), "--emit-dir", str(replay), "report", "emit",

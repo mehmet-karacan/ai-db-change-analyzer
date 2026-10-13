@@ -1840,7 +1840,17 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 connection.execute("UPDATE runs SET status='CLOSED' WHERE run_id=?", (run_id,))
         finally:
             connection.close()
-        return _finish(args, mode="MANUAL", outcome="MANUAL_COMPLETE", emitted_files=emitted, checkpoint_before=store.verify()["checkpoint_sha"], checkpoint_after=store.verify()["checkpoint_sha"], run_id=run_id, report_id=report_id, report_sha256=rendered.sha256, quality=quality, ai_http_attempts=http_attempts, delivery_mode=config.delivery.mode)
+        return _finish(
+            args, mode="MANUAL", outcome="MANUAL_COMPLETE", emitted_files=emitted,
+            checkpoint_before=store.verify()["checkpoint_sha"], checkpoint_after=store.verify()["checkpoint_sha"],
+            run_id=run_id, report_id=report_id, report_sha256=rendered.sha256, quality=quality,
+            ai_http_attempts=http_attempts, delivery_mode=config.delivery.mode,
+            analysis_fingerprint=analysis_fingerprint,
+            artifact_ready=quality != "blocked" if config.delivery.mode == "jenkins_artifact" else False,
+            artifact_manifest_sha256=hashlib.sha256(manifest_json + b"\n").hexdigest() if config.delivery.mode == "jenkins_artifact" else None,
+            email_html_path="report-email.html" if config.delivery.mode == "jenkins_artifact" else None,
+            email_html_sha256=manifest["email_html_sha256"] if config.delivery.mode == "jenkins_artifact" else None,
+        )
     if config.delivery.mode == "jenkins_artifact":
         connection = store.connection()
         try:

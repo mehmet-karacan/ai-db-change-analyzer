@@ -19,7 +19,7 @@ def test_analyzer_pipeline_is_git_only_and_sends_only_verified_artifacts() -> No
     assert "run --allow-ai" in JENKINSFILE
     assert "run --allow-mail" not in JENKINSFILE
     assert "consume_report_artifact.groovy" in JENKINSFILE
-    assert "result.outcome == 'ARTIFACT_READY'" in JENKINSFILE
+    assert "result.outcome in ['ARTIFACT_READY', 'MANUAL_COMPLETE']" in JENKINSFILE
     assert "mkaracan@innova.com.tr" in JENKINSFILE
     assert "ORACLE_DSN" not in JENKINSFILE
     assert "oracle-db-ddl-sync" not in JENKINSFILE
@@ -43,6 +43,12 @@ def test_analyzer_pipeline_is_manually_startable_with_parameters() -> None:
     assert "params.ANALYZER_MODEL_KEY_CREDENTIAL_ID ?:" in JENKINSFILE
     assert "name: 'ANALYZER_CONFIG'" in JENKINSFILE
     assert "name: 'ANALYZER_WHEELHOUSE'" in JENKINSFILE
+    assert "params.ANALYZER_MANUAL_BASE_SHA ?:" in JENKINSFILE
+    assert "params.ANALYZER_MANUAL_TARGET_SHA ?:" in JENKINSFILE
+    assert "name: 'ANALYZER_MANUAL_BASE_SHA'" in JENKINSFILE
+    assert "name: 'ANALYZER_MANUAL_TARGET_SHA'" in JENKINSFILE
+    assert "manual --base \"$ANALYZER_MANUAL_BASE_SHA\"" in JENKINSFILE
+    assert "--target \"$ANALYZER_MANUAL_TARGET_SHA\" --allow-ai" in JENKINSFILE
     assert "name: 'ANALYZER_GIT_CREDENTIAL_ID'" in JENKINSFILE
     assert "name: 'ANALYZER_MODEL_KEY_CREDENTIAL_ID'" in JENKINSFILE
     assert 'cp "$WORKSPACE/out/capability-record.json" "$PWD/.analyzer-state/capability-record.json"' in JENKINSFILE
