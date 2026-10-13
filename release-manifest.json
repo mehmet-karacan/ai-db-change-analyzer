@@ -29,7 +29,7 @@
     "src/db_change_analyzer/config.py": "71880cab4149e7c21f9f9b50e709e416096783581e6f3bf2a0f3ff223c3c13e1",
     "src/db_change_analyzer/dependencies.py": "7d88400a0c639b3ed3dcca3221d943c95cfe32eea26da0d2dd356ec77de2af6b",
     "src/db_change_analyzer/git_client.py": "a0897c1b45ec14252bf3bb1b67fec0c69064ed9c552bedafd5bc7387b5b2a774",
-    "src/db_change_analyzer/inventory.py": "064aef6b2f8f81c12aa5963e9b01ddf636c559d8dadfd65d6e9c02a039bf8029",
+    "src/db_change_analyzer/inventory.py": "a83edf9e5dea6b749f71c93b53fbdef9c8fd627a929c0d98fce0d74181374375",
     "src/db_change_analyzer/litellm_http.py": "87ee19aaf1c7fd5b2d20d26a065241e924f3f3789adbb8c1ba7bbcfc4a3bedc6",
     "src/db_change_analyzer/migrations/002_v5_sidecars.sql": "5719cd259ab20de73610609740dd21f10e9d6cfdc56e5d7273bfcbee5bdcf39f",
     "src/db_change_analyzer/models.py": "c086b9b11cd87c7971dd148b567fc000f753d7c3ce3a9512d36102edfe20539a",

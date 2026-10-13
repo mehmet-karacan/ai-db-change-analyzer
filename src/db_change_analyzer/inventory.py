@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 from dataclasses import dataclass
 from hashlib import sha256
@@ -312,15 +313,14 @@ def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, 
                     raw_by_oid[oid] = git.read_blob(oid, max_file_bytes)
                 except GitError as exc:
                     read_errors[oid] = exc
-    for entry in entries:
+    def inventory_entry(entry: TreeEntry) -> FileInventory | None:
         matching = [(root, schema) for root, schema in roots.items() if entry.path == root.encode() or entry.path.startswith(root.encode() + b"/")]
         if not matching:
-            continue
+            return None
         if not needs_raw(entry):
-            continue
+            return None
         if entry.mode in {"120000", "160000"} or entry.kind != "blob":
-            inventories.append(FileInventory(entry, None, None, None, "unsupported", ("UNSUPPORTED_GIT_MODE",), (), ()))
-            continue
+            return FileInventory(entry, None, None, None, "unsupported", ("UNSUPPORTED_GIT_MODE",), (), ())
         try:
             if entry.oid in read_errors:
                 raise read_errors[entry.oid]
@@ -328,11 +328,20 @@ def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, 
         except (KeyError, GitError) as exc:
             if isinstance(exc, KeyError):
                 exc = GitError("BLOB_READ_MISSING", "batched blob read did not return the requested object")
-            inventories.append(FileInventory(entry, None, None, None, "unresolved", (exc.code,), (), ()))
-            continue
+            return FileInventory(entry, None, None, None, "unresolved", (exc.code,), (), ())
         if not entry.path.lower().endswith(b".sql"):
-            inventories.append(FileInventory(entry, len(raw), None, _newline_style(raw), "artifact", (), (), ()))
-            continue
+            return FileInventory(entry, len(raw), None, _newline_style(raw), "artifact", (), (), ())
         scan_result, projections, status, diagnostics = inventory_bytes(raw, default_schema=matching[0][1], parse_timeout_seconds=timeout_seconds, parse=parse_paths is None or entry.path in parse_paths, parser_cache=parser_cache)
-        inventories.append(FileInventory(entry, len(raw), "utf-8" if "ENCODING_UNRESOLVED" not in diagnostics else None, _newline_style(raw), status, diagnostics, scan_result.occurrences, projections, raw))
+        return FileInventory(entry, len(raw), "utf-8" if "ENCODING_UNRESOLVED" not in diagnostics else None, _newline_style(raw), status, diagnostics, scan_result.occurrences, projections, raw)
+
+    matching_entries = [entry for entry in entries if entry.kind == "blob" and entry.mode not in {"120000", "160000"} and needs_raw(entry)]
+    if len(matching_entries) < 2:
+        inventories.extend(item for entry in matching_entries if (item := inventory_entry(entry)) is not None)
+    else:
+        # Parser workers are isolated subprocesses.  A small bounded pool keeps
+        # slow or complex SQL files from serializing the whole snapshot while
+        # preserving the tree order returned by executor.map().
+        worker_count = min(4, len(matching_entries))
+        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="oracle-inventory") as executor:
+            inventories.extend(item for item in executor.map(inventory_entry, matching_entries) if item is not None)
     return inventories
