@@ -92,6 +92,7 @@ class FileInventory:
     occurrences: tuple[ScanOccurrence, ...]
     projections: tuple[Projection, ...]
     raw: bytes | None = None
+    parser_verified: bool = True
 
 
 def _newline_style(raw: bytes) -> str:
@@ -219,7 +220,7 @@ def _parse_fragments_in_worker(fragments: tuple[str, ...], timeout_seconds: int,
     return result
 
 
-def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_seconds: int = 20, parse: bool = True, parser_cache=None) -> tuple[ScanResult, tuple[Projection, ...], str, tuple[str, ...]]:
+def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_seconds: int = 20, parse: bool = True, parser_cache=None, verify_parser: bool = True) -> tuple[ScanResult, tuple[Projection, ...], str, tuple[str, ...]]:
     result = scan(raw, default_schema=default_schema)
     if "ENCODING_UNRESOLVED" in result.diagnostics:
         return result, (), "unresolved", result.diagnostics
@@ -231,6 +232,16 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
     # facts. Keep their scanner diagnostics as file evidence and continue.
     if not result.occurrences:
         return result, (), "unresolved", result.diagnostics
+    if not verify_parser:
+        # Aggregate mode still uses the scanner's bounded object spans and the
+        # type-specific deterministic extractors, but skips the expensive
+        # grammar worker. The report marks these objects limited elsewhere.
+        projections = tuple(
+            project(item, text[item.start_char : item.end_char], parse_ok=True)
+            for item in result.occurrences
+        )
+        extraction_diagnostics = tuple(code for projection in projections for code in projection.diagnostics)
+        return result, projections, "limited", extraction_diagnostics
     # The generated GPU repository emits standalone sequence DDL. The
     # sequence extractor already validates and normalizes every supported
     # option, while the bundled ANTLR grammar can spend minutes exploring an
@@ -277,7 +288,7 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
     return result, projections, status, tuple((*result.diagnostics, *parse_diagnostics, *extraction_diagnostics))
 
 
-def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, max_file_bytes: int, timeout_seconds: int, parse_paths: set[bytes] | None = None, parser_cache=None) -> list[FileInventory]:
+def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, max_file_bytes: int, timeout_seconds: int, parse_paths: set[bytes] | None = None, parser_cache=None, verify_parser: bool = True) -> list[FileInventory]:
     inventories: list[FileInventory] = []
     entries = git.list_tree(revision)
     def needs_raw(entry: TreeEntry) -> bool:
@@ -331,8 +342,16 @@ def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, 
             return FileInventory(entry, None, None, None, "unresolved", (exc.code,), (), ())
         if not entry.path.lower().endswith(b".sql"):
             return FileInventory(entry, len(raw), None, _newline_style(raw), "artifact", (), (), ())
-        scan_result, projections, status, diagnostics = inventory_bytes(raw, default_schema=matching[0][1], parse_timeout_seconds=timeout_seconds, parse=parse_paths is None or entry.path in parse_paths, parser_cache=parser_cache)
-        return FileInventory(entry, len(raw), "utf-8" if "ENCODING_UNRESOLVED" not in diagnostics else None, _newline_style(raw), status, diagnostics, scan_result.occurrences, projections, raw)
+        scan_result, projections, status, diagnostics = inventory_bytes(
+            raw, default_schema=matching[0][1], parse_timeout_seconds=timeout_seconds,
+            parse=parse_paths is None or entry.path in parse_paths, parser_cache=parser_cache,
+            verify_parser=verify_parser,
+        )
+        return FileInventory(
+            entry, len(raw), "utf-8" if "ENCODING_UNRESOLVED" not in diagnostics else None,
+            _newline_style(raw), status, diagnostics, scan_result.occurrences, projections, raw,
+            verify_parser,
+        )
 
     matching_entries = [entry for entry in entries if entry.kind == "blob" and entry.mode not in {"120000", "160000"} and needs_raw(entry)]
     if len(matching_entries) < 2:

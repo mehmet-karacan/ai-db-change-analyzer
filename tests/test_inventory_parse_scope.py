@@ -73,6 +73,23 @@ def test_generated_sequence_shape_uses_fast_structural_projection(monkeypatch) -
     assert calls == []
 
 
+def test_aggregate_projection_skips_grammar_worker(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "db_change_analyzer.inventory._parse_in_worker",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("grammar worker must be skipped")),
+    )
+    raw = b"CREATE SEQUENCE S.SEQ_T INCREMENT BY 1 START WITH 10 CACHE 20 NOORDER NOCYCLE;"
+
+    _scanned, projections, status, diagnostics = inventory_bytes(
+        raw, default_schema="S", parse_timeout_seconds=20, verify_parser=False,
+    )
+
+    assert status == "limited"
+    assert diagnostics == ()
+    assert projections[0].support == "structural"
+    assert projections[0].properties["start_with"] == "10"
+
+
 def test_inventory_retries_scanned_objects_when_combined_file_parse_fails(monkeypatch) -> None:
     raw = b"CREATE TABLE S.A (ID NUMBER);\nCREATE TABLE S.B (ID NUMBER);\n"
     calls: list[tuple[str, ...]] = []

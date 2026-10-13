@@ -364,6 +364,7 @@ def _incomplete_changed_paths(inventories: list[FileInventory], changed_paths: s
         # Only an inventory that actually yielded an object occurrence can
         # make the object-level analysis incomplete.
         and (not hasattr(item, "occurrences") or item.occurrences)
+        and getattr(item, "parser_verified", True)
         and (
             item.parse_status != "parsed" or "UNRESOLVED_PREFIX_OR_ARTIFACT" in item.diagnostics
             or any(projection.diagnostics for projection in item.projections)
@@ -909,12 +910,37 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     analysis_started_mono = time.monotonic()
     roots = {root.path: root.default_schema for root in config.scope.roots}
     changed_paths = {delta.path for delta in plan.scope_deltas}
-    old_inventories = [] if plan.base_sha is None else inventory_revision(git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths, parser_cache=store)
-    new_inventories = inventory_revision(git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes, timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths, parser_cache=store)
-    old_index = _index(git, plan.base_sha, old_inventories, config.parser.max_file_bytes) if plan.base_sha else {}
-    new_index = _index(git, plan.target_sha, new_inventories, config.parser.max_file_bytes)
-    old_index, old_context_paths = _attach_table_contexts(git, plan.base_sha, roots, old_inventories, old_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store, changed_paths) if plan.base_sha else ({}, set())
-    new_index, new_context_paths = _attach_table_contexts(git, plan.target_sha, roots, new_inventories, new_index, config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store, changed_paths)
+    fast_inventory = True
+
+    def snapshot_context(*, verify_parser: bool):
+        old_snapshot = [] if plan.base_sha is None else inventory_revision(
+            git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes,
+            timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths,
+            parser_cache=store, verify_parser=verify_parser,
+        )
+        new_snapshot = inventory_revision(
+            git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes,
+            timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths,
+            parser_cache=store, verify_parser=verify_parser,
+        )
+        old_snapshot_index = _index(git, plan.base_sha, old_snapshot, config.parser.max_file_bytes) if plan.base_sha else {}
+        new_snapshot_index = _index(git, plan.target_sha, new_snapshot, config.parser.max_file_bytes)
+        if verify_parser:
+            old_snapshot_index, old_paths = _attach_table_contexts(
+                git, plan.base_sha, roots, old_snapshot, old_snapshot_index,
+                config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store, changed_paths,
+            ) if plan.base_sha else ({}, set())
+            new_snapshot_index, new_paths = _attach_table_contexts(
+                git, plan.target_sha, roots, new_snapshot, new_snapshot_index,
+                config.parser.max_file_bytes, config.parser.worker_timeout_seconds, store, changed_paths,
+            )
+        else:
+            old_paths, new_paths = set(), set()
+        return old_snapshot, new_snapshot, old_snapshot_index, new_snapshot_index, old_paths, new_paths
+
+    old_inventories, new_inventories, old_index, new_index, old_context_paths, new_context_paths = snapshot_context(
+        verify_parser=not fast_inventory,
+    )
     incomplete_paths = _incomplete_changed_paths(old_inventories, changed_paths) | _incomplete_changed_paths(new_inventories, changed_paths)
     # Identity completeness is relevant to the changed range. Unchanged
     # sidecar files elsewhere in a generated repository may contain grants,
@@ -929,11 +955,24 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     scope_incomplete = bool(incomplete_paths)
     reordered_keys = _reordered_keys(old_inventories, new_inventories)
     changed_keys = sorted({key for key in old_index.keys() | new_index.keys() if _signature(old_index.get(key, [])) != _signature(new_index.get(key, []))} | reordered_keys)
+    if fast_inventory and len(changed_keys) <= config.analysis.max_objects_for_individual_ai_review:
+        old_inventories, new_inventories, old_index, new_index, old_context_paths, new_context_paths = snapshot_context(verify_parser=True)
+        incomplete_paths = _incomplete_changed_paths(old_inventories, changed_paths) | _incomplete_changed_paths(new_inventories, changed_paths)
+        incomplete_paths |= (_identity_incomplete_paths(old_inventories) | _identity_incomplete_paths(new_inventories)) & changed_paths
+        old_incomplete = (_incomplete_changed_paths(old_inventories, changed_paths)
+                          | (_identity_incomplete_paths(old_inventories) & changed_paths)) - old_context_paths
+        new_incomplete = (_incomplete_changed_paths(new_inventories, changed_paths)
+                          | (_identity_incomplete_paths(new_inventories) & changed_paths)) - new_context_paths
+        incomplete_paths = old_incomplete | new_incomplete
+        scope_incomplete = bool(incomplete_paths)
+        reordered_keys = _reordered_keys(old_inventories, new_inventories)
+        changed_keys = sorted({key for key in old_index.keys() | new_index.keys() if _signature(old_index.get(key, [])) != _signature(new_index.get(key, []))} | reordered_keys)
     _verify_changed_refs(old_index, changed_keys, config.parser.worker_timeout_seconds, store)
     _verify_changed_refs(new_index, changed_keys, config.parser.worker_timeout_seconds, store)
     _phase_log("SNAPSHOT_INVENTORY_COMPLETE", changed_objects=len(changed_keys), changed_paths=len(changed_paths))
     source_review_mode = config.analysis.review_mode == "source_review"
     aggregate_mode = len(changed_keys) > config.analysis.max_objects_for_individual_ai_review
+    aggregate_fast_projection = aggregate_mode and fast_inventory
     dependency_edges: tuple[dict[str, object], ...] = ()
     dependency_evidence: list[dict[str, Any]] = []
     dependency_omissions: tuple[str, ...] = ()
@@ -1105,7 +1144,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 assessments: list[dict[str, Any]] = []
                 facts: list[dict[str, Any]] = []
                 categories = ["unknown"]
-                status = "limited" if any(item.projection.support != "structural" for item in all_refs) else "analyzed"
+                status = "limited" if aggregate_fast_projection or any(item.projection.support != "structural" for item in all_refs) else "analyzed"
                 sequence_change = (
                     sequence_start_value_only(old_evidence[0]["snippet"], new_evidence[0]["snippet"])
                     if old_refs and new_refs and not conflict
@@ -1611,6 +1650,8 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     limitations = ["Analiz Git snapshot kaynaklarıyla sınırlıdır; canlı veritabanı doğrulaması değildir."]
     if scope_incomplete:
         limitations.append("Değişen kaynaklardan bazıları tam ayrıştırılamadı; bilinmeyen nesneler ve işlemler olabilir.")
+    if aggregate_fast_projection:
+        limitations.append("Toplu modda grammar doğrulaması beklemeyi önlemek için atlandı; nesne özetleri deterministik kaynak çıkarımıyla sınırlıdır.")
     if len(plan.commits) > 1 or len(events) > len(unique_deltas):
         limitations.append(
             f"İzlenen aralıkta {len(plan.commits)} Git commit ve {len(events)} dosya geçişi kaydedildi; "
@@ -1635,6 +1676,8 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         },
     }
     risk_assessment = aggregate_risk_assessment or _risk_assessment(objects, changes_by_key, dependency_edges)
+    if aggregate_fast_projection:
+        risk_assessment["limitations"].append("Toplu modda grammar doğrulaması atlandı; risk sınıflandırması scanner ve tip çıkarıcılarının deterministik özetine dayanır.")
     deployment_preparation = _deployment_preparation(objects, changes_by_key)
     _extend_unique_evidence(evidence_registry, dependency_evidence)
     report = {
