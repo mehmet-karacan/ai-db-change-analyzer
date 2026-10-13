@@ -6,7 +6,8 @@
 Kaynak tabanlı risk: {{ risk_summary.label }} ({{ risk_summary.confidence_label }})
 Etki kapsamı: {{ impact_summary.status_label }}. {{ impact_summary.provided_count }} doğrulanmış aday / {{ impact_summary.candidate_count }} aday.
 {% for row in impact_summary.external_rows %}{{ row.label }}: {{ row.value }}
-{% endfor %}{% endif %}
+{% endfor %}{% if aggregate_review.mode == 'aggregate' %}Toplu model değerlendirmesi: {% if aggregate_review.commentary %}{{ aggregate_review.commentary }}{% else %}Model değerlendirmesi üretilemedi; bu rapor deterministik kaynak özetiyle sınırlıdır.{% endif %}
+{% endif %}{% endif %}
 
 EKLENEN: {{ counts.added }} | GÜNCELLENEN: {{ counts.modified }} | SİLİNEN: {{ counts.removed }}
 {{ coverage_display }}

@@ -194,7 +194,14 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
         facts = [fact for fact in obj["facts"] if fact["change_action"] != "unchanged" or fact["context_only"]]
         comments = [{"label": {"summary": "AI Yorumu", "interpretation": "AI Yorumu", "uncertainty": "AI Belirsizlik Notu", "recommended_check": "AI Kontrol Önerisi"}[comment["kind"]], "text": comment["text_tr"], "author_execution_id": comment.get("author_execution_id")} for comment in obj["ai_comments"]]
         limited = obj["verification"] != "verified"
-        method = "Deterministik kaynak karşılaştırması + AI destekli yorum." if comments else "Kaynak farkı doğrulandı; ayrıntılı ayrıştırma sınırlı, AI yorumu gösterilmedi." if limited else "Deterministik kaynak karşılaştırması; AI yorumu kullanılmadı."
+        ai_status = obj.get("ai_status", "not_requested")
+        method = (
+            "Toplu değerlendirme eşiği nedeniyle nesne bazlı yorum üretilmedi."
+            if ai_status == "withheld_threshold" else
+            "Deterministik kaynak karşılaştırması + AI destekli yorum." if comments else
+            "Kaynak farkı doğrulandı; ayrıntılı ayrıştırma sınırlı, AI yorumu gösterilmedi." if limited else
+            "Deterministik kaynak karşılaştırması; AI yorumu kullanılmadı."
+        )
         transformed.append({
             "number": f"{number:02d}", "anchor": "nesne-" + obj["object_id"],
             "type": identity["object_type"], "type_label": _TYPES.get(identity["object_type"], {}).get("label_tr", "Desteklenmeyen / çözümlenemeyen tür"),
@@ -202,6 +209,7 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
             "action": action, "risk": risk_badge, "summary": obj["deterministic_summary_tr"], "limited": limited, "renderer": _route(obj),
             "rows": [{"field": fact["subject_name"], "subject": fact["subject_kind"], "change": _change_label(fact), "before": _value(fact, "before"), "after": _value(fact, "after")} for fact in facts[:max_facts]],
             "omitted_facts": max(0, len(facts) - max_facts), "comments": comments,
+            "ai_status": ai_status,
             "checks": [check["text_tr"] for check in obj["recommended_checks"]], "notes": obj["limitations_tr"], "method": method,
         })
     priority = sorted(range(len(transformed)), key=lambda index: (not transformed[index]["limited"], index))
@@ -302,6 +310,14 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
         "static_dependency_candidates": risk.get("basis", {}).get("static_dependency_candidates", 0),
         "limitations": risk.get("limitations", []),
     }
+    aggregate_review = analysis["ai"].get("aggregate_review")
+    aggregate_status = {
+        "mode": analysis["ai"].get("mode", "individual"),
+        "threshold": analysis["ai"].get("individual_review_threshold", 10),
+        "suppressed_object_count": analysis["ai"].get("suppressed_object_count", 0),
+        "commentary": aggregate_review.get("commentary_tr") if aggregate_review else None,
+        "error_code": analysis["ai"].get("aggregate_error_code"),
+    }
     return {
         "counts": counts, "headline": headline, "summary_tr": summary,
         "preheader": f"{counts['primary_total']} nesne kaynak farkı. {summary}",
@@ -313,6 +329,7 @@ def _context(view: dict[str, Any], profile: tuple[str, int, int, int], report_ur
         "artifact_notices": view["artifact_notices"], "coverage_notes": coverage["limitations_tr"],
         "critical_notes": [obj["display_name"] + ": " + obj["summary"] for index, obj in enumerate(transformed) if obj["limited"] and index not in detail_slots][:4],
         "report_url": report_url, "impact_summary": impact_summary, "risk_summary": risk_summary,
+        "aggregate_review": aggregate_status,
         "show_risk_summary": profile[0] != "minimal",
     }
 

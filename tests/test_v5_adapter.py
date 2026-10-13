@@ -7,7 +7,8 @@ from db_change_analyzer.oracle.changes import compare_projections
 from db_change_analyzer.oracle.changes import Change, Value
 from db_change_analyzer.oracle.projections import project
 from db_change_analyzer.oracle.scanner import scan
-from db_change_analyzer.v5_adapter import _display_value, _fact, _recommended_checks, build_mail_view
+from db_change_analyzer.v5_adapter import _display_value, _fact, _recommended_checks, build_innova_mail_view, build_mail_view
+from db_change_analyzer.innova_rendering import render_innova_view
 from db_change_analyzer.v5_rendering import build_render_manifest, render_v5_view
 
 
@@ -87,6 +88,38 @@ def test_adapter_builds_real_schema_view_and_v5_mime_without_ai() -> None:
     assert manifest["html_bytes"] == len(rendered.html)
     assert manifest["mime_sha256"]
     assert manifest["detail_object_ids"] == [view["objects"][0]["object_id"]]
+
+
+def test_aggregate_review_is_global_and_object_cards_are_threshold_withheld() -> None:
+    report, changes = _report()
+    report["counts"].update(ai_http_attempts=1, ai_units=1)
+    key = report["objects"][0]["identity"]["object_key"]
+    aggregate = {
+        "schema_version": "aggregate-review/1.0", "unit_id": "aggregate-1", "input_digest": "a" * 64,
+        "commentary_tr": "Değişiklikler ağırlıklı olarak düşük riskli sıra üreticisi kaynak farklarından oluşuyor; dağıtım öncesi bağımlılık kontrolü önerilir.",
+        "evidence_ids": ["aggregate-counts"], "limitations": ["Yalnız deterministik özet kullanıldı."],
+    }
+    view = build_innova_mail_view(
+        report, changes, analysis_elapsed_ms=1000, ai_phase_started_at=None,
+        ai_phase_completed_at=None, ai_phase_elapsed_ms=None,
+        returned_models_by_unit={"aggregate-1": {"mock-model"}},
+        ai_status_by_key={key: "withheld_threshold"},
+        ai_mode="aggregate", individual_review_threshold=10,
+        suppressed_object_count=11, aggregate_review=aggregate,
+        aggregate_unit_id="aggregate-1",
+    )
+    assert view["analysis"]["ai"]["mode"] == "aggregate"
+    assert view["analysis"]["ai"]["individual_review_threshold"] == 10
+    assert view["analysis"]["ai"]["suppressed_object_count"] == 11
+    assert view["objects"][0]["ai_comments"] == []
+    assert view["objects"][0]["ai_status"] == "withheld_threshold"
+    rendered = render_innova_view(
+        view, sender="analyzer@example.invalid", recipients=["review@example.invalid"],
+        message_id="<aggregate@example.invalid>", date=datetime(2026, 9, 29, tzinfo=UTC),
+    )
+    text = rendered.text.decode("utf-8")
+    assert text.count("Toplu model değerlendirmesi:") == 1
+    assert "Toplu değerlendirme eşiği nedeniyle nesne bazlı yorum üretilmedi." in text
 
 
 def test_added_object_requires_scope_evidence_and_keeps_other_fields_contextual() -> None:

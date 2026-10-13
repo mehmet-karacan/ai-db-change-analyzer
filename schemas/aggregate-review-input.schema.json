@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bounded aggregate review input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "aggregate-review-input/1.0" },
+    "synthetic": { "const": false },
+    "report_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "unit_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "threshold": { "type": "integer", "minimum": 1, "maximum": 100 },
+    "input_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "object_count": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "object_type_counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 }, "maxProperties": 100 },
+        "operation_counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 }, "maxProperties": 10 },
+        "risk_counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 }, "maxProperties": 10 },
+        "priority_objects": { "type": "array", "items": { "$ref": "#/$defs/object_summary" }, "maxItems": 10 },
+        "deterministic_summaries": { "type": "array", "items": { "$ref": "#/$defs/object_summary" }, "minItems": 1, "maxItems": 100000 }
+      },
+      "required": ["object_count", "object_type_counts", "operation_counts", "risk_counts", "priority_objects", "deterministic_summaries"]
+    },
+    "evidence_registry": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "evidence_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "kind": { "enum": ["aggregate_counts", "deterministic_summary"] },
+          "detail_tr": { "type": "string", "minLength": 1, "maxLength": 300 }
+        },
+        "required": ["evidence_id", "kind", "detail_tr"]
+      },
+      "minItems": 2,
+      "maxItems": 100001
+    }
+  },
+  "required": ["schema_version", "synthetic", "report_id", "unit_id", "threshold", "input_digest", "summary", "evidence_registry"],
+  "$defs": {
+    "object_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 100 }, "minItems": 1, "maxItems": 4 },
+        "object_type": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "object_name": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "operation": { "type": "string", "enum": ["added", "modified", "removed", "relocated", "unknown"] },
+        "risk_level": { "type": "string", "enum": ["critical", "high", "medium", "low", "unknown"] },
+        "priority": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "deterministic_summary": { "type": "string", "minLength": 1, "maxLength": 600 },
+        "categories": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 100 }, "maxItems": 8 }
+      },
+      "required": ["evidence_ids", "object_type", "object_name", "operation", "risk_level", "priority", "deterministic_summary", "categories"]
+    }
+  }
+}

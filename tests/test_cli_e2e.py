@@ -1046,7 +1046,14 @@ def test_source_review_budget_progresses_and_final_report_contains_all_units(tmp
 @pytest.mark.parametrize("object_count", [41, 100])
 def test_source_review_budget_processes_real_scale_without_losing_units(tmp_path: Path, capsys, monkeypatch, object_count: int) -> None:
     config = artifact_config_for(tmp_path)
-    config.write_text(config.read_text(encoding="utf-8").replace("dependency_depth = 1", "dependency_depth = 0"), encoding="utf-8")
+    config.write_text(
+        config.read_text(encoding="utf-8")
+        .replace("dependency_depth = 1", "dependency_depth = 0")
+        # This test exercises the per-object invocation budget itself; opt it
+        # out of the production aggregate threshold deliberately.
+        .replace("max_objects_for_individual_ai_review = 10", "max_objects_for_individual_ai_review = 1000"),
+        encoding="utf-8",
+    )
     assert main(["--config", str(config), "state", "init", "--confirm-new-install"]) == 0
     capsys.readouterr()
     source = GitFixture(tmp_path / "repo")

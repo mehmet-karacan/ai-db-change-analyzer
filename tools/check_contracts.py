@@ -15,7 +15,7 @@ from db_change_analyzer.models import UnitResponse  # noqa: E402
 
 
 def main() -> int:
-    schema_names = ("unit-response.schema.json", "report.schema.json", "result.schema.json", "delivery.schema.json", "corpus-manifest.schema.json", "source-review.schema.json", "source-review-input.schema.json", "review-eval-comparison.schema.json")
+    schema_names = ("unit-response.schema.json", "report.schema.json", "result.schema.json", "delivery.schema.json", "corpus-manifest.schema.json", "source-review.schema.json", "source-review-input.schema.json", "aggregate-review.schema.json", "aggregate-review-input.schema.json", "review-eval-comparison.schema.json")
     for name in schema_names:
         schema = json.loads((ROOT / "schemas" / name).read_text(encoding="utf-8"))
         Draft202012Validator.check_schema(schema)

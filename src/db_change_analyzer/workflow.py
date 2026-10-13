@@ -14,6 +14,7 @@ from typing import Any
 
 from .compat import UTC
 from .archive import ArchiveError, write_report_archive
+from .aggregate_review import AggregateReviewError, accept_aggregate_review, build_aggregate_review_input
 from .config import read_secret
 from .context import select_dependency_context
 from .dependencies import SnapshotObject, build_dependency_graph
@@ -60,10 +61,81 @@ def _extend_unique_evidence(registry: list[dict[str, Any]], items: list[dict[str
     """Keep one registry entry when the same snapshot evidence is shared by objects."""
     known = {item["evidence_id"] for item in registry}
     for item in items:
-        evidence_id = item["evidence_id"]
+        canonical = _canonical_report_evidence(item)
+        evidence_id = canonical["evidence_id"]
         if evidence_id not in known:
-            registry.append(item)
+            registry.append(canonical)
             known.add(evidence_id)
+
+
+_REPORT_SOURCE_EVIDENCE_FIELDS = (
+    "kind", "evidence_id", "revision", "path_display", "path_b64", "blob_oid",
+    "source_sha256", "start_line", "end_line", "start_byte", "end_byte_exclusive",
+    "fragment_sha256", "snippet", "redacted",
+)
+_REPORT_ARTIFACT_EVIDENCE_FIELDS = (
+    "kind", "evidence_id", "revision", "path_display", "path_b64", "git_mode",
+    "blob_oid", "size_bytes", "detail",
+)
+_REPORT_CONTEXT_EVIDENCE_FIELDS = ("kind", "evidence_id", "code", "detail", "related_evidence_ids")
+
+
+def _canonical_report_evidence(item: dict[str, Any]) -> dict[str, Any]:
+    """Remove internal context-selection metadata before report validation.
+
+    Dependency selection may annotate source evidence with fields such as
+    ``context_side`` or ``object_key``.  Those fields are valid internal
+    bookkeeping, but the public report schema intentionally uses closed
+    evidence variants.  Only recognized, complete variants are projected;
+    incomplete or unknown entries are left untouched so the safety validator
+    still rejects them instead of silently discarding evidence.
+    """
+    if not isinstance(item, dict):
+        return item
+    kind = item.get("kind")
+    if kind == "source" and set(_REPORT_SOURCE_EVIDENCE_FIELDS).issubset(item):
+        return {key: item[key] for key in _REPORT_SOURCE_EVIDENCE_FIELDS}
+    if kind == "artifact_metadata" and set(_REPORT_ARTIFACT_EVIDENCE_FIELDS).issubset(item):
+        return {key: item[key] for key in _REPORT_ARTIFACT_EVIDENCE_FIELDS}
+    if kind == "context_limit" and set(_REPORT_CONTEXT_EVIDENCE_FIELDS).issubset(item):
+        return {key: item[key] for key in _REPORT_CONTEXT_EVIDENCE_FIELDS}
+    return dict(item)
+
+
+_AGGREGATE_OBJECT_PRIORITY = {
+    "TABLE": 10, "VIEW": 20, "PACKAGE_BODY": 30, "PROCEDURE": 40,
+    "FUNCTION": 40, "TRIGGER": 40, "PACKAGE_SPEC": 50, "TYPE": 50,
+    "TYPE_BODY": 50, "INDEX": 60, "SEQUENCE": 70,
+}
+
+
+def _aggregate_object_summaries(objects: list[dict[str, Any]], risk_assessment: dict[str, Any]) -> list[dict[str, Any]]:
+    levels = risk_assessment.get("object_levels", {})
+    result: list[dict[str, Any]] = []
+    for item in objects:
+        identity = item["identity"]
+        object_type = identity.get("object_type") or "UNKNOWN"
+        facts = list(item.get("facts", []))
+        result.append({
+            "object_type": object_type,
+            "object_name": ((identity.get("schema_name") + ".") if identity.get("schema_name") else "") + identity["name"],
+            "operation": item["net_operation"],
+            "risk_level": levels.get(identity["object_key"], {}).get("level", "unknown"),
+            "priority": _AGGREGATE_OBJECT_PRIORITY.get(object_type, 100),
+            "deterministic_summary": f"{len(facts)} kaynak alanı farkı kaydedildi." if facts else "Kaynak tanımında fark gözlendi; alan ayrıştırması sınırlı.",
+            "categories": list(item.get("categories", [])),
+        })
+    return result
+
+
+def _response_schema_digest(*, source_review_mode: bool) -> str:
+    paths = [
+        (Path(__file__).parent / "schemas" / "source-review.schema.json") if source_review_mode
+        else (Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json"),
+        Path(__file__).parent / "schemas" / "aggregate-review.schema.json",
+    ]
+    schemas = {str(path.name): json.loads(path.read_text(encoding="utf-8")) for path in paths}
+    return hashlib.sha256(json.dumps(schemas, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def _build_analysis_fingerprint(*, config, plan: RangePlan, generation: int,
@@ -79,13 +151,10 @@ def _build_analysis_fingerprint(*, config, plan: RangePlan, generation: int,
 def compute_analysis_fingerprint(config, plan: RangePlan, generation: int = 0) -> str:
     """Compute the cache identity before an archive range gate is evaluated."""
     source_review_mode = config.analysis.review_mode == "source_review"
-    schema_path = (Path(__file__).parent / "schemas" / "source-review.schema.json") if source_review_mode else (Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json")
-    response_schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    response_schema_digest = hashlib.sha256(json.dumps(response_schema, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
     return _build_analysis_fingerprint(
         config=config, plan=plan, generation=generation,
         policy_fingerprint=load_policy_bundle().fingerprint,
-        response_schema_digest=response_schema_digest,
+        response_schema_digest=_response_schema_digest(source_review_mode=source_review_mode),
     )
 
 
@@ -887,17 +956,24 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     dependency_by_object = _dependency_records_by_object(dependency_edges, changed_keys)
 
     source_review_mode = config.analysis.review_mode == "source_review"
-    system_prompt = (Path(__file__).parent / "prompts" / ("source_review.tr.txt" if source_review_mode else "mail_commentary.tr.txt")).read_text(encoding="utf-8")
+    aggregate_mode = len(changed_keys) > config.analysis.max_objects_for_individual_ai_review
+    system_prompt = (Path(__file__).parent / "prompts" / (
+        "aggregate_review.tr.txt" if aggregate_mode else "source_review.tr.txt" if source_review_mode else "mail_commentary.tr.txt"
+    )).read_text(encoding="utf-8")
     policy_bundle = load_policy_bundle()
-    response_schema_path = (Path(__file__).parent / "schemas" / "source-review.schema.json") if source_review_mode else (Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json")
+    response_schema_path = (
+        Path(__file__).parent / "schemas" / "aggregate-review.schema.json" if aggregate_mode else
+        Path(__file__).parent / "schemas" / "source-review.schema.json" if source_review_mode else
+        Path(__file__).parent / "schemas" / "v5" / "ai-mail-commentary.schema.json"
+    )
     response_schema = json.loads(response_schema_path.read_text(encoding="utf-8"))
     research_dispatcher = ResearchToolDispatcher(
         git, {root.path: root.default_schema for root in config.scope.roots},
         scope_hash=config.scope_hash, max_file_bytes=config.parser.max_file_bytes,
-    ) if source_review_mode else None
+    ) if source_review_mode and not aggregate_mode else None
     research_journal = ResearchJournal(
         store.paths.scope, scope_hash=config.scope_hash, run_id=run_id, generation=analysis_generation,
-    ) if source_review_mode else None
+    ) if source_review_mode and not aggregate_mode else None
     if research_journal is not None:
         try:
             research_journal.ensure()
@@ -907,7 +983,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                 error_code="RESEARCH_JOURNAL_INVALID", checkpoint_before=plan.base_sha,
                 checkpoint_after=plan.base_sha, run_id=run_id,
             )
-    response_schema_digest = hashlib.sha256(json.dumps(response_schema, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    response_schema_digest = _response_schema_digest(source_review_mode=source_review_mode)
     analysis_fingerprint = _build_analysis_fingerprint(
         config=config, plan=plan, generation=analysis_generation,
         policy_fingerprint=policy_bundle.fingerprint, response_schema_digest=response_schema_digest,
@@ -965,8 +1041,8 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
             if stable_id("unit", {"run": run_id, "generation": analysis_generation, "key": key})[:100] in stored_unit_ids
         }
     remaining_keys = [key for key in changed_keys if key not in processed_keys]
-    active_keys = set(remaining_keys[:config.analysis.max_new_units_per_invocation])
-    budget_limited = len(remaining_keys) > len(active_keys)
+    active_keys = set(remaining_keys) if aggregate_mode else set(remaining_keys[:config.analysis.max_new_units_per_invocation])
+    budget_limited = False if aggregate_mode else len(remaining_keys) > len(active_keys)
     run_fingerprint["analysis_fingerprint"] = analysis_fingerprint
     run_fingerprint["processed_keys"] = sorted(processed_keys)
     connection = store.connection()
@@ -990,6 +1066,10 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     returned_models_by_unit: dict[str, set[str]] = {}
     ai_execution_records_by_unit: dict[str, dict[str, Any]] = {}
     source_reviews_by_key: dict[str, dict[str, Any]] = {}
+    aggregate_review: dict[str, Any] | None = None
+    aggregate_unit_id: str | None = None
+    aggregate_error_code: str | None = None
+    aggregate_risk_assessment: dict[str, Any] | None = None
     try:
         with LiteLLMClient(config.model) as model:
             for key in changed_keys:
@@ -1078,7 +1158,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                         "source_pair": {"old_revision": plan.base_sha, "new_revision": plan.target_sha},
                         "event_ids": [], "view_tags": ["net"],
                         })
-                if (key in active_keys or key in processed_keys) and (not diagnostics and key in changes_by_key
+                if (not aggregate_mode and (key in active_keys or key in processed_keys)) and (not diagnostics and key in changes_by_key
                       and any(change.taxonomy_id not in {"common.source.format", "common.source.occurrence_order", "common.source.path"}
                               for change in changes_by_key[key].facts)
                       and (source_review_mode or ((old_refs or new_refs)
@@ -1283,6 +1363,131 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                     "facts": facts, "assessments": assessments, "source_review": source_reviews_by_key.get(key), "diagnostics": diagnostics,
                     "dependency_edges": dependency_by_object.get(key, []),
                 })
+            if aggregate_mode and objects:
+                aggregate_risk_assessment = _risk_assessment(objects, changes_by_key, dependency_edges)
+                aggregate_unit_id = stable_id(
+                    "aggregate-unit",
+                    {
+                        "run": run_id,
+                        "generation": analysis_generation,
+                        "threshold": config.analysis.max_objects_for_individual_ai_review,
+                        "objects": sorted(changed_keys),
+                    },
+                )[:100]
+                aggregate_input: dict[str, Any] | None = None
+                try:
+                    aggregate_input = build_aggregate_review_input(
+                        report_id=report_id,
+                        unit_id=aggregate_unit_id,
+                        threshold=config.analysis.max_objects_for_individual_ai_review,
+                        object_summaries=_aggregate_object_summaries(objects, aggregate_risk_assessment),
+                    )
+                except AggregateReviewError as exc:
+                    aggregate_error_code = str(exc)
+
+                stored_attempt_count = 0
+                stored_unit = None
+                if aggregate_input is not None:
+                    aggregate_connection = store.connection()
+                    try:
+                        stored_unit = aggregate_connection.execute(
+                            "SELECT request_digest,status,result_json,returned_models_json,http_attempts FROM units WHERE run_id=? AND analysis_generation=? AND unit_id=?",
+                            (run_id, analysis_generation, aggregate_unit_id),
+                        ).fetchone()
+                    finally:
+                        aggregate_connection.close()
+                if stored_unit is not None and stored_unit["request_digest"] == aggregate_input["input_digest"] and stored_unit["status"] == "VALIDATED":
+                    try:
+                        aggregate_review = accept_aggregate_review(stored_unit["result_json"], aggregate_input)
+                        returned_models_by_unit[aggregate_unit_id] = set(json.loads(stored_unit["returned_models_json"]))
+                        stored_attempt_count = int(stored_unit["http_attempts"])
+                    except (AggregateReviewError, TypeError, ValueError, json.JSONDecodeError):
+                        # A previously persisted result is not trusted merely
+                        # because its row says VALIDATED.  Re-validate it
+                        # against the current bound input; if that fails, the
+                        # single aggregate request may be retried.  A valid
+                        # persisted result remains the only no-repeat path.
+                        aggregate_error_code = None
+
+                attempts_used = 0
+                execution_started_at = _now()
+                if aggregate_review is None and aggregate_input is not None and aggregate_error_code is None:
+                    if ai_phase_started_at is None:
+                        ai_phase_started_at = _now()
+                        phase_connection = store.connection()
+                        try:
+                            with phase_connection:
+                                phase_connection.execute(
+                                    "UPDATE runs SET ai_phase_started_at=? WHERE run_id=? AND ai_phase_started_at IS NULL",
+                                    (ai_phase_started_at, run_id),
+                                )
+                        finally:
+                            phase_connection.close()
+                    ai_phase_started_mono = time.monotonic()
+                    attempts_used = 1
+                    http_attempts += 1
+                    try:
+                        reply = model.complete(
+                            api_key=read_secret("LITELLM_API_KEY").get_secret_value(),
+                            system_message=system_prompt,
+                            user_payload=aggregate_input,
+                            response_schema=response_schema,
+                            output_tokens=config.analysis.output_tokens,
+                        )
+                        if reply.returned_model:
+                            returned_models_by_unit.setdefault(aggregate_unit_id, set()).add(reply.returned_model)
+                        aggregate_review = accept_aggregate_review(reply.content, aggregate_input)
+                    except (ModelTransportError, AggregateReviewError) as exc:
+                        aggregate_error_code = getattr(exc, "code", None) or str(exc)
+                    ai_phase_completed_at = _now()
+                    ai_phase_elapsed_ms = int((time.monotonic() - ai_phase_started_mono) * 1000)
+
+                if aggregate_unit_id:
+                    returned_model = sorted(returned_models_by_unit.get(aggregate_unit_id, set()))[0] if returned_models_by_unit.get(aggregate_unit_id) else None
+                    execution_attempt = max(1, attempts_used or stored_attempt_count)
+                    execution_id = stable_id(
+                        "execution",
+                        {"run": run_id, "unit": aggregate_unit_id, "attempt": execution_attempt, "generation": analysis_generation},
+                    )[:100]
+                    ai_execution_records_by_unit[aggregate_unit_id] = {
+                        "execution_id": execution_id, "unit_id": aggregate_unit_id, "attempt": execution_attempt,
+                        "turn": execution_attempt, "generation": analysis_generation,
+                        "requested_route": config.model.base_url + config.model.chat_path,
+                        "requested_model": config.model.id, "returned_model": returned_model,
+                        "started_at": execution_started_at, "completed_at": _now(),
+                        "status": "accepted" if aggregate_review is not None else "failed",
+                        "policy_versions": {
+                            name: f"{metadata['version']};sha256={metadata['sha256']}"
+                            for name, metadata in policy_bundle.metadata().items()
+                        }, "policy_fingerprint": policy_bundle.fingerprint,
+                        "response_schema": "aggregate-review/1.0", "error_code": None if aggregate_review is not None else aggregate_error_code,
+                    }
+                    for item in objects:
+                        ai_status_by_key[item["identity"]["object_key"]] = "withheld_threshold"
+                    aggregate_diagnostics = [
+                        "AGGREGATE_MODE",
+                        f"AGGREGATE_THRESHOLD_{config.analysis.max_objects_for_individual_ai_review}",
+                        f"AGGREGATE_SUPPRESSED_OBJECTS_{len(objects)}",
+                    ]
+                    if aggregate_error_code:
+                        aggregate_diagnostics.append(aggregate_error_code)
+                    aggregate_connection = store.connection()
+                    try:
+                        with aggregate_connection:
+                            aggregate_connection.execute(
+                                "INSERT INTO units(run_id,analysis_generation,unit_id,canonical_sources_json,alias_events_json,context_digest,request_digest,status,result_json,diagnostics_json,http_attempts,returned_models_json) VALUES (?,?,?, ?,?,?,?,?,?,?,?,?) ON CONFLICT(run_id,analysis_generation,unit_id) DO UPDATE SET canonical_sources_json=excluded.canonical_sources_json,context_digest=excluded.context_digest,request_digest=excluded.request_digest,status=excluded.status,result_json=excluded.result_json,diagnostics_json=excluded.diagnostics_json,http_attempts=units.http_attempts+excluded.http_attempts,returned_models_json=excluded.returned_models_json",
+                                (
+                                    run_id, analysis_generation, aggregate_unit_id, "[]", "[]",
+                                    aggregate_input["input_digest"] if aggregate_input else "aggregate-input-unavailable",
+                                    aggregate_input["input_digest"] if aggregate_input else "aggregate-input-unavailable",
+                                    "VALIDATED" if aggregate_review is not None else "INVALID",
+                                    json.dumps(aggregate_review, ensure_ascii=False) if aggregate_review is not None else None,
+                                    json.dumps(aggregate_diagnostics, ensure_ascii=False), attempts_used,
+                                    json.dumps(sorted(returned_models_by_unit.get(aggregate_unit_id, set()))),
+                                ),
+                            )
+                    finally:
+                        aggregate_connection.close()
     except ModelTransportError as exc:
         return _finish(
             args, mode="RUN", outcome="AI_TRANSPORT_OR_AUTH", exit_code=30, error_code=exc.code,
@@ -1323,7 +1528,11 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     if previous_ai_phase_started_at and ai_phase_completed_at is None:
         ai_phase_completed_at = _now()
         ai_phase_elapsed_ms = int((datetime.fromisoformat(ai_phase_completed_at) - datetime.fromisoformat(previous_ai_phase_started_at)).total_seconds() * 1000)
-    quality = "blocked" if scope_incomplete or any(item["status"] == "unresolved" for item in objects) else "limited" if any(item["status"] == "limited" for item in objects) else "complete"
+    quality = (
+        "blocked" if scope_incomplete or any(item["status"] == "unresolved" for item in objects)
+        else "limited" if aggregate_error_code or any(item["status"] == "limited" for item in objects)
+        else "complete"
+    )
     commits = _commit_rows(plan)
     unique_deltas = {item.path: item for item in plan.scope_deltas}
     scoped_net_deltas = {item.path: item for item in plan.net_deltas if item.path in unique_deltas}
@@ -1361,7 +1570,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
             "diagnostic_codes": diagnostics, "assessments": [],
         })
     events = _history_events(plan)
-    counts = {"net_files": len(scoped_net_deltas), "history_files": len(unique_deltas), "net_known_objects": len(changed_keys), "history_known_objects": len(changed_keys), "change_events": len(events), "ai_units": len(ai_unit_ids_by_key), "ai_http_attempts": total_http_attempts, "analyzed_objects": sum(item["status"] == "analyzed" for item in objects), "limited_objects": sum(item["status"] == "limited" for item in objects), "unresolved_objects": sum(item["status"] == "unresolved" for item in objects), "unknown_artifacts": len(incomplete_paths), "has_unknown_object_count": scope_incomplete}
+    counts = {"net_files": len(scoped_net_deltas), "history_files": len(unique_deltas), "net_known_objects": len(changed_keys), "history_known_objects": len(changed_keys), "change_events": len(events), "ai_units": len(ai_unit_ids_by_key) + (1 if aggregate_unit_id else 0), "ai_http_attempts": total_http_attempts, "analyzed_objects": sum(item["status"] == "analyzed" for item in objects), "limited_objects": sum(item["status"] == "limited" for item in objects), "unresolved_objects": sum(item["status"] == "unresolved" for item in objects), "unknown_artifacts": len(incomplete_paths), "has_unknown_object_count": scope_incomplete}
     sequence_only = bool(objects) and all(item["categories"] == ["sequence_observed_value"] for item in objects)
     summary = (
         "Git kaynak kapsamı tam ayrıştırılamadı; nesne sayısı ve ekleme/çıkarma işlemleri doğrulanamadı."
@@ -1396,7 +1605,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
             "runtime_usage": "not_connected",
         },
     }
-    risk_assessment = _risk_assessment(objects, changes_by_key, dependency_edges)
+    risk_assessment = aggregate_risk_assessment or _risk_assessment(objects, changes_by_key, dependency_edges)
     deployment_preparation = _deployment_preparation(objects, changes_by_key)
     _extend_unique_evidence(evidence_registry, dependency_evidence)
     report = {
@@ -1421,6 +1630,12 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
             extra_secret_patterns=config.security.extra_secret_patterns,
             ai_comments_by_key=ai_comments_by_key, ai_unit_ids_by_key=ai_unit_ids_by_key,
             ai_status_by_key=ai_status_by_key, ai_execution_records_by_unit=ai_execution_records_by_unit,
+            ai_mode="aggregate" if aggregate_unit_id else "individual",
+            individual_review_threshold=config.analysis.max_objects_for_individual_ai_review,
+            suppressed_object_count=len(objects) if aggregate_unit_id else 0,
+            aggregate_review=aggregate_review,
+            aggregate_unit_id=aggregate_unit_id,
+            aggregate_error_code=aggregate_error_code,
         )
         notification_id = str(uuid.uuid4())
         smtp_sender = config.smtp.sender if config.smtp is not None else "ai-db-analyzer@invalid.example"

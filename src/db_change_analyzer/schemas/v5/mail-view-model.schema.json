@@ -404,6 +404,48 @@
                 "not_recorded"
               ]
             },
+            "mode": {
+              "type": "string",
+              "enum": ["individual", "aggregate"]
+            },
+            "individual_review_threshold": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "suppressed_object_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "aggregate_unit_id": {
+              "anyOf": [
+                { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,100}$" },
+                { "type": "null" }
+              ]
+            },
+            "aggregate_error_code": {
+              "anyOf": [
+                { "type": "string", "maxLength": 120 },
+                { "type": "null" }
+              ]
+            },
+            "aggregate_review": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "schema_version": { "const": "aggregate-review/1.0" },
+                    "unit_id": { "type": "string", "minLength": 1, "maxLength": 100 },
+                    "input_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                    "commentary_tr": { "type": "string", "minLength": 1, "maxLength": 2000 },
+                    "evidence_ids": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 100 }, "minItems": 1, "maxItems": 12 },
+                    "limitations": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 400 }, "maxItems": 8 }
+                  },
+                  "required": ["schema_version", "unit_id", "input_digest", "commentary_tr", "evidence_ids", "limitations"]
+                },
+                { "type": "null" }
+              ]
+            },
             "phase_started_at": {
               "type": [
                 "string",
@@ -1386,6 +1428,7 @@
             "not_requested",
             "displayed",
             "withheld",
+            "withheld_threshold",
             "failed",
             "not_recorded"
           ]

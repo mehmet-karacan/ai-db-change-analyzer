@@ -213,17 +213,27 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
     diff_rows = sorted(sequence_rows + diff_rows, key=_diff_row_sort_key)
     risk = context["risk_summary"]
     impact = context["impact_summary"]
+    aggregate = context.get("aggregate_review", {})
     limited_count = sum(obj.get("verification") != "verified" for obj in objects)
     object_count = len(objects)
     object_type_counts = Counter(obj["identity"].get("object_type", "Diğer") for obj in objects)
     verified = f"{object_count} nesne değişikliği tespit edildi."
+    possible_label = "Olası yorum"
     possible = _build_impact_commentary(impact)
+    if aggregate.get("mode") == "aggregate":
+        possible_label = "Toplu model değerlendirmesi"
+        possible = aggregate.get("commentary") or "Model değerlendirmesi üretilemedi; bu rapor deterministik kaynak özetiyle sınırlıdır."
     assessment = (
         f"Genel risk seviyesi {risk['label']} olarak değerlendirildi; {risk['confidence_label'].lower()}. "
         "Sınıflandırma kaynak farkları ve statik kurallara dayanıyor; canlı veritabanı kontrol edilmedi."
     )
     if limited_count:
         assessment += f" {limited_count} nesnenin ayrıntılı ayrıştırması sınırlı."
+    if aggregate.get("mode") == "aggregate":
+        if aggregate.get("commentary"):
+            assessment += f" Nesne sayısı {aggregate['threshold']} eşiğini aştığı için model değerlendirmesi toplu olarak üretildi."
+        else:
+            assessment += " Nesne sayısı eşiği aşıldığı için nesne bazlı yorum üretilmedi; toplu model değerlendirmesi alınamadı."
     assessment += " Dağıtım öncesinde ilgili nesnelerin uygulama kullanımı ve bağımlılıkları doğrulanmalıdır."
     summary = _build_professional_summary(
         object_count=object_count,
@@ -242,6 +252,7 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "analysis_datetime": _date(completed_at, timezone),
         "summary": summary,
         "verified": verified,
+        "possible_label": possible_label,
         "possible": possible,
         "assessment": assessment,
         "diff_rows": diff_rows,

@@ -54,7 +54,16 @@
 /src/db_change_analyzer/workflow.py text eol=lf
 /src/db_change_analyzer/dependencies.py text eol=lf
 /config/gpu.artifact.example.toml text eol=lf
+/config/gpu.example.toml text eol=lf
 /src/db_change_analyzer/schemas/result.schema.json text eol=lf
+/schemas/aggregate-review-input.schema.json text eol=lf
+/schemas/aggregate-review.schema.json text eol=lf
+/src/db_change_analyzer/schemas/aggregate-review-input.schema.json text eol=lf
+/src/db_change_analyzer/schemas/aggregate-review.schema.json text eol=lf
+/src/db_change_analyzer/aggregate_review.py text eol=lf
+/src/db_change_analyzer/prompts/aggregate_review.tr.txt text eol=lf
+/src/db_change_analyzer/v5_rendering.py text eol=lf
+/src/db_change_analyzer/innova_rendering.py text eol=lf
 /tools/evaluate_source_review.py text eol=lf
 /src/db_change_analyzer/litellm_http.py text eol=lf
 /src/db_change_analyzer/research_tools.py text eol=lf

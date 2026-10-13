@@ -227,6 +227,12 @@ def build_mail_view(
     ai_unit_ids_by_key: dict[str, str] | None = None,
     ai_status_by_key: dict[str, str] | None = None,
     ai_execution_records_by_unit: dict[str, dict[str, Any]] | None = None,
+    ai_mode: str = "individual",
+    individual_review_threshold: int = 10,
+    suppressed_object_count: int = 0,
+    aggregate_review: dict[str, Any] | None = None,
+    aggregate_unit_id: str | None = None,
+    aggregate_error_code: str | None = None,
 ) -> dict[str, Any]:
     run = report["run"]
     base_sha, target_sha = run["base_sha"], run["target_sha"]
@@ -362,22 +368,27 @@ def build_mail_view(
                 "conflict_detected": "CONFLICTING_DEFINITIONS" in item["diagnostics"],
             },
         })
-    if report["counts"]["ai_http_attempts"] == 0:
+    aggregate_mode = ai_mode == "aggregate"
+    if report["counts"]["ai_http_attempts"] == 0 and not aggregate_mode:
         ai = {
             "status": "not_used", "phase_started_at": None, "phase_completed_at": None,
             "phase_elapsed_ms": None, "request_duration_sum_ms": None,
             "http_attempts": 0, "requested_units": 0, "models": [], "executions": [],
+            "mode": "individual", "individual_review_threshold": individual_review_threshold,
+            "suppressed_object_count": 0, "aggregate_unit_id": None,
+            "aggregate_review": None, "aggregate_error_code": None,
         }
     else:
         model_units: dict[tuple[str, ...], list[str]] = {}
-        for unit_id in sorted(set(unit_map.values()) | set(returned_models_by_unit)):
+        all_ai_units = set(unit_map.values()) | set(returned_models_by_unit) | set(execution_map)
+        for unit_id in sorted(all_ai_units):
             labels = tuple(sorted(returned_models_by_unit.get(unit_id, set())))
             model_units.setdefault(labels, []).append(unit_id)
         if not model_units:
             model_units[()] = []
         if len(model_units) > 32:
             raise ValueError("MODEL_UNIT_MAPPING_LIMIT")
-        ai_status = "complete" if unit_map and len(unit_map) == report["counts"]["ai_units"] and all(
+        ai_status = "complete" if aggregate_mode and aggregate_review is not None else "failed" if aggregate_mode else "complete" if unit_map and len(unit_map) == report["counts"]["ai_units"] and all(
             status_map.get(key) in {"displayed", "withheld"} for key in unit_map
         ) else "partial"
         ai = {
@@ -386,6 +397,11 @@ def build_mail_view(
             "request_duration_sum_ms": None, "http_attempts": report["counts"]["ai_http_attempts"],
             "requested_units": report["counts"]["ai_units"],
             "executions": [execution_map[unit_id] for unit_id in sorted(execution_map)],
+            "mode": ai_mode, "individual_review_threshold": individual_review_threshold,
+            "suppressed_object_count": suppressed_object_count,
+            "aggregate_unit_id": aggregate_unit_id,
+            "aggregate_review": aggregate_review,
+            "aggregate_error_code": aggregate_error_code,
             "models": [{
                 "configured_model": report["versions"]["configured_model"],
                 "returned_models": list(labels), "resolved_model_version": None,
@@ -464,6 +480,12 @@ def build_innova_mail_view(
     ai_unit_ids_by_key: dict[str, str] | None = None,
     ai_status_by_key: dict[str, str] | None = None,
     ai_execution_records_by_unit: dict[str, dict[str, Any]] | None = None,
+    ai_mode: str = "individual",
+    individual_review_threshold: int = 10,
+    suppressed_object_count: int = 0,
+    aggregate_review: dict[str, Any] | None = None,
+    aggregate_unit_id: str | None = None,
+    aggregate_error_code: str | None = None,
 ) -> dict[str, Any]:
     """Build the approved Innova report view while preserving the V5 builder."""
     view = build_mail_view(
@@ -473,6 +495,9 @@ def build_innova_mail_view(
         analysis_duration_basis=analysis_duration_basis, extra_secret_patterns=extra_secret_patterns,
         ai_comments_by_key=ai_comments_by_key, ai_unit_ids_by_key=ai_unit_ids_by_key,
         ai_status_by_key=ai_status_by_key, ai_execution_records_by_unit=ai_execution_records_by_unit,
+        ai_mode=ai_mode, individual_review_threshold=individual_review_threshold,
+        suppressed_object_count=suppressed_object_count, aggregate_review=aggregate_review,
+        aggregate_unit_id=aggregate_unit_id, aggregate_error_code=aggregate_error_code,
     )
     view["schema_version"] = "mail-view/3.0"
     view["template_version"] = "innova-db-report/1.0"

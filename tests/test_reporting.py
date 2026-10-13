@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from db_change_analyzer.reporting import ReportError, build_message, render_report, validate_report
+from db_change_analyzer.workflow import _extend_unique_evidence
 
 
 def minimal_report() -> dict:
@@ -78,6 +79,30 @@ def test_template_autoescapes_ai_text_and_message_is_stable() -> None:
 def test_report_link_requires_explicit_https_host() -> None:
     with pytest.raises(ReportError, match="REPORT_URL_NOT_ALLOWED"):
         render_report(minimal_report(), report_url="https://evil.example/report", allowed_link_hosts={"jenkins.example"})
+
+
+def test_report_evidence_registry_strips_internal_context_metadata() -> None:
+    report = minimal_report()
+    source = {
+        "kind": "source", "evidence_id": "ev-context", "revision": "1" * 40,
+        "path_display": "gpu_user/tables.sql", "path_b64": "Z3B1X3VzZXIvdGFibGVzLnNxbA==",
+        "blob_oid": "2" * 40, "source_sha256": "3" * 64,
+        "start_line": 1, "end_line": 2, "start_byte": 0, "end_byte_exclusive": 20,
+        "fragment_sha256": "4" * 64, "snippet": "CREATE TABLE T (ID NUMBER);", "redacted": False,
+        # These fields are useful while selecting dependency context but are
+        # deliberately outside the report evidence contract.
+        "object_key": "GPU_USER|TABLE|T", "context_side": "new_reverse",
+    }
+    registry: list[dict] = []
+    _extend_unique_evidence(registry, [source])
+    report["evidence_registry"] = registry
+
+    validate_report(report)
+    assert set(registry[0]) == {
+        "kind", "evidence_id", "revision", "path_display", "path_b64", "blob_oid",
+        "source_sha256", "start_line", "end_line", "start_byte", "end_byte_exclusive",
+        "fragment_sha256", "snippet", "redacted",
+    }
 
 
 def test_sequence_only_mail_uses_fact_table_without_model_risk() -> None:

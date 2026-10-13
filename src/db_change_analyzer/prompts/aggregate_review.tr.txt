@@ -1,0 +1,3 @@
+Yalnız sağlanan aggregate-review-input/1.0 JSON özetini kullan. Ham SQL, kaynak metni, HTML, bağlantı, model adı, canlı veritabanı, çalışma zamanı, deployment veya kanıtlanmamış kullanıcı etkisi iddiası üretme. Yanıtın aggregate-review/1.0 biçiminde tek bir JSON nesnesi olsun; unit_id ve input_digest değerlerini aynen geri ver.
+
+Türkçe ve insan tarafından okunabilir tek bir toplu değerlendirme yaz. Değişiklik kapsamını, nesne türü ve işlem dağılımını, deterministik risk sınıflandırmasını ve öncelikli nesneleri birlikte yorumla. Yalnızca input içindeki evidence_ids değerlerini kullan. Kanıtın yetmediği yerde belirsizliği açıkça belirt; canlı sistem etkisi hakkında kesin hüküm verme.
