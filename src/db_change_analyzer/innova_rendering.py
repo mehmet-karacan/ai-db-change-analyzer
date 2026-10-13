@@ -87,6 +87,20 @@ _OBJECT_PRIORITY = {
     "SEQUENCE": 70,
 }
 
+_INNOVA_OBJECT_LABELS = {
+    "TABLE": "Tablo",
+    "VIEW": "Görünüm",
+    "PACKAGE_BODY": "Paket gövdesi",
+    "PROCEDURE": "Prosedür",
+    "FUNCTION": "Fonksiyon",
+    "TRIGGER": "Tetikleyici",
+    "PACKAGE_SPEC": "Paket tanımı",
+    "TYPE": "Tür tanımı",
+    "TYPE_BODY": "Tür gövdesi",
+    "INDEX": "İndeks",
+    "SEQUENCE": "Sıra üreticisi",
+}
+
 
 def _diff_row_sort_key(row: dict[str, str]) -> tuple[int, int]:
     object_type = row.get("tur") or "Diğer"
@@ -102,37 +116,43 @@ def _diff_row_sort_key(row: dict[str, str]) -> tuple[int, int]:
 
 def _build_professional_summary(
     *,
-    source: dict[str, Any],
     object_count: int,
-    total_changes: int,
-    changed_files: int,
     object_type_counts: Counter[str],
     risk: dict[str, Any],
-    impact: dict[str, Any],
-) -> tuple[str, str, str, str, str, str]:
-    scope = f"{source['repository']} / {source['branch']} · {source['base_label']} → {source['target_label']}"
+) -> str:
     type_summary = ", ".join(
-        f"{object_type.replace('_', ' ')} ({count})"
+        f"{_INNOVA_OBJECT_LABELS.get(object_type, 'Diğer')} ({count})"
         for object_type, count in sorted(object_type_counts.items())
     ) or "Değişiklik nesnesi bulunmuyor"
-    risk_summary = f"{risk['label']} · {risk['confidence_label']}"
-    boundary = "Canlı Oracle metadata'sı, çalışma zamanı kullanımı ve deployment sonucu doğrulanmadı."
     if object_count:
-        summary = (
-            f"{scope} snapshot'ları arasındaki kaynak farkı incelenmiştir. "
-            f"{total_changes} kaynak değişikliği {object_count} Oracle nesnesinde ve {changed_files} dosyada tespit edilmiştir. "
-            f"Nesne kapsamı {type_summary} türlerini içermektedir. "
-            f"Kaynak tabanlı risk seviyesi {risk['label']} ({risk['confidence_label']}) olarak değerlendirilmiştir. "
-            f"Etki değerlendirmesi: {impact['status_label']}. "
-            f"Bulgular Git snapshot ve repository içi statik kanıtlarla sınırlıdır; {boundary}"
+        return (
+            f"Bu karşılaştırmada {object_count} veritabanı nesnesinde değişiklik tespit edildi. "
+            f"Değişikliklerin kapsamı: {type_summary}. "
+            f"Genel risk seviyesi {risk['label']} olarak değerlendirildi; {risk['confidence_label'].lower()}. "
+            "Bu değerlendirme yalnızca kaynak farklarına dayanır; canlı veritabanı, uygulama kullanımı "
+            "ve dağıtım durumu kontrol edilmedi."
         )
-    else:
-        summary = (
-            f"{scope} snapshot'ları arasında net kaynak nesnesi farkı bulunmamıştır. "
-            f"Karşılaştırma {changed_files} dosyayı kapsamaktadır. "
-            f"Bulgular Git snapshot ve repository içi statik kanıtlarla sınırlıdır; {boundary}"
+    return "Bu karşılaştırmada veritabanı nesnelerinde doğrulanmış bir değişiklik tespit edilmedi. Canlı veritabanı kontrol edilmedi."
+
+
+def _build_impact_commentary(impact: dict[str, Any]) -> str:
+    status = impact["status_label"]
+    candidate_count = impact["candidate_count"]
+    if status == "Repository içi statik kanıt bulundu":
+        return (
+            f"Kaynak kodu taramasında {candidate_count} statik bağımlılık adayı bulundu. "
+            "Bunlar olası ilişkilerdir; çalışma zamanı kullanımı veya canlı etki kanıtı değildir. "
+            "İlgili uygulama akışları ayrıca doğrulanmalıdır."
         )
-    return summary, scope, type_summary, risk_summary, boundary, str(object_count)
+    if status == "Repository içi statik bağımlılık kanıtı bulunmadı":
+        return (
+            "Kaynak kodu taramasında bu değişikliklerle ilişkili doğrulanmış bir uygulama bağımlılığı bulunmadı. "
+            "Bu sonuç, nesnelerin kullanılmadığını kanıtlamaz; yalnızca mevcut incelemede kanıt bulunmadığını gösterir."
+        )
+    return (
+        "Uygulama bağımlılıkları için yeterli inceleme verisi bulunmadığından etki hakkında kesin yorum yapılamıyor. "
+        "İlgili kullanım ve bağımlılıkların ayrıca kontrol edilmesi gerekir."
+    )
 
 
 def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -161,11 +181,9 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
     }
     diff_rows: list[dict[str, str]] = []
     sequence_counts = {"İleri": 0, "Geri": 0}
-    total_changes = 0
     for obj in objects:
         identity = obj["identity"]
         facts = [fact for fact in obj["facts"] if fact["change_action"] != "unchanged" or fact["context_only"]]
-        total_changes += len(facts) or 1
         sequence_direction = _sequence_start_direction(obj)
         if sequence_direction:
             sequence_counts[sequence_direction] += 1
@@ -198,19 +216,19 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
     limited_count = sum(obj.get("verification") != "verified" for obj in objects)
     object_count = len(objects)
     object_type_counts = Counter(obj["identity"].get("object_type", "Diğer") for obj in objects)
-    verified = f"{total_changes} kaynak değişikliği, {object_count} nesnede Git snapshot farkı olarak kaydedildi."
-    possible = f"{impact['status_label']}. Statik aday sayısı: {impact['candidate_count']}."
-    assessment = f"Risk seviyesi {risk['label'].lower()}; {risk['confidence_label'].lower()}. Canlı veritabanı kontrol edilmedi."
+    verified = f"{object_count} nesne değişikliği tespit edildi."
+    possible = _build_impact_commentary(impact)
+    assessment = (
+        f"Genel risk seviyesi {risk['label']} olarak değerlendirildi; {risk['confidence_label'].lower()}. "
+        "Sınıflandırma kaynak farkları ve statik kurallara dayanıyor; canlı veritabanı kontrol edilmedi."
+    )
     if limited_count:
         assessment += f" {limited_count} nesnenin ayrıntılı ayrıştırması sınırlı."
-    summary, summary_scope, summary_types, summary_risk, summary_boundary, summary_object_count = _build_professional_summary(
-        source=source,
+    assessment += " Dağıtım öncesinde ilgili nesnelerin uygulama kullanımı ve bağımlılıkları doğrulanmalıdır."
+    summary = _build_professional_summary(
         object_count=object_count,
-        total_changes=total_changes,
-        changed_files=view["changed_files"],
         object_type_counts=object_type_counts,
         risk=risk,
-        impact=impact,
     )
     return {
         "report_title": "Veritabanı Değişiklik Analizi",
@@ -218,16 +236,11 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "ornek": bool(view.get("synthetic")),
         "model_name": model_name,
         "analysis_duration": _format_analysis_duration(analysis.get("elapsed_ms")),
-        "total_changes": str(total_changes),
+        "total_changes": str(object_count),
         "risk_level": risk["label"],
         "risk_color": risk["fg"],
         "analysis_datetime": _date(completed_at, timezone),
         "summary": summary,
-        "summary_scope": summary_scope,
-        "summary_types": summary_types,
-        "summary_risk": summary_risk,
-        "summary_boundary": summary_boundary,
-        "summary_object_count": summary_object_count,
         "verified": verified,
         "possible": possible,
         "assessment": assessment,

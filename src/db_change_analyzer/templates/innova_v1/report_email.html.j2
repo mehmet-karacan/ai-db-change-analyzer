@@ -18,8 +18,6 @@
   .hero-title{font-size:27px!important;line-height:34px!important}
   .header-tagline{display:none!important}
   .data-table td,.data-table th{padding:8px 5px!important;font-size:11px!important;word-break:break-word!important}
-  .summary-cell{display:block!important;width:100%!important;box-sizing:border-box!important;border-right:0!important;border-bottom:1px solid #E1E7ED!important}
-  .summary-cell-last{border-bottom:0!important}
   .source-col{display:block!important;width:100%!important;box-sizing:border-box!important;border-right:0!important;border-bottom:1px solid #E1E6EB!important}
   .source-col-last{border-bottom:0!important}
 }
@@ -62,7 +60,7 @@
   <!-- KPI strip -->
   <tr><td class="pad" style="padding:0 34px 26px;">
    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F3F6F8" style="width:100%;border-collapse:collapse;background:#F3F6F8;"><tr>
-     {% set metrics=[('▤','Toplam Kaynak Değişikliği',r.total_changes),('△','Risk Seviyesi',r.risk_level),('▣','Yorumlayan Model',r.model_name),('◷','Analiz Süresi',r.analysis_duration),('▣','Analiz Zamanı',r.analysis_datetime)] %}
+     {% set metrics=[('▤','Toplam Değişiklik',r.total_changes),('△','Risk Seviyesi',r.risk_level),('▣','Yorumlayan Model',r.model_name),('◷','Analiz Süresi',r.analysis_duration),('▣','Analiz Zamanı',r.analysis_datetime)] %}
      {% for glyph,label,value in metrics %}
      <td class="metric{% if loop.last %} metric-last{% endif %}" width="20%" valign="middle" style="width:20%;border-right:{% if loop.last %}0{% else %}1px solid #DFE5EB{% endif %};padding:16px 7px 17px 12px;vertical-align:middle;">
        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
@@ -76,18 +74,7 @@
   <!-- summary -->
   <tr><td class="pad" style="padding:0 34px 23px;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;"><tr><td width="5" bgcolor="#CF1838" style="width:5px;background:#CF1838;font-size:1px;">&nbsp;</td><td style="padding:0 0 0 17px;"><h2 style="font-size:22px;line-height:29px;margin:0;font-weight:700;color:#131E30;">Özet</h2></td></tr></table>
-    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#F3F6F8" style="width:100%;border-collapse:collapse;background:#F3F6F8;margin-top:13px;"><tr><td style="padding:20px 23px 18px;color:#46566B;">
-      <p data-field="summary" style="font-size:15px;line-height:25px;margin:0;color:#46566B;">{{ r.summary }}</p>
-      <p style="font-size:11px;line-height:16px;letter-spacing:.7px;text-transform:uppercase;margin:19px 0 8px;color:#7A889B;font-weight:700;">Ana göstergeler</p>
-      <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;border:1px solid #E1E7ED;background:#FFFFFF;"><tr>
-        <td class="summary-cell" width="50%" valign="top" style="width:50%;padding:11px 13px;border-right:1px solid #E1E7ED;border-bottom:1px solid #E1E7ED;vertical-align:top;"><span style="font-size:11px;line-height:16px;color:#7A889B;">Kapsam</span><br><strong style="font-size:13px;line-height:19px;color:#27364A;font-weight:700;">{{ r.summary_scope }}</strong></td>
-        <td class="summary-cell summary-cell-last" width="50%" valign="top" style="width:50%;padding:11px 13px;border-bottom:1px solid #E1E7ED;vertical-align:top;"><span style="font-size:11px;line-height:16px;color:#7A889B;">Değişiklik yoğunluğu</span><br><strong style="font-size:13px;line-height:19px;color:#27364A;font-weight:700;">{{ r.total_changes }} kaynak değişikliği · {{ r.summary_object_count }} nesne</strong></td>
-      </tr><tr>
-        <td class="summary-cell" width="50%" valign="top" style="width:50%;padding:11px 13px;border-right:1px solid #E1E7ED;vertical-align:top;"><span style="font-size:11px;line-height:16px;color:#7A889B;">Nesne türleri</span><br><strong style="font-size:13px;line-height:19px;color:#27364A;font-weight:700;">{{ r.summary_types }}</strong></td>
-        <td class="summary-cell summary-cell-last" width="50%" valign="top" style="width:50%;padding:11px 13px;vertical-align:top;"><span style="font-size:11px;line-height:16px;color:#7A889B;">Risk ve güven</span><br><strong style="font-size:13px;line-height:19px;color:#27364A;font-weight:700;">{{ r.summary_risk }}</strong></td>
-      </tr></table>
-      <p style="font-size:12px;line-height:19px;margin:13px 0 0;color:#68778B;"><strong style="color:#3B4B60;">Doğrulama sınırı:</strong> {{ r.summary_boundary }}</p>
-    </td></tr></table>
+    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#F3F6F8" style="width:100%;border-collapse:collapse;background:#F3F6F8;margin-top:13px;"><tr><td data-field="summary" style="font-size:15px;line-height:26px;padding:20px 23px;color:#46566B;">{{ r.summary }}</td></tr></table>
   </td></tr>
   <!-- impact -->
   <tr><td class="pad" style="padding:0 34px 23px;">

@@ -114,7 +114,7 @@ def test_innova_renderer_orders_summary_metrics_by_importance() -> None:
 
     html = rendered.html.decode("utf-8")
     positions = [html.index(marker) for marker in (
-        "Toplam Kaynak Değişikliği", "Risk Seviyesi", "Yorumlayan Model", "Analiz Süresi", "Analiz Zamanı",
+        "Toplam Değişiklik", "Risk Seviyesi", "Yorumlayan Model", "Analiz Süresi", "Analiz Zamanı",
     )]
     assert positions == sorted(positions)
 
@@ -135,9 +135,9 @@ def test_innova_renderer_explains_source_change_and_object_counts_separately() -
         date=datetime.now(UTC),
     )
 
-    assert rendered_context["total_changes"] == "13"
-    assert rendered_context["verified"] == "13 kaynak değişikliği, 7 nesnede Git snapshot farkı olarak kaydedildi."
-    assert "Toplam Kaynak Değişikliği".encode("utf-8") in rendered.html
+    assert rendered_context["total_changes"] == "7"
+    assert rendered_context["verified"] == "7 nesne değişikliği tespit edildi."
+    assert "Toplam Değişiklik".encode("utf-8") in rendered.html
 
 
 def test_innova_renderer_builds_a_professional_executive_summary() -> None:
@@ -156,15 +156,52 @@ def test_innova_renderer_builds_a_professional_executive_summary() -> None:
         date=datetime.now(UTC),
     )
 
-    assert "gpu-db (örnek) / master" in rendered_context["summary"]
-    assert "13 kaynak değişikliği" in rendered_context["summary"]
-    assert "7 Oracle nesnesinde" in rendered_context["summary"]
-    assert "Git snapshot" in rendered_context["summary"]
-    assert rendered_context["summary_scope"] == "gpu-db (örnek) / master · a1b2c3d → e4f5a6b"
-    assert rendered_context["summary_types"] == "INDEX (1), PACKAGE BODY (1), PACKAGE SPEC (1), SEQUENCE (1), TABLE (2), VIEW (1)"
-    assert rendered_context["summary_risk"] == "Belirsiz · Güven doğrulanmadı"
-    assert "Ana göstergeler" in rendered.html.decode("utf-8")
-    assert "Doğrulama sınırı" in rendered.html.decode("utf-8")
+    summary = rendered_context["summary"]
+    assert "7 veritabanı nesnesinde değişiklik tespit edildi" in summary
+    assert "Sıra üreticisi (1)" in summary
+    assert "gpu-db" not in summary
+    assert "a1b2c3d" not in summary and "e4f5a6b" not in summary
+    assert "snapshot" not in summary.lower()
+    assert "Ana göstergeler" not in rendered.html.decode("utf-8")
+
+
+def test_innova_renderer_adds_context_to_impact_and_assessment() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    view["impact_analysis"] = {
+        "status": "no_static_dependency_evidence",
+        "candidate_count": 0,
+        "provided_count": 0,
+        "external_sources": {
+            "oracle_metadata": "not_connected",
+            "application_repositories": "not_connected",
+            "jenkins_deployments": "not_run",
+            "runtime_usage": "not_connected",
+        },
+    }
+    view["risk_assessment"] = {
+        "level": "medium",
+        "method": "deterministic_source_rules",
+        "confidence": "limited",
+        "basis": {"critical": [], "high": [], "medium": ["TABLE"], "low": [], "unknown": [], "static_dependency_candidates": 0},
+        "object_levels": {},
+        "limitations": ["Canlı metadata ve çalışma zamanı kullanımı doğrulanmadı."],
+    }
+    validate_mail_view(view)
+
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<impact-commentary@example.test>",
+        date=datetime.now(UTC),
+    )
+    html = rendered.html.decode("utf-8")
+
+    assert "Bu sonuç, nesnelerin kullanılmadığını kanıtlamaz" in html
+    assert "Genel risk seviyesi Orta" in html
+    assert "Dağıtım öncesinde" in html
 
 
 def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:
@@ -338,7 +375,7 @@ def test_innova_renderer_separates_source_risk_from_operation_colors() -> None:
 
     html = rendered.html.decode("utf-8")
     assert "Risk Seviyesi" in html
-    assert "Yüksek" in html and "Repository içi statik kanıt bulundu" in html
+    assert "Yüksek" in html and "3 statik bağımlılık adayı bulundu" in html
     assert "Etki ve Değerlendirme" in html
     assert "Değişiklik Detayları" in html
 
