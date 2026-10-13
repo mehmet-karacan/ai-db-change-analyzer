@@ -932,6 +932,8 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     _verify_changed_refs(old_index, changed_keys, config.parser.worker_timeout_seconds, store)
     _verify_changed_refs(new_index, changed_keys, config.parser.worker_timeout_seconds, store)
     _phase_log("SNAPSHOT_INVENTORY_COMPLETE", changed_objects=len(changed_keys), changed_paths=len(changed_paths))
+    source_review_mode = config.analysis.review_mode == "source_review"
+    aggregate_mode = len(changed_keys) > config.analysis.max_objects_for_individual_ai_review
     dependency_edges: tuple[dict[str, object], ...] = ()
     dependency_evidence: list[dict[str, Any]] = []
     dependency_omissions: tuple[str, ...] = ()
@@ -939,14 +941,14 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         old_dependency_objects: list[SnapshotObject] = []
         old_dependency_evidence: dict[tuple[str, str], dict[str, Any]] = {}
         if plan.base_sha:
-            old_dependency_inventories = inventory_revision(
+            old_dependency_inventories = old_inventories if aggregate_mode else inventory_revision(
                 git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes,
                 timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(), parser_cache=store,
             )
             _, old_dependency_objects, old_dependency_evidence = _dependency_snapshot(
                 git, plan.base_sha, old_dependency_inventories, config.parser.max_file_bytes,
             )
-        new_dependency_inventories = inventory_revision(
+        new_dependency_inventories = new_inventories if aggregate_mode else inventory_revision(
             git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes,
             timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=set(), parser_cache=store,
         )
@@ -964,11 +966,15 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         dependency_edges = selected_dependencies.dependency_edges
         dependency_evidence = list(selected_dependencies.evidence_registry)
         dependency_omissions = selected_dependencies.omissions
+        if aggregate_mode:
+            dependency_omissions = (*dependency_omissions, "AGGREGATE_EXTERNAL_DEPENDENCY_SCAN_SKIPPED")
     dependency_by_object = _dependency_records_by_object(dependency_edges, changed_keys)
-    _phase_log("DETERMINISTIC_CONTEXT_COMPLETE", changed_objects=len(changed_keys), dependency_edges=len(dependency_edges))
+    _phase_log(
+        "DETERMINISTIC_CONTEXT_COMPLETE",
+        changed_objects=len(changed_keys), dependency_edges=len(dependency_edges),
+        dependency_scope="changed_files_only" if aggregate_mode else "full_repository",
+    )
 
-    source_review_mode = config.analysis.review_mode == "source_review"
-    aggregate_mode = len(changed_keys) > config.analysis.max_objects_for_individual_ai_review
     system_prompt = (Path(__file__).parent / "prompts" / (
         "aggregate_review.tr.txt" if aggregate_mode else "source_review.tr.txt" if source_review_mode else "mail_commentary.tr.txt"
     )).read_text(encoding="utf-8")

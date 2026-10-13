@@ -102,6 +102,16 @@ def test_more_than_threshold_uses_one_aggregate_call(tmp_path, capsys, monkeypat
     _FakeModel.calls = calls
     monkeypatch.setattr("db_change_analyzer.workflow.LiteLLMClient", _FakeModel)
     monkeypatch.setenv("LITELLM_API_KEY", "test-key")
+    inventory_calls: list[set[str]] = []
+    from db_change_analyzer import workflow as workflow_module
+
+    original_inventory = workflow_module.inventory_revision
+
+    def record_inventory(*args, **kwargs):
+        inventory_calls.append(set(kwargs.get("parse_paths") or set()))
+        return original_inventory(*args, **kwargs)
+
+    monkeypatch.setattr(workflow_module, "inventory_revision", record_inventory)
 
     assert main(["--config", str(config), "run", "--offline", "--allow-ai"]) == 0
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
@@ -115,6 +125,7 @@ def test_more_than_threshold_uses_one_aggregate_call(tmp_path, capsys, monkeypat
     assert view["analysis"]["ai"]["suppressed_object_count"] == count
     assert all(item["ai_status"] == "withheld_threshold" for item in view["objects"])
     assert result["quality"] in {"complete", "limited"}
+    assert inventory_calls and all(parse_paths for parse_paths in inventory_calls)
 
 
 def test_at_threshold_keeps_individual_calls(tmp_path, capsys, monkeypatch) -> None:
