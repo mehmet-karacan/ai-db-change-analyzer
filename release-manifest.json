@@ -24,7 +24,7 @@
     "schemas/aggregate-review.schema.json": "b34e8a4c5b0c132d455a728af54e937074ce69fbe0a995faa314539d578aa21d",
     "schemas/v5/render-manifest.schema.json": "8ad7d94cf3a2912cad963cbf8a8c7934aca309b93212dd12b369d82ee6c2268a",
     "src/db_change_analyzer/archive.py": "16d48263ba00892873ced94cb97555627540928cb967353b8af4f929c92618d8",
-    "src/db_change_analyzer/cli.py": "881ea4853ce5fb2c02e6c3076174f3187336e0c0f4d212c11b7f8602eb926af6",
+    "src/db_change_analyzer/cli.py": "465a450e780b84fd4980bcc557e2f58a1e48272d09b1d395b1c9241050993a9e",
     "src/db_change_analyzer/compat.py": "fb40b91c58eba5627949fede0b491c73a115ae75b93ab52bd4772125a0d388e6",
     "src/db_change_analyzer/config.py": "71880cab4149e7c21f9f9b50e709e416096783581e6f3bf2a0f3ff223c3c13e1",
     "src/db_change_analyzer/dependencies.py": "7d88400a0c639b3ed3dcca3221d943c95cfe32eea26da0d2dd356ec77de2af6b",

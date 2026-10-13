@@ -211,6 +211,10 @@ def test_stale_completed_render_run_is_abandoned_when_target_advances(tmp_path, 
             "SELECT run_id FROM runs WHERE report_id IS NULL ORDER BY rowid DESC LIMIT 1"
         ).fetchone()[0]
         cache = scope_dir / "source.git"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace("max_job_seconds = 1500", "max_job_seconds = 1501"),
+        encoding="utf-8",
+    )
 
     source.branch("alternate", first)
     source.write(

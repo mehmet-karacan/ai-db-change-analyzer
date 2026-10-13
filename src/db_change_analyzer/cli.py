@@ -223,7 +223,7 @@ def run_command(args: argparse.Namespace) -> int:
         finally:
             connection.close()
         if unfinished is not None:
-            if unfinished["base_sha"] != state["checkpoint_sha"] or unfinished["config_digest"] != config.config_digest:
+            if unfinished["base_sha"] != state["checkpoint_sha"]:
                 return _finish(args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20, error_code="PINNED_RUN_CONTEXT_CHANGED", checkpoint_before=state["checkpoint_sha"], checkpoint_after=state["checkpoint_sha"], run_id=unfinished["run_id"])
             git = _client(config, store)
             git.ensure_cache()
@@ -236,11 +236,12 @@ def run_command(args: argparse.Namespace) -> int:
                 ).fetchone()
             finally:
                 connection.close()
-            try:
-                run_fingerprint = json.loads(unfinished["fingerprint_json"] or "{}")
-            except (TypeError, ValueError, json.JSONDecodeError):
-                run_fingerprint = {}
-            pending_reason = run_fingerprint.get("pending_reason") if isinstance(run_fingerprint, dict) else None
+            config_changed = unfinished["config_digest"] != config.config_digest
+            checkpoint_is_ancestor = (
+                state["checkpoint_sha"] is None
+                or current_target == state["checkpoint_sha"]
+                or git.is_ancestor(state["checkpoint_sha"], current_target)
+            )
             # A persisted report or an invalid unit belongs to the pinned retry
             # path.  A still-running analysis with no invalid retry marker must
             # stop if the branch moved, so new commits cannot be silently omitted.
@@ -249,11 +250,24 @@ def run_command(args: argparse.Namespace) -> int:
             # the checkpoint.  The checkpoint, not the stale pinned target, is
             # the safety proof: the old attempt may have come from a rewritten
             # or diverged remote tip.
-            if unfinished["report_id"] is None and invalid_unit is None and current_target != unfinished["target_sha"]:
-                checkpoint_is_ancestor = (
-                    state["checkpoint_sha"] is None
-                    or git.is_ancestor(state["checkpoint_sha"], current_target)
+            if unfinished["report_id"] is None and invalid_unit is None and config_changed:
+                if not checkpoint_is_ancestor:
+                    return _finish(
+                        args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20,
+                        error_code="PINNED_RUN_CONTEXT_CHANGED", checkpoint_before=state["checkpoint_sha"],
+                        checkpoint_after=state["checkpoint_sha"], run_id=unfinished["run_id"],
+                    )
+                store.abandon_stale_run(
+                    unfinished["run_id"],
+                    "report-less run superseded by an analyzer configuration change",
                 )
+                unfinished = None
+            elif unfinished["report_id"] is None and invalid_unit is None and current_target != unfinished["target_sha"]:
+                try:
+                    run_fingerprint = json.loads(unfinished["fingerprint_json"] or "{}")
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    run_fingerprint = {}
+                pending_reason = run_fingerprint.get("pending_reason") if isinstance(run_fingerprint, dict) else None
                 if pending_reason == "UNIT_BUDGET" or not checkpoint_is_ancestor:
                     return _finish(
                         args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20,
