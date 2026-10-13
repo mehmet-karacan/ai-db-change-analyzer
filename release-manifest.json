@@ -58,7 +58,7 @@
     "src/db_change_analyzer/taxonomy/change-catalog.json": "23f2c5077853516a3847d51affa951d8345da08e1d29564522e08a75db4d6a0e",
     "src/db_change_analyzer/taxonomy/design-tokens.json": "215cd460fda993f4b0d2c6d861a22889a5edc4ed0969c10cb216e653d100c967",
     "src/db_change_analyzer/taxonomy/object-catalog.json": "8e7926082fc1e189ebde2d8c6118119ee0bc6fcac0922f548a1a1a32884dbbd8",
-    "src/db_change_analyzer/templates/innova_v1/report_email.html.j2": "55c3317a9207c2e0781ba864d3a887dbfd4b3074a5ea3d9826f34099afce40db",
+    "src/db_change_analyzer/templates/innova_v1/report_email.html.j2": "9ab3b48c1012cc10fb3f74e22feebf8170928474ad5d514fd91e73d2a3822e2d",
     "src/db_change_analyzer/templates/innova_v1/report_email.txt.j2": "4c1c2513b19da16b48410a986ab5485bcf56ddbcca6a59e68673575dec32c21e",
     "src/db_change_analyzer/templates/v5/components/ai_commentary.html.j2": "18a86e5e3c66e75112839ba7f298a4176b2e65fc1837260a75183b1812408442",
     "src/db_change_analyzer/templates/v5/components/analysis_record.html.j2": "b3318a60238d296294592d1f968f6dea338dcbde01dad8a815072c3478582f31",

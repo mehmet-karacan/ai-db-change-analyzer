@@ -6,9 +6,15 @@ from pathlib import Path
 
 import pytest
 
-from db_change_analyzer.innova_rendering import InnovaRenderError, build_innova_render_manifest, render_innova_view
+from db_change_analyzer.innova_rendering import (
+    InnovaRenderError,
+    _new_analysis_context,
+    _format_analysis_duration,
+    build_innova_render_manifest,
+    render_innova_view,
+)
 from db_change_analyzer.cli import _extract_persisted_html
-from db_change_analyzer.v5_rendering import validate_mail_view
+from db_change_analyzer.v5_rendering import _PROFILES, _context, validate_mail_view
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +41,143 @@ def test_innova_renderer_separates_standalone_html_from_cid_email() -> None:
     assert manifest["schema_version"] == "render-manifest/2.0"
     assert manifest["email_html_sha256"]
     assert _extract_persisted_html(rendered.mime) == rendered.email_html
+
+
+@pytest.mark.parametrize(
+    ("elapsed_ms", "expected"),
+    [
+        (None, "Kaydedilmedi"),
+        (0, "0 saniye"),
+        (5_000, "5 saniye"),
+        (500, "1 saniye"),
+        (60_000, "1 dakika"),
+        (65_000, "1 dakika 5 saniye"),
+        (100_973, "1 dakika 41 saniye"),
+        (59_500, "1 dakika"),
+        (3_600_000, "1 saat"),
+        (3_661_000, "1 saat 1 dakika 1 saniye"),
+    ],
+)
+def test_innova_renderer_formats_analysis_duration(elapsed_ms: int | None, expected: str) -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    view["analysis"]["elapsed_ms"] = elapsed_ms
+    validate_mail_view(view)
+
+    assert _format_analysis_duration(elapsed_ms) == expected
+
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id=f"<duration-{elapsed_ms}@example.test>",
+        date=datetime.now(UTC),
+    )
+
+    assert expected.encode("utf-8") in rendered.html
+
+
+def test_innova_renderer_displays_full_model_name() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    view["analysis"]["ai"]["models"][0]["configured_model"] = "Qwen/Qwen3.8-27B-FP8"
+    validate_mail_view(view)
+
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<model-display@example.test>",
+        date=datetime.now(UTC),
+    )
+
+    assert b"Qwen3.8 27B-IT" in rendered.html
+    assert b"Qwen/Qwen3.8-27B-FP8" not in rendered.html
+    assert b"Qwen3.8-27B-FP8" not in rendered.html
+
+
+def test_innova_renderer_orders_summary_metrics_by_importance() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    validate_mail_view(view)
+
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<metric-order@example.test>",
+        date=datetime.now(UTC),
+    )
+
+    html = rendered.html.decode("utf-8")
+    positions = [html.index(marker) for marker in (
+        "Toplam Değişiklik", "Risk Seviyesi", "Yorumlayan Model", "Analiz Süresi", "Analiz Zamanı",
+    )]
+    assert positions == sorted(positions)
+
+
+def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/03-sequence-only.view.json").read_text(encoding="utf-8"))
+    sequence = view["objects"][0]
+    view["objects"] = []
+    for index in range(51):
+        item = deepcopy(sequence)
+        item["object_id"] = f"obj-seq-{index:03d}"
+        item["identity"]["name"] = f"SEQ_{index:03d}"
+        item["facts"][0]["fact_id"] = f"fact-seq-{index:03d}"
+        item["facts"][0]["after"]["value"] = str(15_480 + index)
+        view["objects"].append(item)
+
+    context = _context(view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(view, context)
+    sequence_rows = [row for row in rendered_context["diff_rows"] if row["tur"] == "SEQUENCE"]
+
+    assert sequence_rows == [{
+        "tur": "SEQUENCE",
+        "nesne": "51 sequence",
+        "degisiklik": "İleri gitti",
+        "aciklama": "51 sequence tek satırda toplandı.",
+    }]
+
+
+def test_innova_renderer_orders_detail_rows_by_object_priority() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    validate_mail_view(view)
+
+    context = _context(view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(view, context)
+
+    assert [row["tur"] for row in rendered_context["diff_rows"]] == [
+        "TABLE", "TABLE", "VIEW", "PACKAGE_BODY", "PACKAGE_SPEC", "INDEX", "SEQUENCE",
+    ]
+
+
+def test_innova_renderer_orders_sequence_subtypes_with_backward_first() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/03-sequence-only.view.json").read_text(encoding="utf-8"))
+    sequence = view["objects"][0]
+    forward = deepcopy(sequence)
+    forward["object_id"] = "obj-seq-forward"
+    forward["identity"]["name"] = "SEQ_FORWARD"
+    forward["facts"][0]["fact_id"] = "fact-seq-forward"
+    forward["facts"][0]["after"]["value"] = "15481"
+    backward = deepcopy(sequence)
+    backward["object_id"] = "obj-seq-backward"
+    backward["identity"]["name"] = "SEQ_BACKWARD"
+    backward["facts"][0]["fact_id"] = "fact-seq-backward"
+    backward["facts"][0]["after"]["value"] = "15199"
+    view["objects"] = [forward, backward]
+
+    context = _context(view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(view, context)
+
+    assert [row["degisiklik"] for row in rendered_context["diff_rows"]] == [
+        "Geri gitti", "İleri gitti",
+    ]
 
 
 def test_innova_renderer_fails_closed_when_approved_logo_is_missing(tmp_path: Path, monkeypatch) -> None:
@@ -114,7 +257,7 @@ def test_innova_renderer_keeps_accepted_execution_attribution_in_both_profiles()
     )
 
     assert "YZ Destekli Teknik Değerlendirme".encode("utf-8") in rendered.html
-    assert b"Yorumlayan model" in rendered.html
+    assert b"Yorumlayan Model" in rendered.html
     assert b"AI" in rendered.html
     assert b"requested_route" not in rendered.html
 
@@ -146,7 +289,7 @@ def test_innova_renderer_separates_source_risk_from_operation_colors() -> None:
     )
 
     html = rendered.html.decode("utf-8")
-    assert "Risk seviyesi" in html
+    assert "Risk Seviyesi" in html
     assert "Yüksek" in html and "Repository içi statik kanıt bulundu" in html
     assert "Etki ve Değerlendirme" in html
     assert "Değişiklik Detayları" in html
@@ -170,7 +313,7 @@ def test_innova_renderer_keeps_approved_section_order_and_object_risk_badges() -
         "Özet", "Etki ve Değerlendirme", "Değişiklik Detayları", "Kaynak ve İzlenebilirlik",
     )]
     assert positions == sorted(positions)
-    assert "Risk seviyesi" in html
+    assert "Risk Seviyesi" in html
 
 
 @pytest.mark.parametrize("level,label,color", [

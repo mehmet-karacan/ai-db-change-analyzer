@@ -14,7 +14,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 from jsonschema import Draft202012Validator, FormatChecker
 
-from .v5_rendering import _PROFILES, _context, _date, _duration, validate_mail_view
+from .v5_rendering import _PROFILES, _context, _date, validate_mail_view
 
 
 _TEMPLATES = Path(__file__).parent / "templates" / "innova_v1"
@@ -25,13 +25,89 @@ class InnovaRenderError(ValueError):
     pass
 
 
+def _format_analysis_duration(milliseconds: int | None) -> str:
+    if milliseconds is None:
+        return "Kaydedilmedi"
+
+    total_seconds = (milliseconds + 500) // 1000
+    hours, remaining_seconds = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remaining_seconds, 60)
+    parts: list[str] = []
+    if hours:
+        parts.append(f"{hours} saat")
+    if minutes:
+        parts.append(f"{minutes} dakika")
+    if seconds:
+        parts.append(f"{seconds} saniye")
+    if not parts:
+        parts.append("0 saniye")
+    return " ".join(parts)
+
+
+def _display_model_name(configured_model: str) -> str:
+    model_id = configured_model.rsplit("/", 1)[-1]
+    aliases = {
+        "Qwen3.8-27B-FP8": "Qwen3.8 27B-IT",
+    }
+    return aliases.get(model_id, model_id)
+
+
+def _sequence_start_direction(obj: dict[str, Any]) -> str | None:
+    if obj["identity"].get("object_type") != "SEQUENCE" or obj.get("operation") != "modified":
+        return None
+    facts = [fact for fact in obj["facts"] if fact["change_action"] != "unchanged" or fact["context_only"]]
+    if len(facts) != 1 or facts[0]["taxonomy_id"] != "sequence.sequence_property.start_with":
+        return None
+    before, after = facts[0]["before"], facts[0]["after"]
+    if before.get("state") != "present" or after.get("state") != "present":
+        return None
+    try:
+        before_value, after_value = int(before["value"]), int(after["value"])
+    except (TypeError, ValueError):
+        return None
+    if after_value > before_value:
+        return "İleri"
+    if after_value < before_value:
+        return "Geri"
+    return None
+
+
+_OBJECT_PRIORITY = {
+    "TABLE": 10,
+    "VIEW": 20,
+    "PACKAGE_BODY": 30,
+    "PROCEDURE": 40,
+    "FUNCTION": 40,
+    "TRIGGER": 40,
+    "PACKAGE_SPEC": 50,
+    "TYPE": 50,
+    "TYPE_BODY": 50,
+    "INDEX": 60,
+    "SEQUENCE": 70,
+}
+
+
+def _diff_row_sort_key(row: dict[str, str]) -> tuple[int, int]:
+    object_type = row.get("tur") or "Diğer"
+    priority = _OBJECT_PRIORITY.get(object_type, 100)
+    if object_type != "SEQUENCE":
+        return priority, 0
+    direction_priority = {
+        "Geri gitti": 0,
+        "İleri gitti": 1,
+    }
+    return priority, direction_priority.get(row.get("degisiklik", ""), 2)
+
+
 def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     """Adapt the validated mail view to the current corporate email template."""
     source = view["source"]
     analysis = view["analysis"]
     ai = analysis["ai"]
     models = ai.get("models", [])
-    model_name = ", ".join(dict.fromkeys(item["configured_model"] for item in models)) if models else "AI çağrısı yapılmadı"
+    model_name = ", ".join(
+        dict.fromkeys(_display_model_name(item["configured_model"]) for item in models)
+    ) if models else "AI çağrısı yapılmadı"
     completed_at = analysis.get("completed_at") or source.get("observed_at")
     timezone = analysis["display_timezone"]
     objects = view["objects"]
@@ -48,11 +124,16 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         for item in displayed_objects
     }
     diff_rows: list[dict[str, str]] = []
+    sequence_counts = {"İleri": 0, "Geri": 0}
     total_changes = 0
     for obj in objects:
         identity = obj["identity"]
         facts = [fact for fact in obj["facts"] if fact["change_action"] != "unchanged" or fact["context_only"]]
         total_changes += len(facts) or 1
+        sequence_direction = _sequence_start_direction(obj)
+        if sequence_direction:
+            sequence_counts[sequence_direction] += 1
+            continue
         if obj["object_id"] not in displayed_keys:
             continue
         comments = [comment["text_tr"] for comment in obj.get("ai_comments", [])]
@@ -65,6 +146,17 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
             "degisiklik": operation_labels.get(obj["operation"], "Doğrulanamadı"),
             "aciklama": description,
         })
+    sequence_rows = [
+        {
+            "tur": "SEQUENCE",
+            "nesne": f"{count} sequence",
+            "degisiklik": f"{direction} gitti",
+            "aciklama": f"{count} sequence tek satırda toplandı.",
+        }
+        for direction, count in sequence_counts.items()
+        if count
+    ]
+    diff_rows = sorted(sequence_rows + diff_rows, key=_diff_row_sort_key)
     risk = context["risk_summary"]
     impact = context["impact_summary"]
     limited_count = sum(obj.get("verification") != "verified" for obj in objects)
@@ -79,7 +171,7 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "system_context": f"{source['repository']} · Git snapshot karşılaştırması",
         "ornek": bool(view.get("synthetic")),
         "model_name": model_name,
-        "analysis_duration": _duration(analysis.get("elapsed_ms")),
+        "analysis_duration": _format_analysis_duration(analysis.get("elapsed_ms")),
         "total_changes": str(total_changes),
         "risk_level": risk["label"],
         "risk_color": risk["fg"],
