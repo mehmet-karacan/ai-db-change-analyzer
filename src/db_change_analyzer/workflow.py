@@ -913,15 +913,37 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     fast_inventory = True
 
     def snapshot_context(*, verify_parser: bool):
+        _phase_log(
+            "SNAPSHOT_OLD_INVENTORY_START",
+            verify_parser=verify_parser,
+            include_sql_sidecars=verify_parser,
+        )
         old_snapshot = [] if plan.base_sha is None else inventory_revision(
             git, plan.base_sha, roots, max_file_bytes=config.parser.max_file_bytes,
             timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths,
             parser_cache=store, verify_parser=verify_parser,
+            include_sql_sidecars=verify_parser,
+        )
+        _phase_log(
+            "SNAPSHOT_OLD_INVENTORY_COMPLETE",
+            files=len(old_snapshot),
+            objects=sum(len(item.occurrences) for item in old_snapshot),
+        )
+        _phase_log(
+            "SNAPSHOT_NEW_INVENTORY_START",
+            verify_parser=verify_parser,
+            include_sql_sidecars=verify_parser,
         )
         new_snapshot = inventory_revision(
             git, plan.target_sha, roots, max_file_bytes=config.parser.max_file_bytes,
             timeout_seconds=config.parser.worker_timeout_seconds, parse_paths=changed_paths,
             parser_cache=store, verify_parser=verify_parser,
+            include_sql_sidecars=verify_parser,
+        )
+        _phase_log(
+            "SNAPSHOT_NEW_INVENTORY_COMPLETE",
+            files=len(new_snapshot),
+            objects=sum(len(item.occurrences) for item in new_snapshot),
         )
         old_snapshot_index = _index(git, plan.base_sha, old_snapshot, config.parser.max_file_bytes) if plan.base_sha else {}
         new_snapshot_index = _index(git, plan.target_sha, new_snapshot, config.parser.max_file_bytes)

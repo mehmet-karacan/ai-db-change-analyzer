@@ -288,7 +288,18 @@ def inventory_bytes(raw: bytes, *, default_schema: str | None, parse_timeout_sec
     return result, projections, status, tuple((*result.diagnostics, *parse_diagnostics, *extraction_diagnostics))
 
 
-def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, max_file_bytes: int, timeout_seconds: int, parse_paths: set[bytes] | None = None, parser_cache=None, verify_parser: bool = True) -> list[FileInventory]:
+def inventory_revision(
+    git: GitClient,
+    revision: str,
+    roots: dict[str, str],
+    *,
+    max_file_bytes: int,
+    timeout_seconds: int,
+    parse_paths: set[bytes] | None = None,
+    parser_cache=None,
+    verify_parser: bool = True,
+    include_sql_sidecars: bool = True,
+) -> list[FileInventory]:
     inventories: list[FileInventory] = []
     entries = git.list_tree(revision)
     def needs_raw(entry: TreeEntry) -> bool:
@@ -296,7 +307,11 @@ def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, 
         # standalone COMMENT/ALTER statements can enrich a changed table.
         # Unchanged JSON, README and manifest files cannot contribute Oracle
         # object evidence and should not be loaded into memory.
-        return parse_paths is None or entry.path in parse_paths or entry.path.lower().endswith(b".sql")
+        return (
+            parse_paths is None
+            or entry.path in parse_paths
+            or (include_sql_sidecars and entry.path.lower().endswith(b".sql"))
+        )
 
     matching_entries = [
         entry for entry in entries
@@ -353,7 +368,6 @@ def inventory_revision(git: GitClient, revision: str, roots: dict[str, str], *, 
             verify_parser,
         )
 
-    matching_entries = [entry for entry in entries if entry.kind == "blob" and entry.mode not in {"120000", "160000"} and needs_raw(entry)]
     if len(matching_entries) < 2:
         inventories.extend(item for entry in matching_entries if (item := inventory_entry(entry)) is not None)
     else:

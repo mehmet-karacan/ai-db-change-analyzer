@@ -44,6 +44,72 @@ def test_revision_only_structurally_parses_selected_paths(monkeypatch) -> None:
     assert calls == [True]
 
 
+def test_revision_does_not_submit_out_of_scope_sql_to_inventory_workers(monkeypatch) -> None:
+    in_scope = TreeEntry(mode="100644", kind="blob", oid="1" * 40, path=b"gpu_user/a.sql")
+    in_scope_two = TreeEntry(mode="100644", kind="blob", oid="3" * 40, path=b"gpu_user/b.sql")
+    out_of_scope = TreeEntry(mode="100644", kind="blob", oid="2" * 40, path=b"other/a.sql")
+    entries = [in_scope, in_scope_two, out_of_scope]
+
+    class FakeGit:
+        def list_tree(self, _revision):
+            return entries
+
+        def read_blob(self, oid, _maximum):
+            return (
+                b"CREATE SEQUENCE S.SEQ_T START WITH 1;"
+                if oid in {in_scope.oid, in_scope_two.oid}
+                else b"CREATE SEQUENCE S.OUTSIDE START WITH 1;"
+            )
+
+    submitted = []
+
+    class RecordingExecutor:
+        def __init__(self, **_kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def map(self, function, values):
+            values = list(values)
+            submitted.extend(values)
+            return [function(value) for value in values]
+
+    monkeypatch.setattr("db_change_analyzer.inventory.ThreadPoolExecutor", RecordingExecutor)
+
+    inventories = inventory_revision(
+        FakeGit(), "2" * 40, {"gpu_user": "GPU_USER"}, max_file_bytes=1024,
+        timeout_seconds=20, parse_paths={in_scope.path}, verify_parser=False,
+    )
+
+    assert [item.entry.path for item in inventories] == [in_scope.path, in_scope_two.path]
+    assert submitted == [in_scope, in_scope_two]
+
+
+def test_fast_inventory_does_not_load_unchanged_sql_sidecars() -> None:
+    changed = TreeEntry(mode="100644", kind="blob", oid="1" * 40, path=b"gpu_user/changed.sql")
+    sidecar = TreeEntry(mode="100644", kind="blob", oid="2" * 40, path=b"gpu_user/unchanged.sql")
+    entries = [changed, sidecar]
+
+    class FakeGit:
+        def list_tree(self, _revision):
+            return entries
+
+        def read_blob(self, oid, _maximum):
+            return b"CREATE SEQUENCE S.CHANGED START WITH 1;" if oid == changed.oid else b"CREATE TABLE S.SIDECAR (ID NUMBER);"
+
+    inventories = inventory_revision(
+        FakeGit(), "2" * 40, {"gpu_user": "GPU_USER"}, max_file_bytes=1024,
+        timeout_seconds=20, parse_paths={changed.path}, verify_parser=False,
+        include_sql_sidecars=False,
+    )
+
+    assert [item.entry.path for item in inventories] == [changed.path]
+
+
 def test_objectless_sql_sidecar_skips_parser_worker(monkeypatch) -> None:
     calls = []
     monkeypatch.setattr("db_change_analyzer.inventory._parse_in_worker", lambda *_args: calls.append("whole") or (True, ()))
