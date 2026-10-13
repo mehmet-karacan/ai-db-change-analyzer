@@ -114,9 +114,57 @@ def test_innova_renderer_orders_summary_metrics_by_importance() -> None:
 
     html = rendered.html.decode("utf-8")
     positions = [html.index(marker) for marker in (
-        "Toplam Değişiklik", "Risk Seviyesi", "Yorumlayan Model", "Analiz Süresi", "Analiz Zamanı",
+        "Toplam Kaynak Değişikliği", "Risk Seviyesi", "Yorumlayan Model", "Analiz Süresi", "Analiz Zamanı",
     )]
     assert positions == sorted(positions)
+
+
+def test_innova_renderer_explains_source_change_and_object_counts_separately() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    validate_mail_view(view)
+
+    context = _context(view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(view, context)
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<count-clarity@example.test>",
+        date=datetime.now(UTC),
+    )
+
+    assert rendered_context["total_changes"] == "13"
+    assert rendered_context["verified"] == "13 kaynak değişikliği, 7 nesnede Git snapshot farkı olarak kaydedildi."
+    assert "Toplam Kaynak Değişikliği".encode("utf-8") in rendered.html
+
+
+def test_innova_renderer_builds_a_professional_executive_summary() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    validate_mail_view(view)
+
+    context = _context(view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(view, context)
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<executive-summary@example.test>",
+        date=datetime.now(UTC),
+    )
+
+    assert "gpu-db (örnek) / master" in rendered_context["summary"]
+    assert "13 kaynak değişikliği" in rendered_context["summary"]
+    assert "7 Oracle nesnesinde" in rendered_context["summary"]
+    assert "Git snapshot" in rendered_context["summary"]
+    assert rendered_context["summary_scope"] == "gpu-db (örnek) / master · a1b2c3d → e4f5a6b"
+    assert rendered_context["summary_types"] == "INDEX (1), PACKAGE BODY (1), PACKAGE SPEC (1), SEQUENCE (1), TABLE (2), VIEW (1)"
+    assert rendered_context["summary_risk"] == "Belirsiz · Güven doğrulanmadı"
+    assert "Ana göstergeler" in rendered.html.decode("utf-8")
+    assert "Doğrulama sınırı" in rendered.html.decode("utf-8")
 
 
 def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import base64
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from email.message import EmailMessage
@@ -99,6 +100,41 @@ def _diff_row_sort_key(row: dict[str, str]) -> tuple[int, int]:
     return priority, direction_priority.get(row.get("degisiklik", ""), 2)
 
 
+def _build_professional_summary(
+    *,
+    source: dict[str, Any],
+    object_count: int,
+    total_changes: int,
+    changed_files: int,
+    object_type_counts: Counter[str],
+    risk: dict[str, Any],
+    impact: dict[str, Any],
+) -> tuple[str, str, str, str, str, str]:
+    scope = f"{source['repository']} / {source['branch']} · {source['base_label']} → {source['target_label']}"
+    type_summary = ", ".join(
+        f"{object_type.replace('_', ' ')} ({count})"
+        for object_type, count in sorted(object_type_counts.items())
+    ) or "Değişiklik nesnesi bulunmuyor"
+    risk_summary = f"{risk['label']} · {risk['confidence_label']}"
+    boundary = "Canlı Oracle metadata'sı, çalışma zamanı kullanımı ve deployment sonucu doğrulanmadı."
+    if object_count:
+        summary = (
+            f"{scope} snapshot'ları arasındaki kaynak farkı incelenmiştir. "
+            f"{total_changes} kaynak değişikliği {object_count} Oracle nesnesinde ve {changed_files} dosyada tespit edilmiştir. "
+            f"Nesne kapsamı {type_summary} türlerini içermektedir. "
+            f"Kaynak tabanlı risk seviyesi {risk['label']} ({risk['confidence_label']}) olarak değerlendirilmiştir. "
+            f"Etki değerlendirmesi: {impact['status_label']}. "
+            f"Bulgular Git snapshot ve repository içi statik kanıtlarla sınırlıdır; {boundary}"
+        )
+    else:
+        summary = (
+            f"{scope} snapshot'ları arasında net kaynak nesnesi farkı bulunmamıştır. "
+            f"Karşılaştırma {changed_files} dosyayı kapsamaktadır. "
+            f"Bulgular Git snapshot ve repository içi statik kanıtlarla sınırlıdır; {boundary}"
+        )
+    return summary, scope, type_summary, risk_summary, boundary, str(object_count)
+
+
 def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     """Adapt the validated mail view to the current corporate email template."""
     source = view["source"]
@@ -161,11 +197,21 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
     impact = context["impact_summary"]
     limited_count = sum(obj.get("verification") != "verified" for obj in objects)
     object_count = len(objects)
-    verified = f"{object_count} nesne için Git snapshot farkı, {total_changes} kaynak değişikliği olarak kaydedildi."
+    object_type_counts = Counter(obj["identity"].get("object_type", "Diğer") for obj in objects)
+    verified = f"{total_changes} kaynak değişikliği, {object_count} nesnede Git snapshot farkı olarak kaydedildi."
     possible = f"{impact['status_label']}. Statik aday sayısı: {impact['candidate_count']}."
     assessment = f"Risk seviyesi {risk['label'].lower()}; {risk['confidence_label'].lower()}. Canlı veritabanı kontrol edilmedi."
     if limited_count:
         assessment += f" {limited_count} nesnenin ayrıntılı ayrıştırması sınırlı."
+    summary, summary_scope, summary_types, summary_risk, summary_boundary, summary_object_count = _build_professional_summary(
+        source=source,
+        object_count=object_count,
+        total_changes=total_changes,
+        changed_files=view["changed_files"],
+        object_type_counts=object_type_counts,
+        risk=risk,
+        impact=impact,
+    )
     return {
         "report_title": "Veritabanı Değişiklik Analizi",
         "system_context": f"{source['repository']} · Git snapshot karşılaştırması",
@@ -176,7 +222,12 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "risk_level": risk["label"],
         "risk_color": risk["fg"],
         "analysis_datetime": _date(completed_at, timezone),
-        "summary": context["summary_tr"],
+        "summary": summary,
+        "summary_scope": summary_scope,
+        "summary_types": summary_types,
+        "summary_risk": summary_risk,
+        "summary_boundary": summary_boundary,
+        "summary_object_count": summary_object_count,
         "verified": verified,
         "possible": possible,
         "assessment": assessment,
