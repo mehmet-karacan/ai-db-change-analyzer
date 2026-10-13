@@ -20,3 +20,4 @@ def test_jenkins_consumer_is_a_reviewable_single_emailext_fragment() -> None:
     assert "def emailBody = emailHtml.replaceAll" in source
     assert "body: emailBody" in source
     assert "&#36;" in source
+    assert "return this" in source

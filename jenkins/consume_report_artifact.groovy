@@ -51,3 +51,7 @@ def consumeAnalyzerReportArtifact(String artifactDir, String subject, String rec
         to: recipients,
     )
 }
+
+// Pipeline `load` returns the script object only when the loaded script has a
+// non-null final expression. Keep the helper methods callable from Jenkinsfile.
+return this
