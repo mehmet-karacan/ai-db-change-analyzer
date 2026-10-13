@@ -209,12 +209,14 @@ class LiteLLMClient:
         user_payload: dict[str, Any],
         response_schema: dict[str, Any],
         output_tokens: int,
+        read_timeout_seconds: int | None = None,
     ) -> ModelReply:
         if not self.config.route_verified or not self.config.capabilities_verified:
             raise ModelTransportError("MODEL_CAPABILITY_UNVERIFIED")
         return self._complete_request(
             api_key=api_key, system_message=system_message, user_payload=user_payload,
             response_schema=response_schema, output_tokens=output_tokens,
+            read_timeout_seconds=read_timeout_seconds,
         )
 
     def probe_synthetic(self, *, api_key: str, response_schema: dict[str, Any], output_tokens: int,
@@ -356,6 +358,7 @@ class LiteLLMClient:
     def _complete_request(
         self, *, api_key: str, system_message: str, user_payload: dict[str, Any],
         response_schema: dict[str, Any], output_tokens: int,
+        read_timeout_seconds: int | None = None,
     ) -> ModelReply:
         if self.config.output_mode != "json_schema":
             system_message += "\nReturn exactly one JSON object matching this schema; do not add fields: " + json.dumps(
@@ -375,7 +378,7 @@ class LiteLLMClient:
             body["response_format"] = format_value
         if self.config.id.startswith("Qwen/"):
             body["chat_template_kwargs"] = {"enable_thinking": False}
-        return self._validate_envelope(self._send_json(api_key, body))
+        return self._validate_envelope(self._send_json(api_key, body, read_timeout_seconds=read_timeout_seconds))
 
     def _tool_request(self, *, api_key: str, messages: list[dict[str, Any]], tools: Sequence[dict[str, Any]],
                       response_schema: dict[str, Any], output_tokens: int, tool_choice: str,
@@ -391,7 +394,19 @@ class LiteLLMClient:
             body["chat_template_kwargs"] = {"enable_thinking": False}
         return self._validate_tool_envelope(self._send_json(api_key, body))
 
-    def _send_json(self, api_key: str, body: dict[str, Any]) -> Any:
+    def _send_json(self, api_key: str, body: dict[str, Any], *, read_timeout_seconds: int | None = None) -> Any:
+        if read_timeout_seconds is not None and (
+            isinstance(read_timeout_seconds, bool)
+            or read_timeout_seconds <= 0
+            or read_timeout_seconds > self.config.read_timeout_seconds
+        ):
+            raise ModelTransportError("MODEL_READ_TIMEOUT_INVALID")
+        timeout = httpx.Timeout(
+            connect=self.config.connect_timeout_seconds,
+            read=read_timeout_seconds if read_timeout_seconds is not None else self.config.read_timeout_seconds,
+            write=self.config.write_timeout_seconds,
+            pool=self.config.pool_timeout_seconds,
+        )
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         request_kind = "tools" if "tools" in body else "json_schema" if "response_format" in body else "chat"
         started = time.perf_counter()
@@ -409,7 +424,7 @@ class LiteLLMClient:
             follow_redirects=False,
         )
         try:
-            with self._client.stream("POST", self.url, headers=headers, json=body) as response:
+            with self._client.stream("POST", self.url, headers=headers, json=body, timeout=timeout) as response:
                 content_type = response.headers.get("content-type", "")
                 _safe_log(
                     "model_http_response",

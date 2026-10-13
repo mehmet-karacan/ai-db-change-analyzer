@@ -98,6 +98,7 @@ class ParserConfig(ConfigModel):
 class AnalysisConfig(ConfigModel):
     review_mode: Literal["legacy_commentary", "source_review"] = "legacy_commentary"
     max_objects_for_individual_ai_review: Annotated[int, Field(ge=1, le=1000)]
+    aggregate_model_timeout_seconds: Annotated[int, Field(gt=0, le=300)]
     max_job_seconds: Annotated[int, Field(ge=1)]
     shutdown_reserve_seconds: Annotated[int, Field(ge=0)]
     max_new_units_per_invocation: Annotated[int, Field(ge=1)]

@@ -121,6 +121,39 @@ def test_http_request_shape_and_envelope_are_strict(tmp_path: Path) -> None:
     assert captured["response_format"]["type"] == "json_schema"
 
 
+def test_per_request_read_timeout_can_only_shorten_configured_timeout(tmp_path: Path, monkeypatch) -> None:
+    config = verified_model_config(tmp_path)
+    captured: dict = {}
+
+    class StreamResponse:
+        def __enter__(self):
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": valid_content()}, "finish_reason": "stop"}]},
+                request=httpx.Request("POST", "https://aihub-api.turktelekom.com.tr/chat/completions"),
+            )
+
+        def __exit__(self, *_args):
+            return None
+
+    def stream(_method, _url, **kwargs):
+        captured["timeout"] = kwargs["timeout"]
+        return StreamResponse()
+
+    with LiteLLMClient(config, transport=httpx.MockTransport(lambda _: pytest.fail("patched stream expected"))) as client:
+        monkeypatch.setattr(client._client, "stream", stream)
+        client.complete(
+            api_key="local-test-key", system_message="safe", user_payload={},
+            response_schema={"type": "object"}, output_tokens=64, read_timeout_seconds=90,
+        )
+        assert captured["timeout"].read == 90
+        with pytest.raises(ModelTransportError, match="MODEL_READ_TIMEOUT_INVALID"):
+            client.complete(
+                api_key="local-test-key", system_message="safe", user_payload={},
+                response_schema={"type": "object"}, output_tokens=64, read_timeout_seconds=121,
+            )
+
+
 def test_http_diagnostics_are_detailed_without_logging_secret_or_payload(tmp_path: Path, capsys) -> None:
     config = verified_model_config(tmp_path)
 

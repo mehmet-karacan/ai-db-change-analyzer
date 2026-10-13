@@ -1506,7 +1506,16 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                     attempts_used = 1
                     http_attempts += 1
                     aggregate_output_tokens = min(config.analysis.output_tokens, 4096)
-                    _phase_log("AGGREGATE_MODEL_START", object_count=len(objects), output_tokens=aggregate_output_tokens)
+                    aggregate_read_timeout = min(
+                        config.analysis.aggregate_model_timeout_seconds,
+                        config.model.read_timeout_seconds,
+                    )
+                    _phase_log(
+                        "AGGREGATE_MODEL_START",
+                        object_count=len(objects),
+                        output_tokens=aggregate_output_tokens,
+                        read_timeout_seconds=aggregate_read_timeout,
+                    )
                     try:
                         reply = model.complete(
                             api_key=read_secret("LITELLM_API_KEY").get_secret_value(),
@@ -1514,6 +1523,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                             user_payload=aggregate_input,
                             response_schema=response_schema,
                             output_tokens=aggregate_output_tokens,
+                            read_timeout_seconds=aggregate_read_timeout,
                         )
                         if reply.returned_model:
                             returned_models_by_unit.setdefault(aggregate_unit_id, set()).add(reply.returned_model)

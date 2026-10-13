@@ -58,6 +58,7 @@ def _prepare(tmp_path: Path, count: int, *, individual: bool) -> tuple[Path, Git
 
 class _FakeModel:
     calls: list[dict]
+    timeout_calls: list[int | None]
 
     def __init__(self, _config):
         pass
@@ -71,6 +72,7 @@ class _FakeModel:
     def complete(self, **kwargs):
         payload = kwargs["user_payload"]
         self.calls.append(payload)
+        self.timeout_calls.append(kwargs.get("read_timeout_seconds"))
         if payload["schema_version"] == "aggregate-review-input/1.0":
             evidence_id = payload["evidence_registry"][0]["evidence_id"]
             response = {
@@ -100,6 +102,7 @@ def test_more_than_threshold_uses_one_aggregate_call(tmp_path, capsys, monkeypat
     config, _source, _scope_dir = _prepare(tmp_path, count, individual=False)
     calls: list[dict] = []
     _FakeModel.calls = calls
+    _FakeModel.timeout_calls = []
     monkeypatch.setattr("db_change_analyzer.workflow.LiteLLMClient", _FakeModel)
     monkeypatch.setenv("LITELLM_API_KEY", "test-key")
     inventory_calls: list[set[str]] = []
@@ -118,6 +121,7 @@ def test_more_than_threshold_uses_one_aggregate_call(tmp_path, capsys, monkeypat
     view = json.loads((tmp_path / "out" / "mail-view.json").read_text(encoding="utf-8"))
 
     assert len(calls) == expected_calls
+    assert _FakeModel.timeout_calls == [90]
     assert calls[0]["summary"]["object_count"] == count
     assert all("raw_sql" not in call and "source_snippet" not in call for call in calls)
     assert view["analysis"]["ai"]["mode"] == "aggregate"
@@ -132,12 +136,14 @@ def test_at_threshold_keeps_individual_calls(tmp_path, capsys, monkeypatch) -> N
     config, _source, _scope_dir = _prepare(tmp_path, 10, individual=True)
     calls: list[dict] = []
     _FakeModel.calls = calls
+    _FakeModel.timeout_calls = []
     monkeypatch.setattr("db_change_analyzer.workflow.LiteLLMClient", _FakeModel)
     monkeypatch.setenv("LITELLM_API_KEY", "test-key")
 
     assert main(["--config", str(config), "run", "--offline", "--allow-ai"]) == 0
     capsys.readouterr()
     assert len(calls) == 10
+    assert _FakeModel.timeout_calls == [None] * 10
 
 
 def test_aggregate_model_failure_keeps_deterministic_report(tmp_path, capsys, monkeypatch) -> None:
@@ -147,9 +153,11 @@ def test_aggregate_model_failure_keeps_deterministic_report(tmp_path, capsys, mo
     class InvalidAggregateModel(_FakeModel):
         def complete(self, **kwargs):
             self.calls.append(kwargs["user_payload"])
+            self.timeout_calls.append(kwargs.get("read_timeout_seconds"))
             return ModelReply("{}", "mock-model", "stop", None)
 
     _FakeModel.calls = calls
+    _FakeModel.timeout_calls = []
     monkeypatch.setattr("db_change_analyzer.workflow.LiteLLMClient", InvalidAggregateModel)
     monkeypatch.setenv("LITELLM_API_KEY", "test-key")
 
@@ -158,6 +166,7 @@ def test_aggregate_model_failure_keeps_deterministic_report(tmp_path, capsys, mo
     view = json.loads((tmp_path / "out" / "mail-view.json").read_text(encoding="utf-8"))
 
     assert len(calls) == 1
+    assert _FakeModel.timeout_calls == [90]
     assert result["quality"] == "limited"
     assert view["analysis"]["ai"]["status"] == "failed"
     assert view["analysis"]["ai"]["aggregate_error_code"] == "AGGREGATE_REVIEW_INVALID"
@@ -168,6 +177,7 @@ def test_successful_aggregate_call_is_not_repeated_after_render_resume(tmp_path,
     config, _source, scope_dir = _prepare(tmp_path, 11, individual=False)
     calls: list[dict] = []
     _FakeModel.calls = calls
+    _FakeModel.timeout_calls = []
     monkeypatch.setattr("db_change_analyzer.workflow.LiteLLMClient", _FakeModel)
     monkeypatch.setenv("LITELLM_API_KEY", "test-key")
 

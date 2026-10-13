@@ -37,6 +37,7 @@ worker_memory_mib = 1024
 [analysis]
 review_mode = "source_review"
 max_objects_for_individual_ai_review = 10
+aggregate_model_timeout_seconds = 90
 max_job_seconds = 1500
 shutdown_reserve_seconds = 60
 max_new_units_per_invocation = 40
