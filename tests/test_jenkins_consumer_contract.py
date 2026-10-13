@@ -14,6 +14,9 @@ def test_jenkins_consumer_is_a_reviewable_single_emailext_fragment() -> None:
     assert "result.smtp_attempts != 0" in source
     assert "result.artifact_manifest_sha256" in source
     assert "manifest.email_html_sha256" in source
+    assert "def sha256File(String path)" in source
+    assert "sha256sum --" in source
+    assert "MessageDigest" not in source
     assert "mail-view.json" in source
     assert "report.report_id" in source
     assert "manifest.email_html_bytes" in source

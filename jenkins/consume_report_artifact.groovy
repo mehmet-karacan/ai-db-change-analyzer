@@ -5,9 +5,16 @@
  * sender or a new job. Call consumeAnalyzerReportArtifact('out', subject, to)
  * from the existing job after the Analyzer process has completed.
  */
-def sha256(byte[] bytes) {
-    def digest = java.security.MessageDigest.getInstance('SHA-256')
-    digest.digest(bytes).collect { String.format('%02x', it) }.join()
+def sha256File(String path) {
+    // Use the agent's command-line hash utility so this loaded Pipeline
+    // fragment remains compatible with Jenkins' Groovy sandbox. The caller
+    // supplies repository-local artifact paths (currently only `out`).
+    def safePath = path.replace("'", "'\"'\"'")
+    def hashLine = sh(
+        script: "sha256sum -- '${safePath}'",
+        returnStdout: true
+    ).trim()
+    return hashLine.tokenize(' ')[0]
 }
 
 def consumeAnalyzerReportArtifact(String artifactDir, String subject, String recipients) {
@@ -29,13 +36,12 @@ def consumeAnalyzerReportArtifact(String artifactDir, String subject, String rec
         error('Analyzer artifact identity or version mismatch')
     }
 
-    def manifestBytes = readFile(file: "${artifactDir}/render-manifest.json", encoding: 'UTF-8').getBytes('UTF-8')
-    if (sha256(manifestBytes) != result.artifact_manifest_sha256) {
+    if (sha256File("${artifactDir}/render-manifest.json") != result.artifact_manifest_sha256) {
         error('Analyzer artifact manifest hash mismatch')
     }
     def emailHtml = readFile(file: "${artifactDir}/report-email.html", encoding: 'UTF-8')
     if (manifest.email_html_bytes != emailHtml.getBytes('UTF-8').length ||
-        sha256(emailHtml.getBytes('UTF-8')) != manifest.email_html_sha256) {
+        sha256File("${artifactDir}/report-email.html") != manifest.email_html_sha256) {
         error('Analyzer artifact email hash mismatch')
     }
 
