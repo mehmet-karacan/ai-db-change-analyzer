@@ -1509,6 +1509,10 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         )
 
     run_fingerprint["processed_keys"] = sorted(processed_keys | active_keys)
+    if budget_limited:
+        run_fingerprint["pending_reason"] = "UNIT_BUDGET"
+    else:
+        run_fingerprint.pop("pending_reason", None)
     connection = store.connection()
     try:
         with connection:

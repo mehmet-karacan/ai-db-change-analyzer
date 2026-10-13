@@ -182,3 +182,46 @@ def test_successful_aggregate_call_is_not_repeated_after_render_resume(tmp_path,
     assert resumed["outcome"] == "ARTIFACT_READY"
     assert resumed["run_id"] == run_id
     assert len(calls) == 1
+
+
+def test_stale_completed_render_run_is_abandoned_when_target_advances(tmp_path, capsys, monkeypatch) -> None:
+    config, source, scope_dir = _prepare(tmp_path, 11, individual=False)
+    calls: list[dict] = []
+    _FakeModel.calls = calls
+    monkeypatch.setattr("db_change_analyzer.workflow.LiteLLMClient", _FakeModel)
+    monkeypatch.setenv("LITELLM_API_KEY", "test-key")
+
+    from db_change_analyzer import workflow as workflow_module
+    from db_change_analyzer.reporting import ReportError
+
+    original_render = workflow_module.render_innova_view
+
+    def crash_render(*_args, **_kwargs):
+        raise ReportError("REPORT_SCHEMA_INVALID:evidence_registry/103:oneOf")
+
+    monkeypatch.setattr(workflow_module, "render_innova_view", crash_render)
+    run_args = ["--config", str(config), "run", "--offline", "--allow-ai"]
+    assert main(run_args) == 50
+    failed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert failed["outcome"] == "SAFETY_POLICY_VIOLATION"
+    assert len(calls) == 1
+    with sqlite3.connect(scope_dir / "state.sqlite3") as connection:
+        old_run_id = connection.execute(
+            "SELECT run_id FROM runs WHERE report_id IS NULL ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()[0]
+        cache = scope_dir / "source.git"
+
+    source.write("gpu_user/new.sql", "CREATE TABLE S.NEW_OBJECT(ID NUMBER);\n")
+    third = source.commit("new change after failed render")
+    _git("fetch", str(source.root), f"{third}:refs/remotes/source/master", cwd=cache)
+
+    monkeypatch.setattr(workflow_module, "render_innova_view", original_render)
+    assert main(run_args) == 0
+    resumed = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert resumed["outcome"] == "ARTIFACT_READY"
+    assert resumed["run_id"] != old_run_id
+    assert resumed["checkpoint_after"] == third
+    assert len(calls) == 2
+    with sqlite3.connect(scope_dir / "state.sqlite3") as connection:
+        old_status = connection.execute("SELECT status FROM runs WHERE run_id=?", (old_run_id,)).fetchone()[0]
+    assert old_status == "CLOSED"

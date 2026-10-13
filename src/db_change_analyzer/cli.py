@@ -236,16 +236,30 @@ def run_command(args: argparse.Namespace) -> int:
                 ).fetchone()
             finally:
                 connection.close()
+            try:
+                run_fingerprint = json.loads(unfinished["fingerprint_json"] or "{}")
+            except (TypeError, ValueError, json.JSONDecodeError):
+                run_fingerprint = {}
+            pending_reason = run_fingerprint.get("pending_reason") if isinstance(run_fingerprint, dict) else None
             # A persisted report or an invalid unit belongs to the pinned retry
             # path.  A still-running analysis with no invalid retry marker must
             # stop if the branch moved, so new commits cannot be silently omitted.
             if unfinished["report_id"] is None and invalid_unit is None and current_target != unfinished["target_sha"]:
-                return _finish(
-                    args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20,
-                    error_code="PINNED_RUN_CONTEXT_CHANGED", checkpoint_before=state["checkpoint_sha"],
-                    checkpoint_after=state["checkpoint_sha"], run_id=unfinished["run_id"],
+                if pending_reason == "UNIT_BUDGET" or not git.is_ancestor(unfinished["target_sha"], current_target):
+                    return _finish(
+                        args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20,
+                        error_code="PINNED_RUN_CONTEXT_CHANGED", checkpoint_before=state["checkpoint_sha"],
+                        checkpoint_after=state["checkpoint_sha"], run_id=unfinished["run_id"],
+                    )
+                store.abandon_stale_run(
+                    unfinished["run_id"],
+                    "pinned target was superseded after a report-less completed analysis attempt",
                 )
-            plan = HistoryPlanner(git, [root.path for root in config.scope.roots], config.git.max_new_commits).automatic(unfinished["base_sha"], unfinished["target_sha"])
+                unfinished = None
+            if unfinished is not None:
+                plan = HistoryPlanner(git, [root.path for root in config.scope.roots], config.git.max_new_commits).automatic(unfinished["base_sha"], unfinished["target_sha"])
+            else:
+                plan = _automatic_plan(config, store, offline=args.offline)
         else:
             plan = _automatic_plan(config, store, offline=args.offline)
         _json_line({"event": "range_plan", "plan": _plan_projection(plan)}, stream=sys.stderr)

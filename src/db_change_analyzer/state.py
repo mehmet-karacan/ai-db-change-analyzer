@@ -584,3 +584,35 @@ class SqliteStateStore:
             raise
         finally:
             connection.close()
+
+    def abandon_stale_run(self, run_id: str, reason: str) -> None:
+        """Close a report-less run whose pinned target was superseded safely."""
+        if not reason.strip():
+            raise StateError("stale run abandonment reason is required")
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT scope_hash,mode,base_sha,target_sha,status,report_id FROM runs WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None or row["mode"] != "AUTO" or row["report_id"] is not None or row["status"] in (
+                "BASELINED", "NO_CHANGE", "OUT_OF_SCOPE_ONLY", "COMMITTED", "CLOSED"
+            ):
+                raise StateError("run is not eligible for stale abandonment")
+            cursor = connection.execute(
+                "UPDATE runs SET status='CLOSED',last_attempt_at=? WHERE run_id=? AND status=? AND report_id IS NULL",
+                (_now(), run_id, row["status"]),
+            )
+            if cursor.rowcount != 1:
+                raise StateError("stale run compare-and-swap failed")
+            connection.execute(
+                "INSERT INTO audit_events(scope_hash,run_id,action,actor,expected_base,target,reason,created_at) VALUES (?,?, 'PINNED_RUN_ABANDONED', 'system', ?, ?, ?, ?)",
+                (row["scope_hash"], run_id, row["base_sha"], row["target_sha"], reason, _now()),
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
