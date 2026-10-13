@@ -186,6 +186,7 @@ def test_successful_aggregate_call_is_not_repeated_after_render_resume(tmp_path,
 
 def test_stale_completed_render_run_is_abandoned_when_target_advances(tmp_path, capsys, monkeypatch) -> None:
     config, source, scope_dir = _prepare(tmp_path, 11, individual=False)
+    first = _git("rev-parse", "HEAD~1", cwd=source.root)
     calls: list[dict] = []
     _FakeModel.calls = calls
     monkeypatch.setattr("db_change_analyzer.workflow.LiteLLMClient", _FakeModel)
@@ -211,9 +212,14 @@ def test_stale_completed_render_run_is_abandoned_when_target_advances(tmp_path, 
         ).fetchone()[0]
         cache = scope_dir / "source.git"
 
+    source.branch("alternate", first)
+    source.write(
+        "gpu_user/tables.sql",
+        "\n".join(f"CREATE TABLE T_{index} (ID NUMBER NOT NULL);" for index in range(11)) + "\n",
+    )
     source.write("gpu_user/new.sql", "CREATE TABLE S.NEW_OBJECT(ID NUMBER);\n")
     third = source.commit("new change after failed render")
-    _git("fetch", str(source.root), f"{third}:refs/remotes/source/master", cwd=cache)
+    _git("fetch", str(source.root), f"+{third}:refs/remotes/source/master", cwd=cache)
 
     monkeypatch.setattr(workflow_module, "render_innova_view", original_render)
     assert main(run_args) == 0

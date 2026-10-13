@@ -244,8 +244,17 @@ def run_command(args: argparse.Namespace) -> int:
             # A persisted report or an invalid unit belongs to the pinned retry
             # path.  A still-running analysis with no invalid retry marker must
             # stop if the branch moved, so new commits cannot be silently omitted.
+            # When the old attempt has no report and the entire attempt reached
+            # the report boundary, a newer target can safely be re-planned from
+            # the checkpoint.  The checkpoint, not the stale pinned target, is
+            # the safety proof: the old attempt may have come from a rewritten
+            # or diverged remote tip.
             if unfinished["report_id"] is None and invalid_unit is None and current_target != unfinished["target_sha"]:
-                if pending_reason == "UNIT_BUDGET" or not git.is_ancestor(unfinished["target_sha"], current_target):
+                checkpoint_is_ancestor = (
+                    state["checkpoint_sha"] is None
+                    or git.is_ancestor(state["checkpoint_sha"], current_target)
+                )
+                if pending_reason == "UNIT_BUDGET" or not checkpoint_is_ancestor:
                     return _finish(
                         args, mode="RUN", outcome="PINNED_RUN_CONFLICT", exit_code=20,
                         error_code="PINNED_RUN_CONTEXT_CHANGED", checkpoint_before=state["checkpoint_sha"],
