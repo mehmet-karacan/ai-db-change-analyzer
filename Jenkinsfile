@@ -197,8 +197,10 @@ pipeline {
                                             --ack-unanalysed-history
                                     fi
                                     echo 'ANALYZER_PHASE=RUN_START'
-                                    if [ -n "$ANALYZER_MANUAL_BASE_SHA" ] || [ -n "$ANALYZER_MANUAL_TARGET_SHA" ]; then
-                                        if [ -z "$ANALYZER_MANUAL_BASE_SHA" ] || [ -z "$ANALYZER_MANUAL_TARGET_SHA" ]; then
+                                    manual_base_sha="${ANALYZER_MANUAL_BASE_SHA:-}"
+                                    manual_target_sha="${ANALYZER_MANUAL_TARGET_SHA:-}"
+                                    if [ -n "$manual_base_sha" ] || [ -n "$manual_target_sha" ]; then
+                                        if [ -z "$manual_base_sha" ] || [ -z "$manual_target_sha" ]; then
                                             echo 'Manuel analiz için base ve target SHA birlikte verilmelidir.' >&2
                                             exit 2
                                         fi
@@ -206,8 +208,8 @@ pipeline {
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \
                                             --emit-dir "$WORKSPACE/out" \
-                                            manual --base "$ANALYZER_MANUAL_BASE_SHA" \
-                                            --target "$ANALYZER_MANUAL_TARGET_SHA" --allow-ai
+                                            manual --base "$manual_base_sha" \
+                                            --target "$manual_target_sha" --allow-ai
                                     else
                                         PYTHONPATH="$PWD/.site:$PWD/src" python3 -m db_change_analyzer \
                                             --config "$ANALYZER_CONFIG" \

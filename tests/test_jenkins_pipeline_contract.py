@@ -47,8 +47,10 @@ def test_analyzer_pipeline_is_manually_startable_with_parameters() -> None:
     assert "params.ANALYZER_MANUAL_TARGET_SHA ?:" in JENKINSFILE
     assert "name: 'ANALYZER_MANUAL_BASE_SHA'" in JENKINSFILE
     assert "name: 'ANALYZER_MANUAL_TARGET_SHA'" in JENKINSFILE
-    assert "manual --base \"$ANALYZER_MANUAL_BASE_SHA\"" in JENKINSFILE
-    assert "--target \"$ANALYZER_MANUAL_TARGET_SHA\" --allow-ai" in JENKINSFILE
+    assert 'manual_base_sha="${ANALYZER_MANUAL_BASE_SHA:-}"' in JENKINSFILE
+    assert 'manual_target_sha="${ANALYZER_MANUAL_TARGET_SHA:-}"' in JENKINSFILE
+    assert 'manual --base "$manual_base_sha"' in JENKINSFILE
+    assert '--target "$manual_target_sha" --allow-ai' in JENKINSFILE
     assert "name: 'ANALYZER_GIT_CREDENTIAL_ID'" in JENKINSFILE
     assert "name: 'ANALYZER_MODEL_KEY_CREDENTIAL_ID'" in JENKINSFILE
     assert 'cp "$WORKSPACE/out/capability-record.json" "$PWD/.analyzer-state/capability-record.json"' in JENKINSFILE
