@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 import uuid
 from collections import defaultdict
@@ -55,6 +56,15 @@ class OccurrenceRef:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _phase_log(name: str, **fields: Any) -> None:
+    payload = {"phase": name, **fields}
+    print(
+        "ANALYZER_PHASE=" + json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _extend_unique_evidence(registry: list[dict[str, Any]], items: list[dict[str, Any]]) -> None:
@@ -921,6 +931,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
     changed_keys = sorted({key for key in old_index.keys() | new_index.keys() if _signature(old_index.get(key, [])) != _signature(new_index.get(key, []))} | reordered_keys)
     _verify_changed_refs(old_index, changed_keys, config.parser.worker_timeout_seconds, store)
     _verify_changed_refs(new_index, changed_keys, config.parser.worker_timeout_seconds, store)
+    _phase_log("SNAPSHOT_INVENTORY_COMPLETE", changed_objects=len(changed_keys), changed_paths=len(changed_paths))
     dependency_edges: tuple[dict[str, object], ...] = ()
     dependency_evidence: list[dict[str, Any]] = []
     dependency_omissions: tuple[str, ...] = ()
@@ -954,6 +965,7 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
         dependency_evidence = list(selected_dependencies.evidence_registry)
         dependency_omissions = selected_dependencies.omissions
     dependency_by_object = _dependency_records_by_object(dependency_edges, changed_keys)
+    _phase_log("DETERMINISTIC_CONTEXT_COMPLETE", changed_objects=len(changed_keys), dependency_edges=len(dependency_edges))
 
     source_review_mode = config.analysis.review_mode == "source_review"
     aggregate_mode = len(changed_keys) > config.analysis.max_objects_for_individual_ai_review
@@ -1426,13 +1438,15 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                     ai_phase_started_mono = time.monotonic()
                     attempts_used = 1
                     http_attempts += 1
+                    aggregate_output_tokens = min(config.analysis.output_tokens, 4096)
+                    _phase_log("AGGREGATE_MODEL_START", object_count=len(objects), output_tokens=aggregate_output_tokens)
                     try:
                         reply = model.complete(
                             api_key=read_secret("LITELLM_API_KEY").get_secret_value(),
                             system_message=system_prompt,
                             user_payload=aggregate_input,
                             response_schema=response_schema,
-                            output_tokens=config.analysis.output_tokens,
+                            output_tokens=aggregate_output_tokens,
                         )
                         if reply.returned_model:
                             returned_models_by_unit.setdefault(aggregate_unit_id, set()).add(reply.returned_model)
@@ -1441,6 +1455,11 @@ def execute_analysis(args, config, store, plan: RangePlan, git: GitClient, *, mo
                         aggregate_error_code = getattr(exc, "code", None) or str(exc)
                     ai_phase_completed_at = _now()
                     ai_phase_elapsed_ms = int((time.monotonic() - ai_phase_started_mono) * 1000)
+                    _phase_log(
+                        "AGGREGATE_MODEL_COMPLETE",
+                        elapsed_ms=ai_phase_elapsed_ms,
+                        status="accepted" if aggregate_review is not None else "failed",
+                    )
 
                 if aggregate_unit_id:
                     returned_model = sorted(returned_models_by_unit.get(aggregate_unit_id, set()))[0] if returned_models_by_unit.get(aggregate_unit_id) else None
