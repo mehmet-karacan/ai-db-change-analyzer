@@ -1,41 +1,134 @@
 # AI Database Change Analyzer
 
-Oracle DDL snapshot’larının sabit Git revision’ları arasındaki değişikliklerini kaynak kanıtından ayırmadan analiz eden, Python 3.10+ CLI ürünüdür. Ürün kaynak DDL repository’sine yazmaz, Oracle SQL çalıştırmaz ve mevcut DB Sync pipeline’ını değiştirmez. Açıkça etkinleştirilen arşiv ayarı, çıktıyı ayrı bir uygulama repository checkout’unda kalıcı kayıt olarak tutabilir; commit/push işlemi Analyzer dışında yürütülür.
+Oracle DDL snapshot’larının iki sabit Git revision’ı arasındaki farklarını
+inceleyen, sonucu kaynak kanıtlarıyla birlikte raporlayan Python 3.10+ CLI
+ürünüdür. Analyzer yalnızca Git’teki kaynakları okur; canlı Oracle’a bağlanmaz,
+SQL çalıştırmaz ve kaynak DDL repository’sine yazmaz.
 
-Repository'deki Analyzer `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` job'ının başarılı tamamlanmasından sonra çalışacak artifact pipeline'ını tanımlar. Pipeline yalnız `gpu-db` Git geçmişini analiz eder, canlı Oracle'a bağlanmaz; doğrulanmış HTML/JSON/text artifact'lerini Jenkins'e arşivletir ve doğrulanmış HTML raporunu `ANALYZER_MAIL_CREDENTIAL_ID` ile seçilen Jenkins Secret Text credential içindeki alıcılara (varsayılan credential: `gpu-oracle-ddl-sync-notify-to`) mevcut `emailext` mekanizmasıyla gönderir. `BASELINED` ve `NO_CHANGE` sonuçlarında mail gönderilmez. Kaynak kod, GPU artifact config'i ve Python 3.10 uyumlu Linux wheelhouse doğrudan bu repository checkout'undan okunur; Jenkins agent'ta yalnız genel `python3` ve Git bulunması gerekir, pip, venv veya internet gerekmez. Wheel'ler `.site` klasörüne doğrudan açılarak kullanılır. Job, upstream tetikleyicisinin yanında Jenkins'teki **Build with Parameters** ile manuel çalıştırılabilir; ilk manuel çalıştırma baseline oluşturur, yeni commit varsa analiz üretir. Kurumdaki mevcut `09-AI-DB-CHANGE-ANALYZER` job'ı bu dosya pushlandıktan ve model credential'ı tanımlandıktan sonra çalıştırılmalıdır. `docs/Jenkinsfile.txt` ayrı DB Sync referansıdır ve değiştirilmemiştir.
+## Arka plan ve amaç
 
-Yerel güvenlik ve kalite denetimi: `docs/GUVENLIK_KALITE_DENETIMI.md`.
+Bu proje, `10-ORACLE_DB_DDL_SYNC` job’ının ürettiği `gpu-db` snapshot’larını
+karşılaştırarak dağıtıma hazırlanan veritabanı değişikliklerini görünür hale
+getirir. Amaç yalnızca dosya farkı üretmek değil; değişikliğin nesne türünü,
+önceliğini, riskini ve rapora yansıtılabilecek kanıt sınırlarını anlaşılır bir
+şekilde göstermektir.
 
-## Kurumsal Jenkins Kullanımı
+Analyzer mevcut DB Sync pipeline’ına stage eklemez ve onun davranışını
+değiştirmez. Jenkins’te ayrı bir downstream job olarak çalışır; doğrulanmış
+artifact’leri arşivler ve hazırlanmış HTML raporunu standart Jenkins mail akışı
+üzerinden gönderir.
 
-Hazır `Jenkinsfile`, `gpu-db / master` snapshot'larını salt okunur olarak
-karşılaştırır ve doğrulanmış `report-email.html` artifact'ini mevcut Jenkins
-`emailext` adımıyla gönderir. Alıcı adresleri kaynak koda veya parametreye
-doğrudan yazılmaz; `ANALYZER_MAIL_CREDENTIAL_ID` parametresi bir Jenkins
-**Secret Text** credential seçer. GPU kurulumundaki varsayılan credential ID'si
-`gpu-oracle-ddl-sync-notify-to`'dur. Bu credential'ın içeriği Jenkins'te
-yönetilir ve rapor alıcı listesi olarak kullanılır.
+## Mimari
 
-Jenkins'teki temel parametreler şunlardır:
+![Mimari](docs/architecture.png)
+
+Diyagramın düzenlenebilir kaynakları:
+[`docs/architecture.excalidraw`](docs/architecture.excalidraw) ve
+[`docs/architecture.json`](docs/architecture.json). JSON dosyasını
+[Excalidraw](https://excalidraw.com/) üzerinde açabilirsiniz.
+
+Temel akış şöyledir:
+
+1. Jenkins, upstream DB Sync job’ının tamamlanmasını bekler.
+2. Analyzer `gpu-db` Git geçmişinden iki revision arasındaki aralığı belirler.
+3. Deterministik karşılaştırma nesne türü, değişiklik durumu, öncelik, risk ve
+   sequence gruplamasını üretir.
+4. Uygun kapsamda model değerlendirmesi yapılır; ham SQL modele gönderilmez.
+5. HTML, text ve JSON artifact’leri doğrulanır, arşivlenir ve mail gönderimine
+   hazırlanır.
+
+## Analiz kapsamı
+
+### Deterministik karşılaştırma
+
+Rapor; dosya kapsamını ve çözümlenen nesne sayısını birbirinden ayırarak
+gösterir. Nesneler için aşağıdaki bilgiler üretilir:
+
+- tablo, index, sequence, view, package, trigger, procedure, function ve type
+  gibi Oracle nesne türleri,
+- eklenen, güncellenen veya silinen değişiklik durumu,
+- nesne türüne göre öncelik ve risk sınıflandırması,
+- sequence değişikliklerinin tek satırlık özet halinde gruplanması,
+- doğrulanmış kaynak farkları ve ayrıştırılamayan alanların kapsam bilgisi.
+
+### Model değerlendirmesi
+
+Model kullanımı güvenli bir eşikle sınırlandırılmıştır:
+
+- 10 veya daha az değişen nesnede nesne bazlı AI incelemesi yapılır.
+- 10 nesneden fazla olduğunda nesne bazlı çağrılar yapılmaz; yalnızca tek bir
+  toplu model değerlendirmesi çalıştırılır.
+- Toplu çağrıya ham SQL, canlı sistem iddiası veya araştırma aracı verilmez.
+- Toplu değerlendirme raporda yalnızca **Etki ve Değerlendirme** bölümünde
+  gösterilir.
+- Model timeout veya geçersiz yanıt verirse deterministik rapor üretilebilir
+  kalır ve AI bölümü sınırlı olarak işaretlenir.
+
+Bu sınır `analysis.max_objects_for_individual_ai_review` ayarıyla açıkça
+tanımlıdır. Kullanıcıya gösterilen model etiketi `Qwen3.8 27B-IT`, teknik
+endpoint route’u ise yalnızca çalışma config’inde tutulur.
+
+## Jenkins kullanımı
+
+Repository’deki `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` job’ının başarılı
+tamamlanmasından sonra çalışacak artifact pipeline’ını tanımlar. Pipeline:
+
+- yalnız `gpu-db` Git geçmişini okur,
+- canlı Oracle’a bağlanmaz,
+- doğrulanmış artifact’leri Jenkins’e arşivletir,
+- doğrulanmış `report-email.html` dosyasını standart `emailext` adımıyla
+  gönderir,
+- `BASELINED` ve `NO_CHANGE` sonuçlarında mail göndermez.
+
+Job, upstream tetikleyicisinin yanında Jenkins’te **Build with Parameters** ile
+manuel olarak da çalıştırılabilir. İki SHA birlikte verilirse otomatik
+checkpoint değiştirilmeden kontrollü manuel analiz yapılır.
+
+### Jenkins parametreleri
 
 | Parametre | Kullanım |
 |---|---|
-| `ANALYZER_CONFIG` | `config/gpu.artifact.toml` gibi çalışma profili |
-| `ANALYZER_MAIL_CREDENTIAL_ID` | Rapor alıcı listesini taşıyan Secret Text credential ID'si |
-| `ANALYZER_MANUAL_BASE_SHA` / `ANALYZER_MANUAL_TARGET_SHA` | Sabit iki revision arasında kontrollü manuel analiz |
+| `ANALYZER_CONFIG` | Analyzer checkout’undaki çalışma profili; varsayılan `config/gpu.artifact.toml` |
+| `ANALYZER_WHEELHOUSE` | Onaylı ve hash kilitli Python wheel klasörü |
+| `ANALYZER_MANUAL_BASE_SHA` | Manuel analiz aralığının başlangıç revision’ı |
+| `ANALYZER_MANUAL_TARGET_SHA` | Manuel analiz aralığının hedef revision’ı |
+| `ANALYZER_MAIL_CREDENTIAL_ID` | Mail alıcı listesini taşıyan Jenkins Secret Text credential ID’si |
+| `ANALYZER_GIT_CREDENTIAL_ID` | `gpu-db` Git erişimi için Jenkins credential ID’si |
+| `ANALYZER_MODEL_KEY_CREDENTIAL_ID` | Kurumsal model endpoint anahtarı için Jenkins credential ID’si |
 
-On veya daha az değişen nesnede nesne bazlı AI incelemesi yapılır. Nesne sayısı
-onu aştığında deterministik karşılaştırma aynen korunur; model yalnızca tek bir
-toplu değerlendirme çağrısı alır. Bu sınır `analysis.max_objects_for_individual_ai_review`
-ile açıkça tanımlıdır. Kullanıcıya gösterilen model etiketi `Qwen3.8 27B-IT`,
-endpoint route'u ise yalnız config içinde tutulur.
+Varsayılan mail credential ID’si `gpu-oracle-ddl-sync-notify-to`’dur. Alıcı
+adresleri kaynak koda veya README’ye yazılmaz; Jenkins Credentials üzerinden
+yönetilir.
 
-Mimari diyagramın düzenlenebilir ve görsel kaynakları:
-[`docs/architecture.excalidraw`](docs/architecture.excalidraw),
-[`docs/architecture.json`](docs/architecture.json) ve
-[`docs/architecture.png`](docs/architecture.png).
+### Jenkins çalışma sınırları
 
-Geliştirme kurulumu:
+Analyzer ayrılmış `jenkins-2` agent’ında çalışır, aynı anda ikinci bir build’in
+başlamasını engeller ve 30 dakikalık job timeout’una sahiptir. Kaynak kod,
+config ve Python wheelhouse doğrudan repository checkout’undan okunur; Jenkins
+agent’ta pip, venv veya internet erişimi gerekmez.
+
+## Rapor çıktıları
+
+Başarılı bir analizde `out/` altında doğrulanan başlıca dosyalar şunlardır:
+
+| Dosya | Amaç |
+|---|---|
+| `report-email.html` | Mailde gönderilen responsive HTML rapor |
+| `report.html` | Tarayıcıda incelenen HTML rapor |
+| `report.txt` | Sade metin raporu |
+| `report.json` | Canonical analiz kaydı |
+| `result.json` | Çalışma ve teslimat sonucu |
+| `mail-view.json` | Mail görünümü için doğrulanmış yan kayıt |
+| `render-manifest.json` | Render ve artifact bütünlüğü kaydı |
+
+HTML raporunda toplam değişiklik, risk seviyesi ve analiz bilgileri üstte; özet,
+etki/değerlendirme, değişiklik detayları ve izlenebilirlik bölümleri önem sırasına
+göre yer alır. Responsive düzen masaüstü ve mobil mail istemcileri için
+uygundur.
+
+## Yerel geliştirme
+
+### Kurulum
 
 ```text
 python3 -m venv .venv
@@ -43,25 +136,11 @@ python3 -m venv .venv
 PYTHONPATH=src .venv/bin/python -m db_change_analyzer --config config/gpu.example.toml doctor --offline
 ```
 
-Örnek config bilinçli olarak canlı model capability doğrulamasını kapalı ve SMTP kurulum alanlarını placeholder bırakır. Gerçek credential dosyaya yazılmaz; yalnız allowlist environment değişkenlerinden çalışma anında okunur.
+Örnek config canlı model capability doğrulamasını kapalı ve SMTP alanlarını
+placeholder olarak bırakır. Gerçek credential dosyaya yazılmaz; çalışma zamanı
+değerleri yalnızca onaylı environment veya Jenkins credential akışından alınır.
 
-Yerel corpus hazırlama ve güvenlik sınırları için `docs/CORPUS_DOGRULAMA.md`, işletim akışları için `docs/OPERASYON.md` kullanılır.
-
-Source-review değerlendirmesi aynı sentetik corpus üzerinde mock sözleşme/rubrik
-koşusu ile yapılır; mock sonuç model kalite kabulü değildir. Politika sürümü
-karşılaştırması için iki policy kökü aynı corpus'a bağlanabilir:
-
-```text
-python tools/evaluate_source_review.py --config config/gpu.artifact.example.toml --corpus tests/fixtures/review_eval/corpus.json --output eval.json --mode mock
-python tools/compare_source_review_eval.py --config config/gpu.artifact.example.toml --corpus tests/fixtures/review_eval/corpus.json --output eval-compare.json --baseline-policy-root src/db_change_analyzer --candidate-policy-root src/db_change_analyzer --mode mock
-```
-
-Her çalışma policy dosyalarının sürüm/hash bilgisini taşır; kabul edilen model
-yorumları yalnız kabul edilmiş execution kaydının kimliğiyle ilişkilendirilir.
-Gerçek route değerlendirmesi ayrıca `--allow-ai` ve doğrulanmış capability
-kaydı gerektirir. İnsan değerlendirme alanları `docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md` içindedir.
-
-Temel offline akış:
+### Temel offline akış
 
 ```text
 db-change-analyzer --config gpu.toml state init --confirm-new-install
@@ -70,20 +149,47 @@ db-change-analyzer --config gpu.toml inventory --target <FULL_SHA> --offline
 db-change-analyzer --config gpu.toml run --dry-run --offline
 ```
 
-`run --allow-ai --allow-mail` yalnız verified model profile ve hazırlanmış SMTP config ile açılır. `manual` otomatik checkpoint'i değiştirmez; `notification resend` yeni AI analizi yapmaz. CLI stdout'ta tek satır `ResultRecord` JSON, stderr'de kaynak/secret içermeyen JSONL işletim olayları üretir.
+`run --allow-ai --allow-mail` yalnızca doğrulanmış model profili ve hazırlanmış
+SMTP config ile açılır. `manual` otomatik checkpoint’i değiştirmez;
+`notification resend` yeni AI analizi çalıştırmaz.
 
-Yeni raporlar canonical `report/2.0` kaydına bağlı `mail-view/3.0` ve `render-manifest/2.0` yan kayıtlarıyla onaylı İnnova HTML/plain text/MIME üretir; eski `report/1.0`, `mail-view/2.0` ve V5 kayıtları okunabilir kalır. Yapısal diff kapsamı tablo, index, sequence, view, package, trigger, procedure, function ve type kaynaklarını kapsayacak şekilde genişletilmiştir; doğrulanamayan özellik aileleri görünümde sınırlı kapsam olarak işaretlenir. Repository içi statik bağımlılıklar, nesne bazlı deterministik risk rozetleri ve çalıştırılmamış deployment ön kontrol planı canonical rapora yazılır. Model yalnız temizlenmiş `mail-unit-input/1.0` alır; `mail-commentary/1.1` yanıtındaki serbest yorumlar kanıtlı deterministik kabul kapısından geçmedikçe mailde gösterilmez. Önceden hazırlanmış bildirim tekrar denendiğinde kayıtlı MIME aynen kullanılır.
+## Testler ve kalite kontrolleri
 
-Ürün kapsamı ve kalıcı uygulama repository arşivi `docs/DB_CHANGE_ANALYZER_KAPSAM.md` içinde tanımlıdır. Arşiv isteğe bağlıdır: `reports.archive_enabled = true` ve `reports.archive_root` ile etkinleştirilir; raporlar uygulama checkout’unda `db-change-analyzer/reports/<year>/<date>/...` altında immutable kayıt olarak tutulur. Otomatik akış aynı `repository + branch + base_sha + target_sha` aralığı daha önce arşivlenmişse yeni change analizi başlatmaz; aynı gün içindeki farklı aralıklar ayrı raporlanır. Bu yol Jenkins tetikleme kapsamından çıkarılmalıdır.
-
-Mevcut schema v1 state için kapsam kilidi altında ve yedek alarak `db-change-analyzer --config gpu.toml state migrate-v5` çalıştırılır. Eski rapor ve pending bildirim byte'ları korunur. `docs/V5_UYGULAMA_DURUMU.md` uygulama kapsamını ve henüz yapılmamış kurum kabul adımlarını listeler.
-
-Doğrulama:
+Tam test paketi:
 
 ```text
-python -m pytest -q
+PYTHONPATH=src .venv/bin/python -m pytest -q
+```
+
+Sözleşme, release manifest ve final audit kontrolleri:
+
+```text
 python tools/check_contracts.py
 python tools/check_release_manifest.py
-python -m build --wheel
-python tools/final_audit.py %TEMP%\ai-db-change-analyzer-final-audit.json
+python tools/final_audit.py %TEMP%\\ai-db-change-analyzer-final-audit.json
 ```
+
+Source-review değerlendirmesi aynı sentetik corpus üzerinde mock
+sözleşme/rubrik koşusuyla yapılır; mock sonuç gerçek model kalite kabulü
+değildir. İnsan değerlendirme alanları
+`docs/GERCEK_MODEL_DEGERLENDIRME_FORMU.md` içinde tutulur.
+
+## Güvenlik ve sınırlamalar
+
+- Analyzer canlı Oracle bağlantısı kurmaz ve SQL çalıştırmaz.
+- Model girdisi kanıtlanmış, temizlenmiş analiz verisinden oluşur; ham SQL ve
+  gizli credential değerleri gönderilmez.
+- AI değerlendirmesi başarısız olsa bile deterministik bulgular korunur.
+- Statik bağımlılıklar, nesne bazlı risk rozetleri ve çalıştırılmamış deployment
+  ön kontrol planı rapora yazılabilir; bu bilgiler canlı sistemde doğrulama
+  yapıldığı anlamına gelmez.
+- Arşiv özelliği isteğe bağlıdır. `reports.archive_enabled = true` ve
+  `reports.archive_root` ile açılır; raporlar uygulama checkout’unda immutable
+  kayıt olarak tutulur.
+
+Ayrıntılı güvenlik ve işletim bilgileri için:
+
+- [`docs/GUVENLIK_KALITE_DENETIMI.md`](docs/GUVENLIK_KALITE_DENETIMI.md)
+- [`docs/CORPUS_DOGRULAMA.md`](docs/CORPUS_DOGRULAMA.md)
+- [`docs/OPERASYON.md`](docs/OPERASYON.md)
+- [`docs/DB_CHANGE_ANALYZER_KAPSAM.md`](docs/DB_CHANGE_ANALYZER_KAPSAM.md)
