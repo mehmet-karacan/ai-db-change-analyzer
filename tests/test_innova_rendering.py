@@ -218,7 +218,7 @@ def test_innova_renderer_adds_context_to_impact_and_assessment() -> None:
     )
     html = rendered.html.decode("utf-8")
 
-    assert "Bu sonuç, nesnelerin kullanılmadığını kanıtlamaz" in html
+    assert "Bu sonuç, nesnelerin kullanılmadığını kanıtlamıyor" in html
     assert "Genel risk seviyesi Orta" in html
     assert "Dağıtım öncesinde" in html
 
@@ -240,9 +240,9 @@ def test_innova_renderer_explains_limited_details_and_sequence_coverage() -> Non
     )
     html = rendered.html.decode("utf-8")
 
-    assert "yalnızca kaynak farkı doğrulanabildi; ayrıntılı etki değerlendirmesi kesinleştirilemedi" in html
+    assert "Kaynak farkı kaydedildi. Bu nesnenin olası etkisi ayrıntılı olarak doğrulanamadı." in html
     assert "Ayrıntılı ayrıştırma sınırlı." not in html
-    assert rendered_context["detail_note"] == "Toplam 7 değişikliğin tamamı listelendi; 1 sequence tek satırda toplandı."
+    assert rendered_context["detail_note"] == "Toplam 7 değişikliğin tamamı listede yer alıyor. 1 sequence değişikliği tek satırda toplandı."
     assert rendered_context["diff_rows"][-1]["tur"] == "SEQUENCE"
     assert rendered_context["detail_note"] in html
 
@@ -262,7 +262,7 @@ def test_innova_renderer_adds_space_after_red_section_rule() -> None:
     )
     html = rendered.html.decode("utf-8")
 
-    assert html.count("padding:0 0 0 22px;") == 4
+    assert html.count("padding:0 0 0 28px;") == 4
 
 
 def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:
@@ -285,7 +285,7 @@ def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:
         "tur": "SEQUENCE",
         "nesne": "51 sequence",
         "degisiklik": "İleri gitti",
-        "aciklama": "51 sequence tek satırda toplandı.",
+        "aciklama": "51 sequence değişikliği tek satırda gösteriliyor.",
     }]
 
 
@@ -304,7 +304,7 @@ def test_innova_renderer_keeps_non_start_sequence_changes_in_aggregate_row() -> 
         "tur": "SEQUENCE",
         "nesne": "1 sequence",
         "degisiklik": "Değişti",
-        "aciklama": "1 sequence tek satırda toplandı.",
+        "aciklama": "1 sequence değişikliği tek satırda gösteriliyor.",
     }]
 
 

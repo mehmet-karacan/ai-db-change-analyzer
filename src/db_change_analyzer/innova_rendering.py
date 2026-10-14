@@ -128,8 +128,9 @@ def _build_professional_summary(
         return (
             f"Bu karşılaştırmada {object_count} veritabanı nesnesinde değişiklik tespit edildi. "
             f"Değişikliklerin kapsamı: {type_summary}. "
-            f"Genel risk seviyesi {risk['label']} olarak değerlendirildi; {risk['confidence_label'].lower()}. "
-            "Bu değerlendirme yalnızca kaynak farklarına dayanır; canlı veritabanı, uygulama kullanımı "
+            f"Genel risk seviyesi {risk['label']} olarak değerlendirildi. "
+            f"Bu değerlendirmeye olan güven {risk['confidence_label'].lower()}. "
+            "İnceleme yalnızca kaynak farklarına dayanıyor. Canlı veritabanı, uygulama kullanımı "
             "ve dağıtım durumu kontrol edilmedi."
         )
     return "Bu karşılaştırmada veritabanı nesnelerinde doğrulanmış bir değişiklik tespit edilmedi. Canlı veritabanı kontrol edilmedi."
@@ -141,13 +142,14 @@ def _build_impact_commentary(impact: dict[str, Any]) -> str:
     if status == "Repository içi statik kanıt bulundu":
         return (
             f"Kaynak kodu taramasında {candidate_count} statik bağımlılık adayı bulundu. "
-            "Bunlar olası ilişkilerdir; çalışma zamanı kullanımı veya canlı etki kanıtı değildir. "
-            "İlgili uygulama akışları ayrıca doğrulanmalıdır."
+            "Bunlar olası ilişkilerdir. Çalışma zamanında gerçekten kullanıldıklarını veya canlı sistemde "
+            "etki oluşturduklarını göstermiyor. İlgili uygulama akışları ayrıca doğrulanmalı."
         )
     if status == "Repository içi statik bağımlılık kanıtı bulunmadı":
         return (
             "Kaynak kodu taramasında bu değişikliklerle ilişkili doğrulanmış bir uygulama bağımlılığı bulunmadı. "
-            "Bu sonuç, nesnelerin kullanılmadığını kanıtlamaz; yalnızca mevcut incelemede kanıt bulunmadığını gösterir."
+            "Bu sonuç, nesnelerin kullanılmadığını kanıtlamıyor. Yalnızca mevcut incelemede böyle bir bağımlılık "
+            "kanıtı bulunamadığını gösteriyor."
         )
     return (
         "Uygulama bağımlılıkları için yeterli inceleme verisi bulunmadığından etki hakkında kesin yorum yapılamıyor. "
@@ -202,7 +204,7 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         comments = [comment["text_tr"] for comment in obj.get("ai_comments", [])]
         description = comments[0] if comments else obj.get("deterministic_summary_tr", "Kaynak farkı doğrulandı.")
         if obj.get("verification") != "verified":
-            description += " Kaynak farkı kaydedildi; ayrıntılı etki değerlendirmesi kesinleştirilemedi."
+            description += " Kaynak farkı kaydedildi. Bu nesnenin olası etkisi ayrıntılı olarak doğrulanamadı."
         diff_rows.append({
             "tur": identity.get("object_type") or "Diğer",
             "nesne": ((identity.get("schema_name") + ".") if identity.get("schema_name") else "") + identity["name"],
@@ -214,7 +216,7 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
             "tur": "SEQUENCE",
             "nesne": f"{count} sequence",
             "degisiklik": f"{direction} gitti" if direction != "Diğer" else "Değişti",
-            "aciklama": f"{count} sequence tek satırda toplandı.",
+            "aciklama": f"{count} sequence değişikliği tek satırda gösteriliyor.",
         }
         for direction, count in sequence_counts.items()
         if count
@@ -231,28 +233,43 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
     possible = _build_impact_commentary(impact)
     if aggregate.get("mode") == "aggregate":
         possible_label = "Toplu model değerlendirmesi"
-        possible = aggregate.get("commentary") or "Model değerlendirmesi üretilemedi; bu rapor deterministik kaynak özetiyle sınırlıdır."
+        possible = aggregate.get("commentary") or "Model değerlendirmesi üretilemedi. Rapor deterministik kaynak özetiyle sınırlı."
     assessment = (
-        f"Genel risk seviyesi {risk['label']} olarak değerlendirildi; {risk['confidence_label'].lower()}. "
-        "Sınıflandırma kaynak farkları ve statik kurallara dayanıyor; canlı veritabanı kontrol edilmedi."
+        f"Genel risk seviyesi {risk['label']} olarak değerlendirildi. "
+        f"Bu sonuca olan güven {risk['confidence_label'].lower()}. "
+        "Sınıflandırma kaynak farkları ve statik kurallara dayanıyor. "
+        "Canlı veritabanı kontrol edilmedi."
     )
     if limited_count:
-        assessment += f" {limited_count} nesne için yalnızca kaynak farkı doğrulanabildi; ayrıntılı etki değerlendirmesi kesinleştirilemedi."
+        assessment += (
+            f" {limited_count} nesne için kaynak farkı doğrulandı. "
+            "Bu nesnelerin olası etkisi ayrıntılı olarak belirlenemedi."
+        )
     if aggregate.get("mode") == "aggregate":
         if aggregate.get("commentary"):
-            assessment += f" Nesne sayısı {aggregate['threshold']} eşiğini aştığı için model değerlendirmesi toplu olarak üretildi."
+            assessment += (
+                f" Nesne sayısı {aggregate['threshold']} eşiğini geçtiği için "
+                "model değerlendirmesi nesne bazlı değil, toplu olarak yapıldı."
+            )
         else:
-            assessment += " Nesne sayısı eşiği aşıldığı için nesne bazlı yorum üretilmedi; toplu model değerlendirmesi alınamadı."
+            assessment += (
+                " Nesne sayısı eşiği geçtiği için nesne bazlı yorum üretilemedi. "
+                "Toplu model değerlendirmesi de alınamadı."
+            )
     assessment += " Dağıtım öncesinde ilgili nesnelerin uygulama kullanımı ve bağımlılıkları doğrulanmalıdır."
     sequence_total = sum(sequence_counts.values())
     omitted_count = max(0, object_count - len(displayed_objects) - sequence_total)
     if omitted_count:
         detail_note = (
-            f"Öncelikli {len(displayed_objects)} nesne ve {sequence_total} sequence tek satırda gösteriliyor; "
-            f"{omitted_count} nesnenin ayrıntısı bu görünümde yer almıyor."
+            f"Bu görünümde öncelikli {len(displayed_objects)} nesne ile "
+            f"{sequence_total} sequence değişikliği gösteriliyor. "
+            f"{omitted_count} nesne ayrıntısı raporda yer almıyor."
         )
     elif object_count:
-        detail_note = f"Toplam {object_count} değişikliğin tamamı listelendi; {sequence_total} sequence tek satırda toplandı."
+        detail_note = (
+            f"Toplam {object_count} değişikliğin tamamı listede yer alıyor. "
+            f"{sequence_total} sequence değişikliği tek satırda toplandı."
+        )
     else:
         detail_note = "Listelenecek nesne değişikliği bulunmuyor."
     summary = _build_professional_summary(
@@ -283,7 +300,7 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "scope_name": f"{source['repository']} / {source['branch']}",
         "scope_detail": f"{view['changed_files']} dosya · {object_count} çözümlenen nesne",
         "scope_kinds": f"Karşılaştırma: {source['comparison_mode']} · Canlı veritabanı kullanılmadı",
-        "bottom_notice": "Bu rapor Git snapshot kaynaklarıyla hazırlanmıştır; canlı veritabanı doğrulaması içermez.",
+        "bottom_notice": "Bu rapor Git snapshot kaynaklarıyla hazırlanmıştır. Canlı veritabanı doğrulaması içermez.",
     }
 
 
