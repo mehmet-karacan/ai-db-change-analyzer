@@ -59,7 +59,7 @@ def test_innova_renderer_links_logo_to_official_corporate_identity_page() -> Non
     html = rendered.email_html.decode("utf-8")
 
     assert 'https://www.innova.com.tr/kurumsal-kimlik' in html
-    assert "İnnova kurumsal kimlik" in html
+    assert "İnnova kurumsal kimlik" not in html
 
 
 @pytest.mark.parametrize(
@@ -223,6 +223,48 @@ def test_innova_renderer_adds_context_to_impact_and_assessment() -> None:
     assert "Dağıtım öncesinde" in html
 
 
+def test_innova_renderer_explains_limited_details_and_sequence_coverage() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    validate_mail_view(view)
+
+    context = _context(view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(view, context)
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<coverage-note@example.test>",
+        date=datetime.now(UTC),
+    )
+    html = rendered.html.decode("utf-8")
+
+    assert "yalnızca kaynak farkı doğrulanabildi; ayrıntılı etki değerlendirmesi kesinleştirilemedi" in html
+    assert "Ayrıntılı ayrıştırma sınırlı." not in html
+    assert rendered_context["detail_note"] == "Toplam 7 değişikliğin tamamı listelendi; 1 sequence tek satırda toplandı."
+    assert rendered_context["diff_rows"][-1]["tur"] == "SEQUENCE"
+    assert rendered_context["detail_note"] in html
+
+
+def test_innova_renderer_adds_space_after_red_section_rule() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/02-no-change.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    validate_mail_view(view)
+
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<section-spacing@example.test>",
+        date=datetime.now(UTC),
+    )
+    html = rendered.html.decode("utf-8")
+
+    assert html.count("padding:0 0 0 22px;") == 4
+
+
 def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:
     view = json.loads((ROOT / "tests/fixtures/v5/03-sequence-only.view.json").read_text(encoding="utf-8"))
     sequence = view["objects"][0]
@@ -244,6 +286,25 @@ def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:
         "nesne": "51 sequence",
         "degisiklik": "İleri gitti",
         "aciklama": "51 sequence tek satırda toplandı.",
+    }]
+
+
+def test_innova_renderer_keeps_non_start_sequence_changes_in_aggregate_row() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/03-sequence-only.view.json").read_text(encoding="utf-8"))
+    sequence = view["objects"][0]
+    sequence["facts"][0]["taxonomy_id"] = "sequence.sequence_property.cache"
+    sequence["facts"][0]["subject_name"] = "CACHE"
+    sequence["facts"][0]["before"]["value"] = "20"
+    sequence["facts"][0]["after"]["value"] = "30"
+
+    context = _context(view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(view, context)
+
+    assert rendered_context["diff_rows"] == [{
+        "tur": "SEQUENCE",
+        "nesne": "1 sequence",
+        "degisiklik": "Değişti",
+        "aciklama": "1 sequence tek satırda toplandı.",
     }]
 
 

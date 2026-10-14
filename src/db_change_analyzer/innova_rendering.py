@@ -189,20 +189,20 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
     displayed_objects = non_sequence_objects[:detail_limit]
     displayed_keys = {obj["object_id"] for obj in displayed_objects}
     diff_rows: list[dict[str, str]] = []
-    sequence_counts = {"İleri": 0, "Geri": 0}
+    sequence_counts = {"İleri": 0, "Geri": 0, "Diğer": 0}
     for obj in objects:
         identity = obj["identity"]
         facts = [fact for fact in obj["facts"] if fact["change_action"] != "unchanged" or fact["context_only"]]
         sequence_direction = _sequence_start_direction(obj)
-        if sequence_direction:
-            sequence_counts[sequence_direction] += 1
+        if identity.get("object_type") == "SEQUENCE":
+            sequence_counts[sequence_direction or "Diğer"] += 1
             continue
         if obj["object_id"] not in displayed_keys:
             continue
         comments = [comment["text_tr"] for comment in obj.get("ai_comments", [])]
         description = comments[0] if comments else obj.get("deterministic_summary_tr", "Kaynak farkı doğrulandı.")
         if obj.get("verification") != "verified":
-            description += " Ayrıntılı ayrıştırma sınırlı."
+            description += " Kaynak farkı kaydedildi; ayrıntılı etki değerlendirmesi kesinleştirilemedi."
         diff_rows.append({
             "tur": identity.get("object_type") or "Diğer",
             "nesne": ((identity.get("schema_name") + ".") if identity.get("schema_name") else "") + identity["name"],
@@ -213,7 +213,7 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         {
             "tur": "SEQUENCE",
             "nesne": f"{count} sequence",
-            "degisiklik": f"{direction} gitti",
+            "degisiklik": f"{direction} gitti" if direction != "Diğer" else "Değişti",
             "aciklama": f"{count} sequence tek satırda toplandı.",
         }
         for direction, count in sequence_counts.items()
@@ -237,13 +237,24 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "Sınıflandırma kaynak farkları ve statik kurallara dayanıyor; canlı veritabanı kontrol edilmedi."
     )
     if limited_count:
-        assessment += f" {limited_count} nesnenin ayrıntılı ayrıştırması sınırlı."
+        assessment += f" {limited_count} nesne için yalnızca kaynak farkı doğrulanabildi; ayrıntılı etki değerlendirmesi kesinleştirilemedi."
     if aggregate.get("mode") == "aggregate":
         if aggregate.get("commentary"):
             assessment += f" Nesne sayısı {aggregate['threshold']} eşiğini aştığı için model değerlendirmesi toplu olarak üretildi."
         else:
             assessment += " Nesne sayısı eşiği aşıldığı için nesne bazlı yorum üretilmedi; toplu model değerlendirmesi alınamadı."
     assessment += " Dağıtım öncesinde ilgili nesnelerin uygulama kullanımı ve bağımlılıkları doğrulanmalıdır."
+    sequence_total = sum(sequence_counts.values())
+    omitted_count = max(0, object_count - len(displayed_objects) - sequence_total)
+    if omitted_count:
+        detail_note = (
+            f"Öncelikli {len(displayed_objects)} nesne ve {sequence_total} sequence tek satırda gösteriliyor; "
+            f"{omitted_count} nesnenin ayrıntısı bu görünümde yer almıyor."
+        )
+    elif object_count:
+        detail_note = f"Toplam {object_count} değişikliğin tamamı listelendi; {sequence_total} sequence tek satırda toplandı."
+    else:
+        detail_note = "Listelenecek nesne değişikliği bulunmuyor."
     summary = _build_professional_summary(
         object_count=object_count,
         object_type_counts=object_type_counts,
@@ -265,6 +276,7 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "possible": possible,
         "assessment": assessment,
         "diff_rows": diff_rows,
+        "detail_note": detail_note,
         "old_snapshot": source["base_label"],
         "new_snapshot": source["target_label"],
         "analysis_id": view["report_id"],
