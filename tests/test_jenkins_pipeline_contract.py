@@ -25,6 +25,10 @@ def test_analyzer_pipeline_is_git_only_and_sends_only_verified_artifacts() -> No
     assert "oracle-db-ddl-sync" not in JENKINSFILE
 
 
+def test_analyzer_pipeline_uses_the_standard_mail_subject() -> None:
+    assert '"GPU | AI DB Change Analyzer | ${currentBuild.currentResult ?: \'UNKNOWN\'} | Build #${env.BUILD_NUMBER}"' in JENKINSFILE
+
+
 def test_analyzer_pipeline_uses_locked_offline_runtime() -> None:
     assert "python3 -m zipfile -e" in JENKINSFILE
     assert "ANALYZER_WHEELHOUSE" in JENKINSFILE

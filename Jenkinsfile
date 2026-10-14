@@ -247,7 +247,7 @@ pipeline {
                         def consumer = load 'analyzer-src/jenkins/consume_report_artifact.groovy'
                         consumer.consumeAnalyzerReportArtifact(
                             'out',
-                            "AI DB Değişiklik Analizi | ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                            "GPU | AI DB Change Analyzer | ${currentBuild.currentResult ?: 'UNKNOWN'} | Build #${env.BUILD_NUMBER}",
                             analyzerMailRecipients
                         )
                     }
