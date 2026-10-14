@@ -43,6 +43,25 @@ def test_innova_renderer_separates_standalone_html_from_cid_email() -> None:
     assert _extract_persisted_html(rendered.mime) == rendered.email_html
 
 
+def test_innova_renderer_links_logo_to_official_corporate_identity_page() -> None:
+    view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    view["schema_version"] = "mail-view/3.0"
+    view["template_version"] = "innova-db-report/1.0"
+    validate_mail_view(view)
+
+    rendered = render_innova_view(
+        view,
+        sender="sender@example.test",
+        recipients=["recipient@example.test"],
+        message_id="<logo-link@example.test>",
+        date=datetime.now(UTC),
+    )
+    html = rendered.email_html.decode("utf-8")
+
+    assert 'https://www.innova.com.tr/kurumsal-kimlik' in html
+    assert "İnnova kurumsal kimlik" in html
+
+
 @pytest.mark.parametrize(
     ("elapsed_ms", "expected"),
     [
@@ -226,6 +245,42 @@ def test_innova_renderer_groups_sequence_start_changes_by_direction() -> None:
         "degisiklik": "İleri gitti",
         "aciklama": "51 sequence tek satırda toplandı.",
     }]
+
+
+def test_innova_renderer_keeps_non_sequence_objects_visible_with_aggregated_sequences() -> None:
+    sequence_view = json.loads((ROOT / "tests/fixtures/v5/03-sequence-only.view.json").read_text(encoding="utf-8"))
+    showcase_view = json.loads((ROOT / "tests/fixtures/v5/01-v5-showcase.view.json").read_text(encoding="utf-8"))
+    sequence = sequence_view["objects"][0]
+    table = next(item for item in showcase_view["objects"] if item["identity"]["object_type"] == "TABLE")
+
+    objects = []
+    evidence_registry = []
+    for index in range(45):
+        item = deepcopy(sequence)
+        item["object_id"] = f"obj-seq-{index:03d}"
+        item["identity"]["name"] = f"SEQ_{index:03d}"
+        item["facts"][0]["fact_id"] = f"fact-seq-{index:03d}"
+        item["facts"][0]["after"]["value"] = str(15_480 + index)
+        objects.append(item)
+        for evidence in sequence_view["evidence_registry"]:
+            copied = deepcopy(evidence)
+            copied["evidence_id"] = copied["evidence_id"].replace("ev-004", f"ev-seq-{index:03d}")
+            copied["object_id"] = item["object_id"] if copied["object_id"] else None
+            evidence_registry.append(copied)
+
+    objects.append(table)
+    evidence_registry.extend(showcase_view["evidence_registry"])
+    sequence_view["objects"] = objects
+    sequence_view["evidence_registry"] = evidence_registry
+    sequence_view["changed_files"] = 46
+
+    context = _context(sequence_view, _PROFILES[0], "")
+    rendered_context = _new_analysis_context(sequence_view, context)
+    rows = rendered_context["diff_rows"]
+
+    assert {row["tur"] for row in rows} == {"SEQUENCE", "TABLE"}
+    assert next(row for row in rows if row["tur"] == "SEQUENCE")["nesne"] == "45 sequence"
+    assert next(row for row in rows if row["tur"] == "TABLE")["nesne"] == "GPU_USER.CUSTOMER"
 
 
 def test_innova_renderer_orders_detail_rows_by_object_priority() -> None:

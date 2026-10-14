@@ -21,7 +21,10 @@ def test_jenkins_consumer_is_a_reviewable_single_emailext_fragment() -> None:
     assert "report.report_id" in source
     assert "manifest.email_html_bytes" in source
     assert "error('Analyzer artifact" in source
-    assert "def emailBody = emailHtml.replaceAll" in source
+    assert "def emailBody = emailHtml.replace('cid:innova-logo'" in source
     assert "body: emailBody" in source
     assert "&#36;" in source
+    assert "analyzer-src/src/db_change_analyzer/assets/innova-logo-approved.png" in source
+    assert "data:image/png;base64," in source
+    assert "cid:innova-logo" in source
     assert "return this" in source

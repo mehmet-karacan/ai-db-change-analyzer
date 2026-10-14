@@ -172,13 +172,22 @@ def _new_analysis_context(view: dict[str, Any], context: dict[str, Any]) -> dict
         "relocated": "Taşındı", "unknown": "Doğrulanamadı",
     }
     # The complete object inventory remains in report.json and the archive.
-    # The email uses the renderer's selected detail window so a large commit
-    # still produces a deliverable message within the configured MIME limit.
-    displayed_objects = context.get("detail_objects") or context.get("index_objects") or objects
-    displayed_keys = {
-        item.get("anchor", "").removeprefix("nesne-")
-        for item in displayed_objects
-    }
+    # Sequence changes are summarized below in one row per direction, so use
+    # the detail budget for real object rows first. This keeps a small table
+    # change visible even when a large sequence-only batch fills the source
+    # inventory.
+    selected_detail_objects = context.get("detail_objects") or context.get("index_objects") or objects
+    detail_limit = len(selected_detail_objects)
+    non_sequence_objects = sorted(
+        (obj for obj in objects if obj["identity"].get("object_type") != "SEQUENCE"),
+        key=lambda obj: (
+            _OBJECT_PRIORITY.get(obj["identity"].get("object_type", ""), 100),
+            obj["identity"].get("schema_name") or "",
+            obj["identity"].get("name") or "",
+        ),
+    )
+    displayed_objects = non_sequence_objects[:detail_limit]
+    displayed_keys = {obj["object_id"] for obj in displayed_objects}
     diff_rows: list[dict[str, str]] = []
     sequence_counts = {"İleri": 0, "Geri": 0}
     for obj in objects:

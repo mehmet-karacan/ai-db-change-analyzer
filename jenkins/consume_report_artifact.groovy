@@ -45,10 +45,24 @@ def consumeAnalyzerReportArtifact(String artifactDir, String subject, String rec
         error('Analyzer artifact email hash mismatch')
     }
 
-    // email-ext applies its own token expansion after this step. Preserve
-    // literal model/source text such as $BUILD_URL or ${JOB_NAME} while
-    // keeping the rendered mail visually unchanged.
-    def emailBody = emailHtml.replaceAll(/\$(?=\{?[A-Z][A-Z0-9_]*\}?)/, '&#36;')
+    def logoPath = 'analyzer-src/src/db_change_analyzer/assets/innova-logo-approved.png'
+    if (!fileExists(logoPath)) {
+        error('Approved email logo is missing')
+    }
+    def logoBase64 = sh(
+        script: "base64 -w 0 '${logoPath}'",
+        returnStdout: true
+    ).trim()
+    if (!logoBase64) {
+        error('Approved email logo could not be encoded')
+    }
+
+    // Jenkins email-ext receives an HTML body rather than the renderer's
+    // multipart MIME message. Replace the renderer's CID with the approved
+    // inline logo so the mail remains self-contained. Preserve literal
+    // model/source text such as $BUILD_URL or ${JOB_NAME} afterwards.
+    def emailBody = emailHtml.replace('cid:innova-logo', "data:image/png;base64,${logoBase64}")
+        .replaceAll(/\$(?=\{?[A-Z][A-Z0-9_]*\}?)/, '&#36;')
 
     emailext(
         mimeType: 'text/html; charset=UTF-8',
