@@ -6,6 +6,35 @@ Repository'deki Analyzer `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` job'ının başa
 
 Yerel güvenlik ve kalite denetimi: `docs/GUVENLIK_KALITE_DENETIMI.md`.
 
+## Kurumsal Jenkins Kullanımı
+
+Hazır `Jenkinsfile`, `gpu-db / master` snapshot'larını salt okunur olarak
+karşılaştırır ve doğrulanmış `report-email.html` artifact'ini mevcut Jenkins
+`emailext` adımıyla gönderir. Alıcı adresleri kaynak koda veya parametreye
+doğrudan yazılmaz; `ANALYZER_MAIL_CREDENTIAL_ID` parametresi bir Jenkins
+**Secret Text** credential seçer. GPU kurulumundaki varsayılan credential ID'si
+`gpu-oracle-ddl-sync-notify-to`'dur. Bu credential'ın içeriği Jenkins'te
+yönetilir ve rapor alıcı listesi olarak kullanılır.
+
+Jenkins'teki temel parametreler şunlardır:
+
+| Parametre | Kullanım |
+|---|---|
+| `ANALYZER_CONFIG` | `config/gpu.artifact.toml` gibi çalışma profili |
+| `ANALYZER_MAIL_CREDENTIAL_ID` | Rapor alıcı listesini taşıyan Secret Text credential ID'si |
+| `ANALYZER_MANUAL_BASE_SHA` / `ANALYZER_MANUAL_TARGET_SHA` | Sabit iki revision arasında kontrollü manuel analiz |
+
+On veya daha az değişen nesnede nesne bazlı AI incelemesi yapılır. Nesne sayısı
+onu aştığında deterministik karşılaştırma aynen korunur; model yalnızca tek bir
+toplu değerlendirme çağrısı alır. Bu sınır `analysis.max_objects_for_individual_ai_review`
+ile açıkça tanımlıdır. Kullanıcıya gösterilen model etiketi `Qwen3.8 27B-IT`,
+endpoint route'u ise yalnız config içinde tutulur.
+
+Mimari diyagramın düzenlenebilir ve görsel kaynakları:
+[`docs/architecture.excalidraw`](docs/architecture.excalidraw),
+[`docs/architecture.json`](docs/architecture.json) ve
+[`docs/architecture.png`](docs/architecture.png).
+
 Geliştirme kurulumu:
 
 ```text
