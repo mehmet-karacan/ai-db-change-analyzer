@@ -59,4 +59,4 @@ dosya raporda `limited` olarak görünür.
 
 ## Exit özeti
 
-0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Analyzer `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` sonrasında yalnız commit geçmişini analiz eder; doğrulanmış `ARTIFACT_READY` çıktısını arşivler ve mevcut `emailext` mekanizmasıyla `mkaracan@innova.com.tr` adresine gönderir. İş kuralları ve state/teslimat kararı CLI'da kalır.
+0 başarı/bakım, 10 bildirilmiş limited, 11 pending veya review-required, 20 config/izin, 21 Git, 22 history, 23 state/lock, 30 model transport/auth, 31 model response, 40 SMTP failure/held, 41 SMTP unknown, 50 safety, 90 internal hatadır. Analyzer `Jenkinsfile`, `10-ORACLE_DB_DDL_SYNC` sonrasında yalnız commit geçmişini analiz eder; doğrulanmış `ARTIFACT_READY` çıktısını arşivler ve `ANALYZER_MAIL_CREDENTIAL_ID` ile seçilen Jenkins Secret Text credential içindeki alıcılara, varsayılan olarak `gpu-oracle-ddl-sync-notify-to` credential'ına gönderir. İş kuralları ve state/teslimat kararı CLI'da kalır.

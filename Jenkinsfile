@@ -3,10 +3,10 @@
 // This job is downstream of the Oracle DDL sync job. The analyzer reads only
 // the committed gpu-db Git history; it never connects to Oracle. Jenkins
 // archives the verified artifact bundle and sends the verified HTML report to
-// the approved recipient through the existing emailext mechanism.
+// the recipient list stored in the standard Jenkins Secret Text credential.
 
 def analyzerUpstream = 'sky/GPU/GPU-FUSION/10-ORACLE_DB_DDL_SYNC'
-def analyzerMailRecipients = 'mkaracan@innova.com.tr'
+def analyzerMailCredentialId = (params.ANALYZER_MAIL_CREDENTIAL_ID ?: 'gpu-oracle-ddl-sync-notify-to').trim()
 // Declarative parameters are materialized after the first Jenkins run. Keep
 // the first run usable as well so it can install the job parameters/trigger.
 def requestedAnalyzerConfig = (params.ANALYZER_CONFIG ?: '').trim()
@@ -68,6 +68,13 @@ pipeline {
             name: 'ANALYZER_MANUAL_TARGET_SHA',
             defaultValue: '',
             description: 'Opsiyonel manuel test aralığı hedef SHA değeri. Base ile birlikte verilirse mail üreten manuel analiz çalışır.'
+        )
+        credentials(
+            name: 'ANALYZER_MAIL_CREDENTIAL_ID',
+            defaultValue: 'gpu-oracle-ddl-sync-notify-to',
+            description: 'Rapor alıcı listesini taşıyan Jenkins Secret Text credential ID.',
+            credentialType: 'org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl',
+            required: true
         )
         credentials(
             name: 'ANALYZER_GIT_CREDENTIAL_ID',
@@ -245,11 +252,13 @@ pipeline {
                     def result = readJSON file: 'out/result.json'
                     if (result.outcome in ['ARTIFACT_READY', 'MANUAL_COMPLETE']) {
                         def consumer = load 'analyzer-src/jenkins/consume_report_artifact.groovy'
-                        consumer.consumeAnalyzerReportArtifact(
-                            'out',
-                            "GPU | AI DB Change Analyzer | ${currentBuild.currentResult ?: 'UNKNOWN'} | Build #${env.BUILD_NUMBER}",
-                            analyzerMailRecipients
-                        )
+                        withCredentials([string(credentialsId: analyzerMailCredentialId, variable: 'ANALYZER_MAIL_RECIPIENTS')]) {
+                            consumer.consumeAnalyzerReportArtifact(
+                                'out',
+                                "GPU | AI DB Change Analyzer | ${currentBuild.currentResult ?: 'UNKNOWN'} | Build #${env.BUILD_NUMBER}",
+                                env.ANALYZER_MAIL_RECIPIENTS
+                            )
+                        }
                     }
                 }
             }

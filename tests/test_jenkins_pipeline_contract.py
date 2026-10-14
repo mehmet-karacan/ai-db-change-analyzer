@@ -20,7 +20,12 @@ def test_analyzer_pipeline_is_git_only_and_sends_only_verified_artifacts() -> No
     assert "run --allow-mail" not in JENKINSFILE
     assert "consume_report_artifact.groovy" in JENKINSFILE
     assert "result.outcome in ['ARTIFACT_READY', 'MANUAL_COMPLETE']" in JENKINSFILE
-    assert "mkaracan@innova.com.tr" in JENKINSFILE
+    assert "name: 'ANALYZER_MAIL_CREDENTIAL_ID'" in JENKINSFILE
+    assert "defaultValue: 'gpu-oracle-ddl-sync-notify-to'" in JENKINSFILE
+    assert "params.ANALYZER_MAIL_CREDENTIAL_ID" in JENKINSFILE
+    assert "withCredentials([string(credentialsId: analyzerMailCredentialId, variable: 'ANALYZER_MAIL_RECIPIENTS')])" in JENKINSFILE
+    assert "name: 'ANALYZER_MAIL_RECIPIENTS'" not in JENKINSFILE
+    assert "mkaracan@innova.com.tr" not in JENKINSFILE
     assert "ORACLE_DSN" not in JENKINSFILE
     assert "oracle-db-ddl-sync" not in JENKINSFILE
 

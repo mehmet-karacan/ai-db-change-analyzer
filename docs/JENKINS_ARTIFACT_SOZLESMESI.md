@@ -2,7 +2,9 @@
 
 Analyzer Jenkins üzerinde doğrulanmış artifact üretir. Repository'deki Analyzer
 Jenkinsfile, artifact doğrulamasından sonra mevcut `emailext` mekanizmasını
-`mkaracan@innova.com.tr` alıcısıyla çağırır. Yeni renderer etkin olduğunda
+`ANALYZER_MAIL_CREDENTIAL_ID` ile seçilen Jenkins Secret Text credential içindeki
+alıcılarla çağırır. Parametrenin varsayılan credential ID'si
+`gpu-oracle-ddl-sync-notify-to` değeridir. Yeni renderer etkin olduğunda
 `--emit-dir` altında aşağıdaki dosyalar oluşur:
 
 Artifact profili için örnek yapılandırma `config/gpu.artifact.example.toml` dosyasıdır.

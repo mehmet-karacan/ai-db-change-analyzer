@@ -61,7 +61,10 @@ def build_audit() -> dict[str, Any]:
                 "archiveArtifacts",
                 "artifacts: 'out/**'",
                 "consume_report_artifact.groovy",
-                "mkaracan@innova.com.tr",
+                "name: 'ANALYZER_MAIL_CREDENTIAL_ID'",
+                "defaultValue: 'gpu-oracle-ddl-sync-notify-to'",
+                "params.ANALYZER_MAIL_CREDENTIAL_ID",
+                "withCredentials([string(credentialsId: analyzerMailCredentialId, variable: 'ANALYZER_MAIL_RECIPIENTS')])",
             )
         ) and "run --allow-mail" not in jenkinsfile and "ORACLE_DSN" not in jenkinsfile,
         "consumer_has_single_emailext": consumer.count("emailext(") == 1,
